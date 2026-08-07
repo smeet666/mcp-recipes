@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mcp-recipes",
   "display_name": "Recipes",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server that asks Marmiton and the Wikibooks Cookbook at once, merges the answers, and scales quantities in French and English. No API key required.",
   "long_description": "Ask one question and two kitchens answer: Marmiton in French and the Wikibooks Cookbook in English. Search both at once and get one merged list, read either recipe in full, rescale it to any number of people, and put the same dish side by side as each tradition writes it.\n\nThe scaling is what this server exists for. Quantities land where a cook can follow them: an egg and a sealed sachet stay whole, a clove halves, a spoonful shrinks into the smaller spoon before it is rounded, and a pinch keeps whatever size a hand gives it while its count is multiplied. One list can hold French lines and English lines at once, and each comes back written the way its own language writes numbers, plurals and measures.\n\nNothing is converted between measuring systems, no rating is compared across sites, and a site that fails is named as a site that failed rather than folded into an answer as silence.",
   "author": {

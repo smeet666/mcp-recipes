@@ -66,6 +66,29 @@ const SITE_URL = /^https?:\/\/(?:www\.)?marmiton\.org\//i;
 /** The shape Marmiton mints: digits and nothing else. */
 const REFERENCE = /^\d+$/;
 
+/**
+ * Ask Marmiton, and read the answer it gives to a wording it matches nothing
+ * for.
+ *
+ * Marmiton serves a 404 on the results page when no recipe matches, which is
+ * the site stating an absence. Handed on as a failure it would put "Marmiton
+ * did not answer" in front of a reader for a search Marmiton answered, and
+ * leave the corpus unspoken for. Every other failure stays a failure, so a site
+ * that is unreachable is never read as a site that holds nothing.
+ */
+async function readSearch(
+  reader: MarmitonReader,
+  query: string,
+): Promise<{ data: MarmitonSummary[]; cached: boolean }> {
+  try {
+    return await reader.search(query);
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "not_found") return { data: [], cached: false };
+    throw error;
+  }
+}
+
 export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
   return {
     ...MARMITON_PROFILE,
@@ -85,7 +108,7 @@ export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
     },
 
     async search(query: string): Promise<ReadRows> {
-      const outcome = await reader.search(query);
+      const outcome = await readSearch(reader, query);
       const list = rowsOf<Partial<MarmitonSummary>>(outcome.data, MARMITON_PROFILE);
       const rows = [];
       let skipped = 0;
@@ -166,7 +189,8 @@ export function marmitonDetail(payload: unknown): RecipeDetail {
     totalMinutes: count(recipe.totalMinutes),
     category: text(recipe.category),
     author: text(recipe.author),
-    rating: value === null ? null : { value, count: count(rating?.count), max: count(rating?.best) },
+    rating:
+      value === null ? null : { value, count: count(rating?.count), max: count(rating?.best) },
     nutrition: publishedFigures(recipe.nutrition),
     equipment: [],
     tips: [],

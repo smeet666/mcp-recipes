@@ -1015,6 +1015,10 @@ const HELD_BACK_NOTE: Record<HeldBack, string> = {
   sizeQualifier:
     "The figures here give the size of one item rather than how many, so the line is " +
     "left as published.",
+  itemSize:
+    "The measure standing behind the item gives the size of one of them rather than how many, " +
+    "so the line is left as published. Serving more people is a matter of taking a bigger one, " +
+    "and serving fewer a smaller one.",
   perPerson:
     "This line already states an amount for one person, and the factor is what changes " +
     "how many people the recipe serves, so the line is left as published.",

@@ -71,6 +71,30 @@ export type SearchRecipesArgs = z.infer<typeof searchRecipesInput>;
  */
 const WORDS_BEFORE_SAYING_SO = 4;
 
+/**
+ * Whether a row's title carries a word of the query.
+ *
+ * Accents and punctuation are folded away, so "crêpes" reads the same as
+ * "crepes" and a namespace in front of a page name settles nothing. Words of
+ * two letters are ignored, since an article says nothing about the subject.
+ */
+function titleCarries(title: string, query: string): boolean {
+  const fold = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/œ/g, "oe")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ");
+
+  const haystack = ` ${fold(title)} `;
+  const words = fold(query)
+    .split(" ")
+    .filter((word) => word.length > 2);
+  if (words.length === 0) return true;
+  return words.some((word) => haystack.includes(` ${word}`));
+}
+
 export async function runSearchRecipes(
   client: RecipesClient,
   args: SearchRecipesArgs,
@@ -107,6 +131,16 @@ export async function runSearchRecipes(
         "This query went to each source as free text and no filter was applied to it. Words like " +
           "'vegan' or 'under 300 calories' help only where a source's own index happens to match " +
           "them, so read the rows rather than assuming they meet every condition.",
+      );
+    }
+
+    // A source ranking a title on the letters it opens with answers "chameau"
+    // with a chapeau and three châteaux. The rows are what the sources offered,
+    // and a reader shown them without a word about it takes them for the dish.
+    if (results.length > 0 && !results.some((row) => titleCarries(row.title, args.query))) {
+      notes.push(
+        `No title here carries a word of "${args.query}". These rows are what the sources ranked ` +
+          "for that spelling, so read them as candidates to check rather than as recipes for the dish.",
       );
     }
 

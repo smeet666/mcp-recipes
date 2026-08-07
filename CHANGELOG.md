@@ -4,6 +4,37 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-07
+
+### Changed
+
+- A mass stated behind the thing counted is read as the size of one of them.
+  "1 dinde de 3 kg" names one bird and says what it weighs, and multiplying the
+  count answered a dinner for twelve with a bird and a half. Lines of that shape
+  come back as the page published them, with a note saying the figure gives a
+  size and that more people means a bigger bird. A container keeps counting:
+  "2 boîtes de 400 g de tomates" states what one boîte holds and goes on to name
+  what is in it, and an equivalence such as "450 g (1 livre) de spaghetti"
+  restates one quantity twice and is scaled on both sides.
+
+- A comparison tells apart the two moments a source can fail in. Searching and
+  then opening the version a search offered are two different readings, and a
+  source missing from a comparison was described as one whose search did not
+  answer whichever of the two had happened. Every row of `per_source` now
+  carries a `read` field saying what became of the version that source offered,
+  and the notes name the moment that failed.
+
+- A search Marmiton answers with nothing is counted as an answer. Marmiton
+  serves a 404 on its results page when no recipe matches, and reading that as a
+  failed source put "Marmiton did not answer" in front of a reader for a search
+  Marmiton had answered. Every other failure stays a failure, so a site that
+  cannot be reached is never read as a site that holds nothing.
+
+- A list of results carrying none of the words asked for says so. A source
+  ranking a title on the letters it opens with answers "chameau farci" with a
+  chapeau and a gâteau château. When no title returned carries a word of the
+  query, the answer names that, and the rows read as candidates to check.
+
 ## [1.1.0] - 2026-08-07
 
 ### Changed

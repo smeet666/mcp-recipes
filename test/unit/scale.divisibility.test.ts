@@ -229,3 +229,21 @@ describe("what the criterion already settled stays settled", () => {
     expect(scale("1 onion", 0.25).amount).toBe(0.25);
   });
 });
+
+describe("a feuille, whichever leaf it names", () => {
+  it("splits a feuille de laurier in two, as a pair of scissors does", () => {
+    expect(scaleIngredient("1 feuille de laurier", { factor: 1.5 }).text).toBe(
+      "1 1/2 feuille de laurier",
+    );
+  });
+
+  it("splits a feuille de gélatine the same way", () => {
+    expect(scaleIngredient("1 feuille de gélatine", { factor: 1.5 }).text).toBe(
+      "1 1/2 feuille de gélatine",
+    );
+  });
+
+  it("splits a bay leaf in two, in English", () => {
+    expect(scaleIngredient("1 bay leaf", { factor: 1.5 }).text).toBe("1 1/2 bay leaves");
+  });
+});

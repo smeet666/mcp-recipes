@@ -170,7 +170,10 @@ describe("get_recipe", () => {
 
   it("keeps only the nutrition figures the page published", async () => {
     const payload = payloadOf<{ recipe: { nutrition: Record<string, string> } }>(
-      await runGetRecipe(fakeClient(), recipeArgs({ id: "marmiton:1001", sections: ["nutrition"] })),
+      await runGetRecipe(
+        fakeClient(),
+        recipeArgs({ id: "marmiton:1001", sections: ["nutrition"] }),
+      ),
     );
     expect(payload.recipe.nutrition).toEqual({ calories: "320 kcal", servingSize: "1 crêpe" });
     expect(Object.keys(payload.recipe.nutrition)).not.toContain("protein");
@@ -258,7 +261,6 @@ describe("scale_ingredients", () => {
 });
 
 describe("compare_recipes", () => {
-
   it("shows one version from each source", async () => {
     const payload = payloadOf<{ versions: Array<{ source: string }> }>(
       await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes" })),
@@ -299,7 +301,8 @@ describe("compare_recipes", () => {
 
     expect(payload.versions).toHaveLength(1);
     expect(textOf(result)).toMatch(/This is one version rather than a comparison/);
-    expect(textOf(result)).toMatch(/not because it holds nothing/);
+    expect(textOf(result)).toMatch(/its search did not answer/);
+    expect(textOf(result)).toMatch(/Nothing here is evidence about what it holds/);
   });
 
   it("tells a source holding nothing apart from one that failed", async () => {
@@ -311,7 +314,10 @@ describe("compare_recipes", () => {
   });
 
   it("names which version each note is about", async () => {
-    const result = await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes", servings: 8 }));
+    const result = await runCompareRecipes(
+      fakeClient(),
+      compareArgs({ dish: "crepes", servings: 8 }),
+    );
     expect(textOf(result)).toMatch(/Note: Marmiton: /);
   });
 });

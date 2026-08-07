@@ -1,6 +1,6 @@
 {
   "name": "mcp-recipes",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server that asks Marmiton and the Wikibooks Cookbook at once, merges the answers, and scales quantities in French and English. No API key required.",
   "keywords": [
     "mcp",
@@ -65,8 +65,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "mcp-marmiton": "^1.5.0",
-    "mcp-wikibooks-cookbook": "^1.0.0",
+    "mcp-marmiton": "^1.8.0",
+    "mcp-wikibooks-cookbook": "^1.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

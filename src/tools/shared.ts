@@ -72,6 +72,17 @@ export const reportSchema = z.object({
     })
     .nullable()
     .describe("Why this source did not answer. Null when it did."),
+  read: z
+    .object({
+      status: z.enum(["read", "failed"]),
+      error: z
+        .object({ code: z.string(), message: z.string(), hint: z.string().optional() })
+        .nullable(),
+    })
+    .nullable()
+    .describe(
+      "What became of the row this source offered, once it was opened. Null when no row was opened, which is what a search that did not answer and a search holding nothing both come to. A search and a read are two moments, and this is the second one.",
+    ),
 });
 
 /** One ingredient line, scaled, in the shape every source is read into. */
@@ -137,7 +148,18 @@ export function toReportPayload(report: SourceReport): z.infer<typeof reportSche
     skipped: report.skipped,
     cached: report.cached,
     error: report.error ?? null,
+    // A search alone opens nothing, so only a tool that reads a row fills this
+    // in, through `withRead`.
+    read: null,
   };
+}
+
+/** What became of the row a source offered, added to that source's report. */
+export function withRead(
+  payload: z.infer<typeof reportSchema>,
+  read: z.infer<typeof reportSchema>["read"],
+): z.infer<typeof reportSchema> {
+  return { ...payload, read };
 }
 
 /**

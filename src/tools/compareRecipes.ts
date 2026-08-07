@@ -24,6 +24,7 @@ import {
   reportSchema,
   toReportPayload,
   toToolError,
+  withRead,
 } from "./shared.js";
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
@@ -184,16 +185,22 @@ export async function runCompareRecipes(
 
     const recipes: RecipeDetail[] = [];
     /** Sources whose row was found and whose page then could not be read. */
-    const unread = new Map<SourceId, string>();
+    const unread = new Map<SourceId, { code: string; message: string }>();
+    /** Sources whose row was opened, whichever way that went. */
+    const opened = new Set<SourceId>();
 
     reads.forEach((read, index) => {
       const source = offered[index]![0];
+      opened.add(source);
       if (read.status === "fulfilled") {
         recipes.push(read.value.recipe);
         return;
       }
       const reason = read.reason as { code?: string; message?: string } | undefined;
-      unread.set(source, `${reason?.code ?? "network_error"}: ${reason?.message ?? "unknown"}`);
+      unread.set(source, {
+        code: reason?.code ?? "network_error",
+        message: reason?.message ?? "unknown",
+      });
     });
 
     const views = recipes.map((recipe) =>
@@ -229,11 +236,15 @@ export async function runCompareRecipes(
       const failedRead = unread.get(report.source);
       if (report.status === "failed") {
         notes.push(
-          `${report.name} is missing from this comparison because its search did not answer, not because it holds nothing.`,
+          `${report.name} is missing from this comparison because its search did not answer (${quoteForeign(
+            `${report.error?.code ?? "unknown"}: ${report.error?.message ?? "unknown"}`,
+          )}). Nothing here is evidence about what it holds.`,
         );
       } else if (failedRead) {
         notes.push(
-          `${report.name} offered a recipe and it could not be read (${quoteForeign(failedRead)}), so its version is missing rather than absent.`,
+          `${report.name}'s search answered and offered a version, and that version could not be read (${quoteForeign(
+            `${failedRead.code}: ${failedRead.message}`,
+          )}). The failure is in the reading, so nothing here says whether ${report.name} holds this dish.`,
         );
       } else {
         notes.push(
@@ -324,7 +335,19 @@ export async function runCompareRecipes(
         dish: args.dish,
         versions: payloads,
         differences,
-        per_source: merged.reports.map(toReportPayload),
+        // Two moments per source, told apart: whether the search answered, and
+        // what became of the row it offered.
+        per_source: merged.reports.map((report) => {
+          const payload = toReportPayload(report);
+          if (!opened.has(report.source)) return payload;
+          const failedRead = unread.get(report.source);
+          return withRead(
+            payload,
+            failedRead
+              ? { status: "failed", error: { code: failedRead.code, message: failedRead.message } }
+              : { status: "read", error: null },
+          );
+        }),
         notes,
       },
       summary,
