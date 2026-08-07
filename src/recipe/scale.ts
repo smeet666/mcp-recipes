@@ -19,7 +19,7 @@
 
 import type { Language, LanguageChoice } from "./language.js";
 import { formatAmount, parseIngredient } from "./quantity.js";
-import type { Measure, ParsedIngredient } from "./quantity.js";
+import type { HeldBack, Measure, ParsedIngredient } from "./quantity.js";
 import type { Divisibility, UnitInfo } from "./units.js";
 import {
   QUARTERED_MEASURE,
@@ -294,7 +294,11 @@ function scaleMeasure(
   const inUnit = (target: UnitInfo, ratio: number): ScaledMeasure => ({
     bounds: raws.map((raw, index) => {
       const exact = raw * ratio;
-      const rounded = roundMeasured(exact);
+      // The rounding happens in the smaller of the two units, so moving to a
+      // bigger one never throws away precision the page wrote: 1666 g rounded
+      // as kilos is 1.7, and rounded as grams it is the 1.665 kg a scale shows.
+      const rounded =
+        ratio < 1 ? Number((roundMeasured(raw) * ratio).toPrecision(12)) : roundMeasured(exact);
       // At the bottom of a ladder, keep what precision is left rather than
       // deleting the ingredient.
       const usable = rounded === 0 && exact > 0 ? Number(exact.toPrecision(2)) : rounded;
@@ -366,7 +370,7 @@ const PORTION_SIZED_ITEM = new RegExp(
   "\\b(?:" +
     "shrimps?|prawns?|langoustines?|mussels?|hazelnuts?|peppercorns?|junipers?|grains?|anise" +
     // The same foods, as a French line names them.
-    "|crevettes?|gambas|moules?|noisettes?|genièvres?|genievres?|anis" +
+    "|crevettes?|gambas|moules?|noisettes?|genievres?|genevriers?|badianes?|anis" +
     ")\\b",
   "iu",
 );
@@ -443,10 +447,11 @@ const HALVED_CUT =
  * How far a "clove" divides, when a line counts one.
  *
  * The word names two foods that answer the question in opposite ways. A clove
- * of garlic is a wedge broken off a bulb, the gousse d'ail, and a quarter of
- * one is what a knife scrapes into a pan. A clove on its own is the dried
- * flower bud, the clou de girofle, dropped into the pot and fished back out of
- * it: nothing about it is measured, so there is no share of one to take.
+ * of garlic is a wedge broken off a bulb, the gousse d'ail, and the share of
+ * one a recipe asks for is the half a knife makes of it. A clove on its own is
+ * the dried flower bud, the clou de girofle, dropped into the pot and fished
+ * back out of it: nothing about it is measured, so there is no share of one to
+ * take.
  *
  * Garlic named in the line is what separates the two, and that is how the great
  * majority of lines writing the word say which food they mean. The French words
@@ -460,7 +465,7 @@ const HALVED_CUT =
 function cloveDivisibility(unit: UnitInfo | null, item: string): Divisibility | null {
   const counted = unit ? unit.canonical === "clove" : /\bcloves?\b/i.test(item);
   if (!counted) return null;
-  return /\bgarlic\b/i.test(item) ? "quarter" : "whole";
+  return /\bgarlic\b/i.test(item) ? "half" : "whole";
 }
 
 /**
@@ -487,18 +492,36 @@ function blancDivisibility(item: string): Divisibility | null {
   return BLANC_OF_EGG.test(item) ? "whole" : "half";
 }
 
+/**
+ * Accents removed and the ligature spelled out, so "échalote" and "echalote"
+ * hit one entry.
+ *
+ * A word boundary sits between an ASCII letter and a non-letter and nowhere
+ * else, so a pattern opening on "é" never matches at the start of a word:
+ * folding the item is what lets the lists below be written once, in plain
+ * letters.
+ */
+function foldItem(item: string): string {
+  return item
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0153/g, "oe")
+    .replace(/\u0152/g, "OE");
+}
+
 function divisibilityOf(unit: UnitInfo | null, item: string): Divisibility {
-  const clove = cloveDivisibility(unit, item);
+  const key = foldItem(item);
+  const clove = cloveDivisibility(unit, key);
   if (clove) return clove;
   if (unit && !countsBarePieces(unit)) return unitDivisibility(unit);
-  const blanc = blancDivisibility(item);
+  const blanc = blancDivisibility(key);
   if (blanc) return blanc;
-  if (WHOLE_ITEM.test(item)) return "whole";
-  if (PORTION_SIZED_ITEM.test(item)) return "whole";
-  if (HALVED_ITEM.test(item)) return "half";
-  if (HALVED_CUT.test(item)) return "half";
-  if (QUARTERED_MEASURE.test(item)) return "quarter";
-  return QUARTERED_ITEM.test(item) ? "quarter" : "half";
+  if (WHOLE_ITEM.test(key)) return "whole";
+  if (PORTION_SIZED_ITEM.test(key)) return "whole";
+  if (HALVED_ITEM.test(key)) return "half";
+  if (HALVED_CUT.test(key)) return "half";
+  if (QUARTERED_MEASURE.test(key)) return "quarter";
+  return QUARTERED_ITEM.test(key) ? "quarter" : "half";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -725,6 +748,8 @@ const AGREEABLE_ADJECTIVES = new Set([
   "petite",
   "grand",
   "grande",
+  "gros",
+  "grosse",
   "mur",
   "mure",
   "vert",
@@ -818,6 +843,28 @@ function agreeInFrench(item: string, amount: number): string {
   }
 
   return words.join(" ");
+}
+
+/**
+ * Agree the adjective a line put in front of its measure, as in the "grosse" of
+ * "1 grosse pincée".
+ *
+ * The word qualifies the measure, so in French it takes the number the measure
+ * takes: "2 grosses pincées". English adjectives do not decline, and a French
+ * word outside the declinable list stays as the recipe wrote it, for the same
+ * reason it does after the noun.
+ */
+function agreeLeadingAdjective(word: string, amount: number, language: Language): string {
+  if (language === "en") return word;
+
+  const wantsPlural = amount >= 2;
+  const folded = foldWord(word);
+  const isPlural = folded.endsWith("s") && !AGREEABLE_ADJECTIVES.has(folded);
+  const singular = isPlural ? word.slice(0, -1) : word;
+
+  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) return word;
+  if (wantsPlural === isPlural) return word;
+  return wantsPlural ? `${singular}s` : singular;
 }
 
 function agreeWithAmount(item: string, amount: number, language: Language): string {
@@ -963,12 +1010,25 @@ function scaleAlternative(
   return { text: scaleIngredient(tail, options).text, rewritten: true };
 }
 
+/** Why a line showing a figure came back as the page published it. */
+const HELD_BACK_NOTE: Record<HeldBack, string> = {
+  sizeQualifier:
+    "The figures here give the size of one item rather than how many, so the line is " +
+    "left as published.",
+  perPerson:
+    "This line already states an amount for one person, and the factor is what changes " +
+    "how many people the recipe serves, so the line is left as published.",
+  ambiguousDecimal:
+    "The comma in this number marks thousands in one convention and the decimal point in " +
+    "another, and the line gives no sign which was meant, so it is left as published.",
+};
+
 function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient {
   const { factor } = options;
   const parsed = parseIngredient(line, options.language ?? "auto");
   const language = parsed.language;
 
-  if (parsed.amount === null) {
+  if (parsed.amount === null || parsed.heldBack) {
     return {
       text: parsed.original,
       original: parsed.original,
@@ -977,7 +1037,9 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
       amountMax: null,
       unit: null,
       language,
-      note: "No quantity given; adjust to taste.",
+      note: parsed.heldBack
+        ? HELD_BACK_NOTE[parsed.heldBack]
+        : "No quantity given; adjust to taste.",
     };
   }
 
@@ -1014,7 +1076,13 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   // so the line reads as the count of the thing itself and the marker has
   // nothing to say in it.
   const named = unit && !countsBarePieces(unit) ? unit : null;
-  const unitLabel = named ? ` ${formatUnit(named, shown, language)}` : "";
+  // The size word the page put in front of its measure goes back in front of
+  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
+  const adjective =
+    named && parsed.measureAdjective
+      ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
+      : "";
+  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
   const alternateTexts = alternates.map((entry) => entry.text);
   // Equivalents go back the way the line offered them: inside brackets, or
   // after a slash beside the amount they restate.
@@ -1031,7 +1099,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   const itemLabel = named ? joinItem(parsed.item, language) : counted ? ` ${counted}` : "";
 
   const result: ScaledIngredient = {
-    text: `${amountText}${unitLabel}${altLabel}${itemLabel}`.trim(),
+    text: `${parsed.approximation ?? ""}${amountText}${unitLabel}${altLabel}${itemLabel}`.trim(),
     original: parsed.original,
     scaling: movedPrimary || movedAlternate || restated ? "rounded" : "scaled",
     amount: low.amount,
@@ -1112,6 +1180,14 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   if (unit?.kind === "measured" && low.amount > 0 && low.amount < 0.05) {
     sentences.push(
       "This is smaller than a kitchen scale resolves. Make a larger batch, or measure it by eye.",
+    );
+  }
+
+  // The page put the amount forward as loose, and multiplying it keeps it that
+  // way: the answer is as approximate as the figure it came from.
+  if (parsed.approximation) {
+    sentences.push(
+      "The page gave this amount as an approximation, and the scaled figure is no firmer.",
     );
   }
 
@@ -1209,16 +1285,18 @@ export function passthroughIngredient(
 ): ScaledIngredient {
   const parsed = parseIngredient(line, language);
 
+  const held = parsed.amount === null || parsed.heldBack !== null;
   const result: ScaledIngredient = {
     text: parsed.original,
     original: parsed.original,
-    scaling: parsed.amount === null ? "unscaled" : "scaled",
-    amount: parsed.amount,
-    amountMax: parsed.amountMax,
-    unit: parsed.unit?.canonical ?? null,
+    scaling: held ? "unscaled" : "scaled",
+    amount: held ? null : parsed.amount,
+    amountMax: held ? null : parsed.amountMax,
+    unit: held ? null : (parsed.unit?.canonical ?? null),
     language: parsed.language,
   };
-  if (parsed.amount === null) result.note = "No quantity given; adjust to taste.";
+  if (parsed.heldBack) result.note = HELD_BACK_NOTE[parsed.heldBack];
+  else if (parsed.amount === null) result.note = "No quantity given; adjust to taste.";
   else if (parsed.unit?.kind === "approximate") {
     result.note = withApproximateNote(parsed.unit, undefined);
   }

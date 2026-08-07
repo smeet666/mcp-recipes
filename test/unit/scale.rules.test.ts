@@ -100,9 +100,11 @@ describe("an approximate measure carries a count and keeps its size", () => {
     expect(scale("a jarful of honey", 3).text).toBe("3 jarfuls honey");
   });
 
-  it("never drops below half of one of them", () => {
-    // Half a pinch is nearer the truth than a whole one rounded up.
-    expect(scale("2 pinches of salt", 0.1).amount).toBe(0.5);
+  it("lands the count on a whole one of them", () => {
+    // There is no half of a hand: the size of one pinch is the cook's, so the
+    // count is the whole of what the measure can say, and the line reports that
+    // it moved.
+    expect(scale("2 pinches of salt", 0.1)).toMatchObject({ amount: 1, scaling: "rounded" });
   });
 });
 

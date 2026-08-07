@@ -4,9 +4,43 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-08-07
 
 ### Changed
+
+- The three readings a comma can take are now told apart. English groups
+  thousands with it and French marks the decimal, so "1,500 g flour" is fifteen
+  hundred grams and "1,500 kg de farine" is a kilo and a half. Where a line
+  gives no sign which language it is in, both readings stand and they differ by
+  a factor of a thousand, so the line comes back as published and says why
+  rather than under a guess.
+
+- A figure that was never a count is no longer multiplied. "4 to 5-pound
+  boneless pork loin roast" describes one roast and was doubled into eight to
+  ten of them, and an amount stated "par personne" or "per person" already
+  carries the change the factor asks for. Both come back as the page published
+  them, with a note saying which of the two it is.
+
+- The quantity behind the word that hid it is read. "~1 cup water", "about 6
+  medium lemons" and "environ 6 citrons" carried an amount that was answered as
+  if the line had none, and "1 grosse pincée de sel" lost the pincée, and with it
+  the fact that a pincée is held to no better than the hand. Both now read
+  through to the figure and the measure, and put the word and the sign back
+  where the page had them.
+
+- HTML entities are decoded, brackets a page left empty are dropped, "recipe"
+  naming another dish takes its plural on the count, and "livre" is read as the
+  pound a French page glosses a weight with.
+
+- An approximate measure lands its count on a whole one. There is no half of a
+  hand: the size of one pincée is the cook's and the count is the whole of what
+  the measure can say, so "1 pincée de sel" halved keeps the pincée and the line
+  reports that it moved, where it answered "1/2 pincée" and called the
+  arithmetic exact.
+
+- A gousse d'ail and a clove of garlic stop at the half rather than the quarter,
+  as the person who cooks these recipes has them, and a baie de genévrier and
+  une étoile de badiane are counted whole.
 
 - How finely a counted thing divides now follows the size of one of them against
   what a recipe puts in, and two families come out of that one comparison. Each
@@ -50,11 +84,9 @@ All notable changes to this project are documented here. The format follows
   Each holds enough that a quarter is still a portion someone serves, so the
   answer is now `1/4 pot de crème fraîche`, exact. The word is read wherever it
   stands, so `1 petit pot de crème` gets the same floor.
-- Une gousse, une tranche and a slice divide as far as the quarter. Each is
-  already cut off something larger, and the board that produced one takes a
-  corner off it in the same gesture, so `1 gousse d'ail` reduced to a quarter
-  comes back as `1/4 gousse d'ail` where it came back as a half, and
-  `4 gousses d'ail` reads `1 gousse d'ail`.
+- Une tranche and a slice divide as far as the quarter. Each is already cut off
+  something larger, and the board that produced one takes a corner off it in the
+  same gesture, so a quarter of a tranche de pain is a crouton.
 - Une pastèque and a watermelon, une pintade and a guinea fowl, un poulet and a
   chicken, un poireau and a leek, une banane and a banana, une mangue and a
   mango, un rôti and a roast, un avocat, un reblochon and une bûche divide as
@@ -68,8 +100,8 @@ All notable changes to this project are documented here. The format follows
   `3 cuisses de poulet` at a half now that the whole poulet goes to the quarter.
 - `clove` is read on the line that writes it, having named two foods with one
   answer between them. Garlic in the line makes it the gousse d'ail, which a
-  knife takes to a quarter, so `4 cloves garlic, minced` reduced to a quarter
-  reads `1 clove garlic, minced`. On its own, or written `whole cloves`, it is
+  knife splits in two, so `4 cloves garlic, minced` reduced to a quarter reads
+  `1 clove garlic, minced`. On its own, or written `whole cloves`, it is
   the clou de girofle dropped into the pot and fished back out: nothing about it
   is measured, so `4 whole cloves` halved reads `2 whole cloves` where it read
   `1 whole clof`. The French words need none of this, each naming one food and
@@ -98,6 +130,21 @@ All notable changes to this project are documented here. The format follows
   `9 ea tamarind pods` where it now reads `9 tamarind pods`. The count is
   unchanged, and the divisibility now comes from the thing counted, so
   `1 ea. onion` goes to a quarter and `12 ea. eggs` lands on a whole number.
+
+### Fixed
+
+- A French produce name opening on an accent is recognised again. A word
+  boundary sits between ASCII letters, so the pattern never matched at the start
+  of "échalote", and a shallot reduced to a quarter was clamped up to a half and
+  told it no longer held its share. The name is now read with its accents folded
+  away, so it comes back as "1/4 échalote", exact.
+
+- A second quantity left at its published size is reported on a French line. The
+  vocabulary is keyed without accents and the line writes "cuillère à soupe" with
+  them, so the sentence was never reached.
+
+- Rounding happens in the smaller of the two units when the answer moves to a
+  bigger one, so a promotion no longer costs precision the page had.
 
 ## [1.0.0] - 2026-02-06
 
@@ -144,4 +191,5 @@ First release.
 - A nightly canary against the real sites, which opens an issue when one of them
   changes something this server reads.
 
+[1.1.0]: https://github.com/smeet666/mcp-recipes/releases/tag/v1.1.0
 [1.0.0]: https://github.com/smeet666/mcp-recipes/releases/tag/v1.0.0

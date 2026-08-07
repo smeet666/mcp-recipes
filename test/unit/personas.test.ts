@@ -135,9 +135,11 @@ describe("Léa quarters a small recipe", () => {
     expect(payload.ingredients.map((entry) => entry.text)).toEqual([
       "1/2 sachet de levure chimique",
       "1 oeuf",
-      "1/2 pincée de sel",
+      // A pincée is what a hand gives in one go, and a gousse is split in two
+      // and no finer: both verdicts come from the person who cooks these.
+      "1 pincée de sel",
       "5 cl de lait",
-      "1/4 gousse de vanille",
+      "1/2 gousse de vanille",
     ]);
   });
 

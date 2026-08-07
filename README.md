@@ -59,9 +59,8 @@ clou de girofle, a zeste and a zest go with it, having no half anyone takes.
 
 A few measures go the other way and divide further. A pot, a bouteille, a
 bottle, a jar and a block hold enough for a quarter to be a portion someone
-serves. Une gousse, une tranche and a slice are already cut off something
-larger, and the board that produced one takes a corner off it in the same
-gesture. And a word can state a number of things rather than a measure of them,
+serves. Une tranche and a slice are already cut off something larger, and the
+board that produced one takes a corner off it in the same gesture. And a word can state a number of things rather than a measure of them,
 so `2 dozen mushrooms` at three quarters comes back as **18 mushrooms**. A blanc
 belongs to whichever food the line named: the white of an egg is counted whole,
 a blanc de poulet is meat and halves.
@@ -82,8 +81,8 @@ taken by squeezing half the fruit, and a quarter of one has to be poured out and
 measured back.
 
 The word `clove` names two foods, and the line says which. Garlic in the line
-makes it the wedge broken off a bulb, the gousse d'ail, which a knife takes to a
-quarter; on its own, or written `whole cloves`, it is the dried flower bud, the
+makes it the wedge broken off a bulb, the gousse d'ail, which a knife splits in
+two; on its own, or written `whole cloves`, it is the dried flower bud, the
 clou de girofle, and a count of those lands on a whole number.
 
 - `3 eggs` taken from six people to twenty-five gives **13 eggs**, and never a

@@ -7,7 +7,7 @@
  * about what it recognises and returns nothing rather than guessing.
  */
 
-import type { Language, LanguageChoice } from "./language.js";
+import type { Language, LanguageChoice, LanguageEvidence } from "./language.js";
 import { readLanguage } from "./language.js";
 import type { UnitInfo } from "./units.js";
 import {
@@ -44,6 +44,170 @@ const VULGAR_FRACTIONS: Record<string, number> = {
 };
 
 const VULGAR_CLASS = Object.keys(VULGAR_FRACTIONS).join("");
+
+/**
+ * Named HTML entities a page writes where the character itself would do.
+ *
+ * The fractions are the ones that matter: a line reading "3&frac12; cups" holds
+ * three and a half cups, and a reader that does not decode it sees three and
+ * carries the rest into the item name, where doubling the line loses half a cup
+ * without saying so.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+  frac12: "\u00bd",
+  frac13: "\u2153",
+  frac23: "\u2154",
+  frac14: "\u00bc",
+  frac34: "\u00be",
+  frac15: "\u2155",
+  frac18: "\u215b",
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  deg: "\u00b0",
+  times: "\u00d7",
+  minus: "\u2212",
+  ndash: "\u2013",
+  mdash: "\u2014",
+};
+
+/**
+ * Turn HTML entities back into the characters they stand for.
+ *
+ * A numeric entity names a code point directly, and the fraction glyphs a
+ * recipe uses live well inside the range a page can write that way, so
+ * "&#8532;" is two thirds and reads as such once decoded.
+ */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (whole, hex: string) => codePoint(parseInt(hex, 16), whole))
+    .replace(/&#(\d+);/g, (whole, digits: string) => codePoint(Number(digits), whole))
+    .replace(
+      /&([a-z][a-z0-9]*);/gi,
+      (whole, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? whole,
+    );
+}
+
+/** A code point a page named, or the entity as published when it names none. */
+function codePoint(value: number, published: string): string {
+  if (!Number.isInteger(value) || value < 32 || value > 0x10ffff) return published;
+  try {
+    return String.fromCodePoint(value);
+  } catch {
+    return published;
+  }
+}
+
+/**
+ * Empty brackets, which a page leaves behind when it carried a conversion the
+ * source did not render. They say nothing and belong in no answer.
+ */
+const EMPTY_BRACKETS = /\(\s*\)/g;
+
+/**
+ * Prepare a published line for reading: entities decoded, empty brackets
+ * dropped, runs of spaces squeezed.
+ */
+function readable(text: string): string {
+  return decodeEntities(text).replace(EMPTY_BRACKETS, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Signs and words a page puts before a number to say it is not exact.
+ *
+ * The number behind one of them is still a number, and reading none at all
+ * hands back the line with a note saying it carries no quantity, which is
+ * untrue. It is read, scaled and given back with the mark the page put on it,
+ * so the answer stays as loose as the page was.
+ */
+const APPROXIMATION_PREFIX: Record<Language, RegExp> = {
+  en: /^(?:~|\u2248|about|approx\.?|approximately|around|roughly)\s*/i,
+  fr: /^(?:~|\u2248|environ|approximativement|\u00e0 peu pr\u00e8s|a peu pres)\s*/i,
+};
+
+/**
+ * A line that states its amount for one eater.
+ *
+ * The factor already says how many people the recipe is being made for, so
+ * multiplying an amount that is per person applies it twice and asks for twice
+ * as much on every plate.
+ */
+const PER_PERSON: Record<Language, RegExp> = {
+  en: /\bper\s+(?:person|head|serving|guest|diner)\b/i,
+  fr: /\bpar\s+(?:personne|convive|part|t\u00eate)\b/i,
+};
+
+/**
+ * Size and preparation words a recipe puts between the number and the measure.
+ *
+ * "1 small handful" counts handfuls and says how full one was. Reading the
+ * adjective as the thing being counted loses the measure, and with it the fact
+ * that a handful is held to no better than the hand: the line comes back as an
+ * exact count of something the page never named.
+ */
+const MEASURE_ADJECTIVES: Record<Language, Set<string>> = {
+  en: new Set([
+    "big",
+    "generous",
+    "good",
+    "heaped",
+    "heaping",
+    "large",
+    "level",
+    "medium",
+    "scant",
+    "small",
+  ]),
+  fr: new Set([
+    "beau",
+    "belle",
+    "bon",
+    "bonne",
+    "grand",
+    "grande",
+    "gros",
+    "grosse",
+    "petit",
+    "petite",
+  ]),
+};
+
+/** The adjective a line put in front of its measure, and what stands after it. */
+function takeMeasureAdjective(
+  text: string,
+  language: Language,
+): { adjective: string | null; rest: string } {
+  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  if (!match) return { adjective: null, rest: text };
+
+  const folded = normalizeUnitKey(match[1]!);
+  // The word can be written in the plural where the count is, as in "2 grosses
+  // cuillères", and the list carries the singular.
+  const listed =
+    MEASURE_ADJECTIVES[language].has(folded) ||
+    MEASURE_ADJECTIVES[language].has(folded.replace(/s$/, ""));
+  if (!listed) return { adjective: null, rest: text };
+
+  return { adjective: match[1]!, rest: text.slice(match[0].length) };
+}
+
+/**
+ * A comma neither reading can account for.
+ *
+ * English groups thousands in threes and marks the decimal with a point;
+ * French marks the decimal with a comma and never groups with one. A comma
+ * followed by anything other than three digits is therefore not an English
+ * number, and a second comma group is not a French one. Where the line gives no
+ * sign which language it is in, "1,500" is fifteen hundred under one reading
+ * and one and a half under the other, and choosing wrong is wrong by a factor
+ * of a thousand. Neither is safe, so the line goes back as published and says
+ * why.
+ */
+const COMMA_GROUPED = /^\s*\d{1,3}(?:,\d{3})+(?!\d)/;
+const COMMA_DECIMAL = /^\s*\d+,\d+/;
 
 /**
  * Read a leading amount.
@@ -217,11 +381,42 @@ export interface Measure {
   unit: UnitInfo | null;
 }
 
+/**
+ * Why a line that shows a figure is still not the factor's to multiply.
+ *
+ * Each of these is a reading the parser can make and a scaling it must not do,
+ * and they are kept apart from a line with no figure at all so the answer can
+ * say which of the two it is looking at.
+ */
+export type HeldBack =
+  /** "4 to 5-pound roast": the figures give the size of one, not how many. */
+  | "sizeQualifier"
+  /** "2 pommes de terre par personne": the amount is already stated for one eater. */
+  | "perPerson"
+  /** "1,500 g" with nothing to say whether the comma groups or divides. */
+  | "ambiguousDecimal";
+
 export interface ParsedIngredient {
   /** The line exactly as it was given. */
   original: string;
   /** The language the line was read in. */
   language: Language;
+  /**
+   * Why the figure on this line must not be multiplied, when there is such a
+   * reason. Null for the ordinary line, whose amount is the factor's to scale.
+   */
+  heldBack: HeldBack | null;
+  /**
+   * The sign or word the page put before the amount to say it is loose, as in
+   * the "~" of "~1 cup water". Null when the page stated the amount plainly.
+   */
+  approximation: string | null;
+  /**
+   * A size word standing between the number and the measure, as in the "small"
+   * of "1 small handful". It goes back in front of the measure so the answer
+   * reads the way the page did.
+   */
+  measureAdjective: string | null;
   amount: number | null;
   /**
    * Upper bound when the line gives a range, as in "225–500 g". Null for a
@@ -267,7 +462,10 @@ const FRENCH_ARTICLES: Record<string, number> = { un: 1, une: 1, quelques: 3 };
  * à soupe" is not read as "cuillère" with "à soupe" spilling into the item
  * name, and "fluid ounce" is not read as "ounce" with "fluid" left dangling.
  */
-export function takeUnit(text: string, language: Language): { unit: UnitInfo | null; rest: string } {
+export function takeUnit(
+  text: string,
+  language: Language,
+): { unit: UnitInfo | null; rest: string } {
   const normalized = normalizeUnitKey(text);
   for (const key of unitKeys(language)) {
     if (normalized !== key && !normalized.startsWith(`${key} `)) continue;
@@ -309,6 +507,11 @@ function takeUnitEitherLanguage(
  * it together and whether each vocabulary recognises the measure it names.
  */
 export function detectLanguage(line: string): Language {
+  return readEvidence(line).language;
+}
+
+/** The language a line reads as, with the weight each side gathered. */
+function readEvidence(line: string): LanguageEvidence {
   const text = line.trim();
   // Whatever a leading figure, fraction or article occupies, so the probe looks
   // at the position a measure would stand in.
@@ -318,7 +521,7 @@ export function detectLanguage(line: string): Language {
   const frenchUnit = takeUnit(afterArticle, "fr").unit !== null;
   const englishUnit = takeUnit(afterArticle, "en").unit !== null;
 
-  return readLanguage(text, { frenchUnit, englishUnit }).language;
+  return readLanguage(text, { frenchUnit, englishUnit });
 }
 
 /**
@@ -331,12 +534,16 @@ export function detectLanguage(line: string): Language {
  */
 export function parseIngredient(line: string, choice: LanguageChoice = "auto"): ParsedIngredient {
   const original = line;
-  const text = line.trim();
-  const language = choice === "auto" ? detectLanguage(text) : choice;
+  const text = readable(line);
+  const evidence = readEvidence(text);
+  const language = choice === "auto" ? evidence.language : choice;
 
-  const empty: ParsedIngredient = {
+  const empty = (heldBack: HeldBack | null): ParsedIngredient => ({
     original,
     language,
+    heldBack,
+    approximation: null,
+    measureAdjective: null,
     amount: null,
     amountMax: null,
     rangeSeparator: null,
@@ -346,14 +553,23 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     item: text,
     articleWord: null,
     countMultiplier: null,
-  };
+  });
 
-  const range = parseLeadingRange(text, language);
-  const article = range ? null : readArticle(text, language);
-  const quantity = range ?? parseLeadingQuantity(text, language) ?? article;
-  if (!quantity) return empty;
+  if (unreadableComma(text, language, evidence)) return empty("ambiguousDecimal");
 
-  let rest = text.slice(quantity.length).trimStart();
+  const loose = APPROXIMATION_PREFIX[language].exec(text);
+  const stated = loose ? text.slice(loose[0].length) : text;
+
+  const range = parseLeadingRange(stated, language);
+  const article = range ? null : readArticle(stated, language);
+  const quantity = range ?? parseLeadingQuantity(stated, language) ?? article;
+  if (!quantity) return empty(null);
+
+  // A figure joined to a word by a hyphen describes one thing rather than
+  // counting things: "4 to 5-pound roast" is one roast that weighs that much.
+  if (/^-\p{L}/u.test(stated.slice(quantity.length))) return empty("sizeQualifier");
+
+  let rest = stated.slice(quantity.length).trimStart();
   // "two thirds of a cup" names a share of one cup, and the measure stands
   // behind the preposition and the article that introduce it.
   if (language === "en") rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
@@ -365,7 +581,16 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   if (multiplier) rest = multiplier.rest;
   const times = multiplier?.times ?? 1;
 
-  const leading = takeLeadingUnit(rest, language, quantity === article);
+  const fromArticle = quantity === article;
+  const direct = takeLeadingUnit(rest, language, fromArticle);
+  const described = direct.unit ? { adjective: null, rest } : takeMeasureAdjective(rest, language);
+  // The adjective is only an adjective when a measure stands behind it. In
+  // "1 cleaned leek green" the words that follow name the food itself, and
+  // taking one off would hand back a line the page never wrote.
+  const behind = described.adjective
+    ? takeLeadingUnit(described.rest, language, fromArticle)
+    : null;
+  const leading = direct.unit ? direct : behind?.unit ? behind : direct;
   rest = leading.rest;
 
   const bracketed = takeAlternates(rest, language);
@@ -377,6 +602,9 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   return {
     original,
     language,
+    heldBack: PER_PERSON[language].test(text) ? "perPerson" : null,
+    approximation: loose ? loose[0] : null,
+    measureAdjective: behind?.unit ? described.adjective : null,
     amount: quantity.amount * times,
     amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
@@ -384,9 +612,27 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     alternates: slashed ? slashed.measures : bracketed.measures,
     alternateStyle: slashed ? "slash" : bracketed.measures.length > 0 ? "bracket" : null,
     item: stripItemLead(rest, language),
-    articleWord: quantity === article ? (article?.word ?? null) : null,
+    articleWord: fromArticle ? (article?.word ?? null) : null,
     countMultiplier: multiplier?.times ?? null,
   };
+}
+
+/**
+ * Whether the comma in a leading number is one this line cannot settle.
+ *
+ * A group of exactly three digits reads as thousands in English and as a
+ * decimal in French, so it needs the line to say which language it is in; where
+ * nothing does, both readings stand and they differ by a factor of a thousand.
+ * A group of any other size is not an English number at all, and a second group
+ * is not a French one.
+ */
+function unreadableComma(text: string, language: Language, evidence: LanguageEvidence): boolean {
+  if (COMMA_GROUPED.test(text)) {
+    const settled = evidence.french !== evidence.english;
+    return !settled;
+  }
+  if (language === "en") return COMMA_DECIMAL.test(text);
+  return /^\s*\d+,\d+,\d/.test(text);
 }
 
 interface ParsedArticle extends ParsedQuantity {

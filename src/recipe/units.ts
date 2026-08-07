@@ -71,6 +71,12 @@ const FRENCH_UNITS: Record<string, UnitInfo> = {
   millilitres: { canonical: "ml", kind: "measured", system: "metric", symbol: true },
   centilitre: { canonical: "cl", kind: "measured", system: "metric", symbol: true },
   centilitres: { canonical: "cl", kind: "measured", system: "metric", symbol: true },
+  // A page glossing a metric weight names the pound, which French writes as a
+  // livre: "450 g (1 livre) de spaghetti".
+  livre: { canonical: "livre", kind: "measured", system: "imperial", plural: "livres" },
+  livres: { canonical: "livre", kind: "measured", system: "imperial", plural: "livres" },
+  lb: { canonical: "lb", kind: "measured", system: "imperial", symbol: true },
+  lbs: { canonical: "lb", kind: "measured", system: "imperial", symbol: true },
 
   // Spoons and cups: real measures, but only in sensible fractions.
   "cuillere a soupe": {
@@ -295,6 +301,11 @@ const ENGLISH_UNITS: Record<string, UnitInfo> = {
   leaf: { canonical: "leaf", kind: "portioned", system: "none", plural: "leaves" },
   leaves: { canonical: "leaf", kind: "portioned", system: "none", plural: "leaves" },
   ea: { canonical: "ea", kind: "portioned", system: "none", symbol: true },
+  // A dish of the book standing as an ingredient of another: "1 recipe Flaky
+  // Pie Crust". The count is what the word measures, so the plural mark belongs
+  // on it and not on the name of the dish.
+  recipe: { canonical: "recipe", kind: "portioned", system: "none", plural: "recipes" },
+  recipes: { canonical: "recipe", kind: "portioned", system: "none", plural: "recipes" },
 
   // Held to no better than a hand: the count scales, the size of one does not.
   // `readContainerLoad` explains what else lands here.
@@ -345,16 +356,18 @@ const VOCABULARY: Record<Language, Record<string, UnitInfo>> = {
  * though a spoonful were an indivisible object.
  */
 export function normalizeUnitKey(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\./g, " ")
-    // A recipe that does not know how many it will be writes the plural mark in
-    // brackets: "4 cuillère(s) à soupe". The measure is the word without it.
-    .replace(/\((?:s|x|es)\)/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\./g, " ")
+      // A recipe that does not know how many it will be writes the plural mark in
+      // brackets: "4 cuillère(s) à soupe". The measure is the word without it.
+      .replace(/\((?:s|x|es)\)/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /** Longest keys first, so "cuillère à soupe" wins over "cuillère". */
@@ -398,8 +411,12 @@ function buildEmbedded(language: Language): RegExp {
   return new RegExp(`\\d[\\d.,/]*\\s*(?:${keys.join("|")})\\b`, "i");
 }
 
+/**
+ * The text is normalized first, because the vocabulary is keyed without accents
+ * and a French line writes "cuillère à soupe" with them.
+ */
 export function hasEmbeddedMeasure(text: string, language: Language): boolean {
-  return EMBEDDED[language].test(text);
+  return EMBEDDED[language].test(normalizeUnitKey(text));
 }
 
 /**
@@ -641,13 +658,17 @@ export type Divisibility =
  * is a fact about the contents, so it is decided where the item is named rather
  * than here.
  *
- * A doubtful word takes the half. Half an approximate measure is nearer the
- * truth than a whole one rounded up, and a cook reading "1/2 sachet" knows what
- * to do with it. A measure therefore answers `half`, apart from the few named
- * below, and the one thing that does not divide is decided from the item's own
- * name.
+ * A gesture keeps its own answer. A pincée, a poignée, a pinch is the amount a
+ * hand produces in one go, and there is no half of a hand: the size of one is
+ * the cook's and the count is the whole of what the measure can say, so the
+ * count lands on a whole and the line reports that it moved.
+ *
+ * A doubtful word takes the half. A cook reading "1/2 sachet" knows what to do
+ * with it, so a measure answers `half` apart from the few named below, and the
+ * one thing that does not divide is decided from the item's own name.
  */
 export function unitDivisibility(unit: UnitInfo): Divisibility {
+  if (unit.kind === "approximate") return "whole";
   return QUARTERED_MEASURE.test(unit.canonical) ? "quarter" : "half";
 }
 
@@ -660,10 +681,9 @@ export function unitDivisibility(unit: UnitInfo): Divisibility {
  * block hold enough that a quarter is still a portion someone serves and the
  * rest still keeps: a quarter of a pot is a couple of spoonfuls, a quarter of a
  * bouteille is a glass, a quarter of a block of tofu is a piece cut on a board.
- * A gousse and a tranche are already cut off something larger, and the board
- * that produced one takes a corner off it in the same gesture: a quarter of a
- * gousse d'ail is what a knife scrapes into a pan, a quarter of a tranche de
- * pain is a crouton.
+ * A tranche is already cut off something larger, and the board that produced
+ * one takes a corner off it in the same gesture: a quarter of a tranche de pain
+ * is a crouton.
  *
  * Each measure is listed in either language, because how far one of them
  * divides has nothing to do with the words a page uses for it.
@@ -673,7 +693,7 @@ export function unitDivisibility(unit: UnitInfo): Divisibility {
  * to the same list.
  */
 export const QUARTERED_MEASURE =
-  /\b(pots?|bouteilles?|bottles?|jars?|blocs?|blocks?|gousses?|tranches?|slices?)\b/i;
+  /\b(pots?|bouteilles?|bottles?|jars?|blocs?|blocks?|tranches?|slices?)\b/i;
 
 /**
  * True for a measure that counts pieces without saying anything about them.
