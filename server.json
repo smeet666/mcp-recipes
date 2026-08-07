@@ -1,0 +1,78 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.smeet666/mcp-recipes",
+  "description": "Search Marmiton and the Wikibooks Cookbook at once, and scale quantities. No API key.",
+  "websiteUrl": "https://github.com/smeet666/mcp-recipes#readme",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/smeet666/mcp-recipes/main/assets/icon-128.png",
+      "mimeType": "image/png",
+      "sizes": ["128x128"]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/smeet666/mcp-recipes/main/assets/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/smeet666/mcp-recipes",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mcp-recipes",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "RECIPES_USER_AGENT",
+          "description": "Identify your own client. The project's own identifier is appended, so a site can always reach a human.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_MIN_INTERVAL_MS",
+          "description": "Minimum milliseconds between two requests to the same site. Default 1000, floor 500.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_TIMEOUT_MS",
+          "description": "Deadline for one request to a site, in milliseconds. Default 20000.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_MAX_RETRIES",
+          "description": "Retries on rate limiting and transient failures. Default 3.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_CACHE_TTL_MS",
+          "description": "In-memory cache lifetime, in milliseconds. Default 900000. Set 0 to turn it off.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_CACHE_MAX_ENTRIES",
+          "description": "In-memory cache size. Default 200.",
+          "isRequired": false
+        },
+        {
+          "name": "RECIPES_LOG_LEVEL",
+          "description": "silent, error, info or debug. Default error. Logs go to stderr.",
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/smeet666/mcp-recipes/releases/download/v1.0.0/mcp-recipes-1.0.0.mcpb",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

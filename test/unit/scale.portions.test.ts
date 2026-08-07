@@ -1,0 +1,105 @@
+/**
+ * How finely a counted thing divides, decided by the size of one against what a
+ * recipe puts in.
+ *
+ * A recipe counting twelve of something is counting things that are each
+ * already a portion, and a smaller recipe puts fewer of them in the pan. A
+ * recipe counting one is counting something a knife then takes a share out of.
+ * The two families below are the two ends of that one comparison, and each case
+ * is read in both languages the scaler speaks, because the comparison is about
+ * the food and not about the words a page happens to use for it.
+ */
+
+import { describe, expect, it } from "vitest";
+import { scaleIngredient } from "../../src/recipe/scale.js";
+
+const scale = (line: string, factor: number) => scaleIngredient(line, { factor });
+
+describe("a thing that is already a portion is counted whole", () => {
+  it("lands on whole numbers for the shellfish a recipe counts by the dozen", () => {
+    expect(scale("12 crevettes", 0.5).text).toBe("6 crevettes");
+    expect(scale("5 crevettes", 0.5).amount).toBe(3);
+    expect(scale("12 moules", 0.5).text).toBe("6 moules");
+    expect(scale("6 gambas", 0.25).amount).toBe(2);
+    expect(scale("12 shrimp", 0.5).text).toBe("6 shrimp");
+    expect(scale("12 mussels", 0.5).text).toBe("6 mussels");
+    expect(scale("3 langoustines", 0.5).amount).toBe(2);
+  });
+
+  it("lands on whole numbers for the seeds and buds a recipe counts out", () => {
+    expect(scale("20 grains de poivre", 0.5).text).toBe("10 grains de poivre");
+    expect(scale("3 baies de genièvre", 0.5).amount).toBe(2);
+    expect(scale("1 anis étoilé", 0.5).amount).toBe(1);
+    expect(scale("3 whole black peppercorns", 0.5).amount).toBe(2);
+    expect(scale("3 juniper berries", 0.5).amount).toBe(2);
+    expect(scale("8 star anise", 0.5).text).toBe("4 star anise");
+  });
+
+  it("keeps one nut rather than a share of one", () => {
+    expect(scale("1 noisette de beurre", 0.5).amount).toBe(1);
+    expect(scale("1 hazelnut", 0.5).amount).toBe(1);
+  });
+});
+
+describe("a thing a recipe asks one of is taken to a quarter", () => {
+  it("quarters the joints and the loaves a knife carves", () => {
+    expect(scale("1 gigot d'agneau", 0.25).text).toBe("1/4 gigot d'agneau");
+    expect(scale("1 baguette", 0.25).text).toBe("1/4 baguette");
+    expect(scale("1 leg of lamb", 0.25).text).toBe("1/4 leg of lamb");
+  });
+
+  it("quarters the cheeses a recipe asks one of", () => {
+    expect(scale("1 camembert", 0.25).text).toBe("1/4 camembert");
+    expect(scale("1 fromage de chèvre", 0.25).amount).toBe(0.25);
+    expect(scale("1 chorizo", 0.25).amount).toBe(0.25);
+    expect(scale("1 goat cheese", 0.25).amount).toBe(0.25);
+  });
+
+  it("quarters the fruit a recipe cuts up", () => {
+    expect(scale("1 ananas", 0.25).text).toBe("1/4 ananas");
+    expect(scale("1 pêche", 0.25).amount).toBe(0.25);
+    expect(scale("1 abricot", 0.25).amount).toBe(0.25);
+    expect(scale("1 pineapple", 0.25).text).toBe("1/4 pineapple");
+    expect(scale("1 apricot", 0.25).amount).toBe(0.25);
+  });
+
+  it("quarters a bare lait, which a line counts as what it was bought in", () => {
+    expect(scale("1 lait de coco", 0.25).amount).toBe(0.25);
+  });
+});
+
+describe("a jus stops at the half", () => {
+  it("takes the half a squeezed fruit gives", () => {
+    expect(scale("1 jus de citron", 0.5).text).toBe("1/2 jus de citron");
+    expect(scale("1 lemon juice", 0.5).amount).toBe(0.5);
+  });
+
+  it("comes back up to the half when a quarter is asked for", () => {
+    expect(scale("1 jus de citron", 0.25).text).toBe("1/2 jus de citron");
+    expect(scale("1 lemon juice", 0.25).amount).toBe(0.5);
+  });
+});
+
+describe("a number and the thing it counts agree at one", () => {
+  it("puts the head word back in the singular", () => {
+    expect(scale("2 clous de girofle", 0.5).text).toBe("1 clou de girofle");
+    expect(scale("2 crevettes", 0.5).text).toBe("1 crevette");
+    expect(scale("2 moules", 0.5).text).toBe("1 moule");
+    expect(scale("2 noisettes", 0.5).text).toBe("1 noisette");
+    expect(scale("2 grains de poivre", 0.5).text).toBe("1 grain de poivre");
+    expect(scale("2 kiwis", 0.5).text).toBe("1 kiwi");
+    expect(scale("2 mussels", 0.5).text).toBe("1 mussel");
+    expect(scale("2 hazelnuts", 0.5).text).toBe("1 hazelnut");
+    expect(scale("2 peppercorns", 0.5).text).toBe("1 peppercorn");
+    expect(scale("2 juniper berries", 0.5).text).toBe("1 juniper berry");
+  });
+
+  it("leaves alone the names that read the same whatever the number", () => {
+    expect(scale("2 gambas", 0.5).text).toBe("1 gambas");
+    expect(scale("2 anis étoilés", 0.5).text).toBe("1 anis étoilé");
+    expect(scale("2 ananas", 0.5).text).toBe("1 ananas");
+    expect(scale("2 jus de citron", 0.5).text).toBe("1 jus de citron");
+    expect(scale("2 shrimp", 0.5).text).toBe("1 shrimp");
+    expect(scale("2 star anise", 0.5).text).toBe("1 star anise");
+  });
+});
