@@ -1,5 +1,11 @@
 # mcp-recipes
 
+[![npm](https://img.shields.io/npm/v/mcp-recipes.svg)](https://www.npmjs.com/package/mcp-recipes)
+[![CI](https://github.com/smeet666/mcp-recipes/actions/workflows/ci.yml/badge.svg)](https://github.com/smeet666/mcp-recipes/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/mcp-recipes.svg)](LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.smeet666/mcp-recipes)
+[![Glama](https://glama.ai/mcp/servers/smeet666/mcp-recipes/badges/score.svg)](https://glama.ai/mcp/servers/smeet666/mcp-recipes)
+
 One question, several kitchens. An MCP server that asks every recipe source it
 reads at the same time, merges what they say, and scales quantities in French
 and English.
