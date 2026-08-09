@@ -76,6 +76,16 @@ export interface RecipeDetail {
   /** The lines as published, before any scaling. */
   ingredients: string[];
   steps: string[];
+  /**
+   * The headings the page carries, in the order it carries them, from a source
+   * that reports them. Null from a source that does not, which says nothing
+   * about how the page is laid out.
+   *
+   * They are the evidence that separates a part of a recipe this server failed
+   * to read from a part the page never published, so an answer can state which
+   * of the two it is looking at.
+   */
+  publishedSections: string[] | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
   totalMinutes: number | null;
@@ -92,6 +102,29 @@ export interface RecipeDetail {
 }
 
 /**
+ * One wording sent to one source, and what came of it.
+ *
+ * A question is asked in several wordings, so an answer that named only the
+ * question would leave a reader unable to tell which of them the rows came
+ * from, or whether the widest one was ever tried. Every wording is listed,
+ * including the ones held back, so the search can be redone by hand.
+ */
+export interface WordingAttempt {
+  query: string;
+  /** How this wording was derived from the question, in words. */
+  derivation: string;
+  ran: boolean;
+  /** Rows this wording returned. Null when it did not run. */
+  count: number | null;
+  /** Rows it returned that no earlier wording had. Null when it did not run. */
+  added: number | null;
+  /** Why it was held back, in words. Null when it ran. */
+  notRunBecause: string | null;
+  /** Why this wording failed. Null when it ran or was held back. */
+  error: { code: string; message: string; hint?: string } | null;
+}
+
+/**
  * What one source answered, or why it did not.
  *
  * The two travel together so an answer can never read as an absence: a caller
@@ -104,10 +137,23 @@ export interface SourceReport {
   status: "answered" | "failed";
   /** Rows this source contributed to the answer. */
   count: number;
-  /** Rows the source said it saw, in the terms that source counts in. */
+  /**
+   * Rows the source said it saw, in the terms that source counts in, for the
+   * first wording it answered. A source asked several wordings publishes a
+   * number per wording and none across them, so this is never a total of the
+   * rows in the answer.
+   */
   reportedTotal: number | null;
   /** What `reportedTotal` counts on this source, in words. */
   reportedTotalMeans: string | null;
+  /** Every wording this source was sent or held back from, in the order tried. */
+  wordings: WordingAttempt[];
+  /**
+   * Whether this source's rows were arranged so the ones whose title names the
+   * dish come first. Done only where several wordings contributed, so a page of
+   * near-misses cannot fill the limit and cut away what a later wording found.
+   */
+  preferredByName: boolean;
   /** Rows the source sent that could not be read, and were left out. */
   skipped: number;
   /** Whether this source files reference pages beside recipes. */

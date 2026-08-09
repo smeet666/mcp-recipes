@@ -404,12 +404,31 @@ const EMBEDDED: Record<Language, RegExp> = {
 
 function buildEmbedded(language: Language): RegExp {
   const keys = UNIT_KEYS[language].map((key) => key.replace(/ /g, "\\s+"));
+  // A quantity keeps the same shape whether the measure stands against the
+  // figure or behind the word introducing it: "3/4 tasse" and "3/4 de tasse"
+  // are one quantity written twice. Reading only the first spelling leaves the
+  // second sitting on a scaled line, still saying what the page said.
+  const joiner = "(?:(?:de|du|des|d|of|a|an|the)\\s+)?";
   // The digits and the whitespace are kept in separate pieces that cannot both
   // match a space. Letting them overlap makes the engine try every way of
   // splitting a run of spaces between them, which turns a long line into
   // seconds of work for an answer that was always going to be no.
-  return new RegExp(`\\d[\\d.,/]*\\s*(?:${keys.join("|")})\\b`, "i");
+  return new RegExp(`\\d[\\d.,/]*\\s*${joiner}(?:${keys.join("|")})\\b`, "i");
 }
+
+/**
+ * Nouns naming what a food is sold in.
+ *
+ * A measure written in front of one of them gives what that container holds:
+ * "12 oz can" is the size of the tin rather than an amount to weigh out, and
+ * doubling the recipe means opening a second tin rather than finding a bigger
+ * one.
+ *
+ * Written in either language, because what a word names has nothing to do with
+ * which language names it.
+ */
+export const CONTAINER_NOUN =
+  /^(?:cans?|tins?|jars?|packets?|packages?|packs?|box|boxes|bottles?|cartons?|bags?|tubs?|sachets?|blocks?|blocs?|boites?|pots?|briques?|bocaux|bocals?|barquettes?)\b/i;
 
 /**
  * The text is normalized first, because the vocabulary is keyed without accents
@@ -726,6 +745,13 @@ export interface ChosenUnit {
  * thousandfold walks all the way down its ladder instead of rounding away.
  * Promotion takes one step, at a full unit of the step above, so 999 g stays
  * grams and 1000 g becomes a kilo.
+ *
+ * Both directions ask whether the unit can hold the figure. A kitchen reads two
+ * decimals and no more, so 2468 g written in kilos is 2.47 and the eight grams
+ * are gone. A quantity the bigger unit cannot state stays where the page wrote
+ * it, and a quantity the page's own unit cannot state walks down to the one that
+ * can, so the same mass comes out the same however the page spelled it: "1234 g"
+ * and "1 kg 234" are one quantity and answer with one figure.
  */
 export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
   if (unit.kind !== "measured" || !Number.isFinite(amount) || amount <= 0) {
@@ -743,7 +769,7 @@ export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
   }
 
   const up = PROMOTIONS[normalizeUnitKey(current.canonical)];
-  if (up && amount * ratio >= up.per) {
+  if (up && amount * ratio >= up.per && writesExactly((amount * ratio) / up.per)) {
     const target = lookupUnit(up.to, up.language);
     if (target) {
       ratio /= up.per;
@@ -751,7 +777,19 @@ export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
     }
   }
 
+  while (!writesExactly(amount * ratio)) {
+    const step = demoteUnit(current);
+    if (!step) break;
+    ratio *= step.per;
+    current = step.unit;
+  }
+
   return { unit: current, ratio };
+}
+
+/** Whether a figure survives being written with the two decimals a kitchen reads. */
+function writesExactly(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-9;
 }
 
 /**

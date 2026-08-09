@@ -103,7 +103,7 @@ describe("rows sharing no word with the query", () => {
           },
           cookbook: { rows: [] },
         }),
-        { query: "chameau farci", limit_per_source: 5 },
+        { query: "chameau farci", limit_per_source: 5, fan_out: true },
       ),
     );
 
@@ -112,7 +112,7 @@ describe("rows sharing no word with the query", () => {
 
   it("stays silent when a title carries a word of the query", async () => {
     const payload = payloadOf<{ notes: string[] }>(
-      await runSearchRecipes(fakeClient(), { query: "crêpes", limit_per_source: 5 }),
+      await runSearchRecipes(fakeClient(), { query: "crêpes", limit_per_source: 5, fan_out: true }),
     );
 
     expect(payload.notes.join(" ")).not.toMatch(/No title here carries a word/i);
@@ -128,7 +128,7 @@ describe("a search Marmiton answers with nothing", () => {
             fail: new FakeSourceError("not_found", "Marmiton has no recipe at that address."),
           },
         }),
-        { query: "stuffed turkey", limit_per_source: 5 },
+        { query: "stuffed turkey", limit_per_source: 5, fan_out: true },
       ),
     );
     const marmiton = payload.per_source.find((report) => report.source === "marmiton")!;
@@ -141,7 +141,7 @@ describe("a search Marmiton answers with nothing", () => {
     const payload = payloadOf<{ per_source: Report[] }>(
       await runSearchRecipes(
         fakeClient({ marmiton: { fail: new FakeSourceError("timeout", "Too slow.") } }),
-        { query: "crêpes", limit_per_source: 5 },
+        { query: "crêpes", limit_per_source: 5, fan_out: true },
       ),
     );
 

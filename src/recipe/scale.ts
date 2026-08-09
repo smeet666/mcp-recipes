@@ -83,8 +83,13 @@ function roundTo(value: number, step: number): number {
  * with the value rather than being fixed. The step stays a tenth in the single
  * digits because a unit can be a pound as easily as a gram, and rounding 2.2 lb
  * to 2 would throw away a tenth of the ingredient.
+ *
+ * A whole number is already what a scale shows, so it is left where the
+ * arithmetic put it: 1234 g doubled is 2468 g, and a step of five grams would
+ * report 2470 for a product that needed no rounding at all.
  */
 function roundMeasured(value: number): number {
+  if (Number.isInteger(value)) return value;
   if (value >= 100) return roundTo(value, 5);
   if (value >= 10) return roundTo(value, 1);
   if (value >= 1) return roundTo(value, 0.1);
@@ -233,6 +238,20 @@ function landedExactly(exact: number, amount: number): boolean {
   return exact === 0 || gap / Math.abs(exact) <= EXACT_SHARE;
 }
 
+/**
+ * Whether a bound came out as the exact product, judged in the finer of the two
+ * units involved.
+ *
+ * An absolute tolerance only means what it says at one scale. Read in kilos, a
+ * hundredth is ten grams, so a quantity moved from 2468 g to 2470 g passes as
+ * exact for being 0.002 kg away; read in grams, the same gap is two grams and
+ * the answer is that the value moved.
+ */
+function boundLandedExactly(bound: ScaledBound): boolean {
+  const fine = bound.ratio >= 1 ? bound.ratio : 1;
+  return landedExactly(bound.raw * fine, bound.amount * (fine / bound.ratio));
+}
+
 export interface ScaleOptions {
   /** Multiplier applied to the quantities. */
   factor: number;
@@ -250,6 +269,8 @@ interface ScaledBound {
   clamped: boolean;
   /** The exact product in the unit the recipe wrote, for a readable note. */
   raw: number;
+  /** How many of the unit that came back fit in one of the unit the recipe wrote. */
+  ratio: number;
 }
 
 interface ScaledMeasure {
@@ -295,8 +316,8 @@ function scaleMeasure(
     bounds: raws.map((raw, index) => {
       const exact = raw * ratio;
       // The rounding happens in the smaller of the two units, so moving to a
-      // bigger one never throws away precision the page wrote: 1666 g rounded
-      // as kilos is 1.7, and rounded as grams it is the 1.665 kg a scale shows.
+      // bigger one never throws away precision the page wrote: 1500 g rounded
+      // as kilos is 2, and rounded as grams it is the 1.5 kg a scale shows.
       const rounded =
         ratio < 1 ? Number((roundMeasured(raw) * ratio).toPrecision(12)) : roundMeasured(exact);
       // At the bottom of a ladder, keep what precision is left rather than
@@ -311,6 +332,7 @@ function scaleMeasure(
         exact,
         clamped: false,
         raw,
+        ratio,
       };
     }),
     unit: target,
@@ -331,7 +353,7 @@ function scaleMeasure(
     const bounds = raws.map((raw, index) => {
       const ceiling = factor < 1 ? sources[index]! : Number.POSITIVE_INFINITY;
       const rounded = roundSpoon(raw, ceiling);
-      return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw };
+      return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw, ratio: 1 };
     });
     return { bounds, unit };
   }
@@ -340,7 +362,7 @@ function scaleMeasure(
     // Scaling down must never end up asking for more than the recipe did.
     const ceiling = factor < 1 ? sources[index]! : Number.POSITIVE_INFINITY;
     const rounded = roundCountable(raw, divisibility, ceiling);
-    return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw };
+    return { amount: rounded.value, exact: raw, clamped: rounded.clamped, raw, ratio: 1 };
   });
   return { bounds, unit };
 }
@@ -623,8 +645,19 @@ const IRREGULAR_SINGULAR: Record<string, string> = Object.fromEntries(
   Object.entries(IRREGULAR_PLURAL).map(([one, many]) => [many, one]),
 );
 
-/** Keep the capitalisation the line used while looking the word up in lower case. */
+/**
+ * Keep the capitalisation the line used while looking the word up in lower
+ * case.
+ *
+ * A page writes its ingredients in whichever case it likes, and the shape of a
+ * word is the page's rather than this server's: a list set in capitals reads as
+ * a list somebody typed over when one line of it comes back in lower case.
+ * Three shapes carry: all capitals, one leading capital, and everything else,
+ * which keeps the replacement as the vocabulary spells it.
+ */
 function matchCase(source: string, replacement: string): string {
+  const hasLetter = /\p{L}/u.test(source);
+  if (hasLetter && source === source.toUpperCase()) return replacement.toUpperCase();
   if (source[0] === source[0]?.toUpperCase() && source.slice(1) === source.slice(1).toLowerCase()) {
     return replacement[0]!.toUpperCase() + replacement.slice(1);
   }
@@ -707,6 +740,23 @@ function agreeInEnglish(item: string, amount: number): string {
  * The word is the same whatever the number, so the ending a plural would give
  * back belongs to the singular and must stay.
  */
+/**
+ * French nouns in -ou whose plural takes an -x.
+ *
+ * The ending settles nothing on its own: "clou" and "trou" take the ordinary
+ * -s, and only these few take the -x. A cabbage is the one a recipe counts, and
+ * the others are here because the list is the rule.
+ */
+const FRENCH_OU_PLURAL_IN_X = new Set([
+  "bijou",
+  "caillou",
+  "chou",
+  "genou",
+  "hibou",
+  "joujou",
+  "pou",
+]);
+
 const INVARIABLE_FRENCH_NOUN = new Set([
   "ananas",
   "anis",
@@ -816,20 +866,26 @@ function agreeInFrench(item: string, amount: number): string {
   if (head.length <= 3) return item;
 
   const wantsPlural = amount >= 2;
-  const isPlural = /s$|eaux$|aux$/i.test(head);
+  // A final -x marks the plural of the few nouns in -ou that take one, and it
+  // belongs to the singular of everything else ("prix", "houx").
+  const ouPlural = /x$/i.test(head) && FRENCH_OU_PLURAL_IN_X.has(foldWord(head.slice(0, -1)));
+  const isPlural = /s$|eaux$|aux$/i.test(head) || ouPlural;
 
   if (wantsPlural && !isPlural) {
     // Words ending in -s, -x or -z do not take a plural mark.
     if (/[sxz]$/i.test(head)) {
       // The head stays as written.
     }
-    // "morceau" and "bocal" take -x and -aux where the ordinary noun takes -s.
+    // "morceau", "chou" and "bocal" take -x and -aux where the ordinary noun
+    // takes -s.
     else if (/eau$/i.test(head)) words[0] = `${head}x`;
+    else if (FRENCH_OU_PLURAL_IN_X.has(foldWord(head))) words[0] = `${head}x`;
     else if (/al$/i.test(head)) words[0] = `${head.slice(0, -2)}aux`;
     else words[0] = `${head}s`;
   } else if (!wantsPlural && isPlural) {
     if (/eaux$/i.test(head)) words[0] = head.slice(0, -1);
     else if (/aux$/i.test(head)) words[0] = `${head.slice(0, -3)}al`;
+    else if (ouPlural) words[0] = head.slice(0, -1);
     // "ananas", "anis", "couscous": the -s belongs to the singular.
     else if (INVARIABLE_FRENCH_NOUN.has(foldWord(head))) {
       // The head stays as written.
@@ -869,6 +925,21 @@ function agreeLeadingAdjective(word: string, amount: number, language: Language)
 
 function agreeWithAmount(item: string, amount: number, language: Language): string {
   return language === "fr" ? agreeInFrench(item, amount) : agreeInEnglish(item, amount);
+}
+
+/**
+ * Agree the container a line counts, which is the word the item opens with.
+ *
+ * "2 (14 oz) cans tomatoes" counts tins and names what is in them, so the
+ * number belongs to the tin. English otherwise agrees the last word before a
+ * comma, which would put the plural mark on the tomatoes and leave the tin
+ * reading as one.
+ */
+function agreeCountedContainer(item: string, amount: number, language: Language): string {
+  if (language === "fr") return agreeInFrench(item, amount);
+  const space = item.indexOf(" ");
+  if (space < 0) return agreeInEnglish(item, amount);
+  return `${agreeInEnglish(item.slice(0, space), amount)}${item.slice(space)}`;
 }
 
 /**
@@ -1019,9 +1090,17 @@ const HELD_BACK_NOTE: Record<HeldBack, string> = {
     "The measure standing behind the item gives the size of one of them rather than how many, " +
     "so the line is left as published. Serving more people is a matter of taking a bigger one, " +
     "and serving fewer a smaller one.",
+  containerSize:
+    "The measure here gives what one container holds rather than how many of them the recipe " +
+    "uses, and the line states no count, so it is left as published. Scaling it is a matter of " +
+    "opening that many containers of the size named.",
   perPerson:
     "This line already states an amount for one person, and the factor is what changes " +
     "how many people the recipe serves, so the line is left as published.",
+  duration:
+    "This line states a length of time rather than an amount of an ingredient, so it is left as " +
+    "published. A rest, a proof or a bake takes as long for a large batch as for a small one, " +
+    "and the factor has nothing to say about it.",
   ambiguousDecimal:
     "The comma in this number marks thousands in one convention and the decimal point in " +
     "another, and the line gives no sign which was meant, so it is left as published.",
@@ -1053,12 +1132,19 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
 
   const primaryBounds = primary.bounds;
   const alternateBounds = alternates.flatMap((entry) => entry.bounds);
-  const movedPrimary = primaryBounds.some((b) => !landedExactly(b.exact, b.amount));
-  const movedAlternate = alternateBounds.some((b) => !landedExactly(b.exact, b.amount));
+  const movedPrimary = primaryBounds.some((bound) => !boundLandedExactly(bound));
+  const movedAlternate = alternateBounds.some((bound) => !boundLandedExactly(bound));
   const clamped = [...primaryBounds, ...alternateBounds].find((bound) => bound.clamped) ?? null;
   // Two figures beside each other agree only as closely as the page wrote
   // them, and multiplying both keeps that gap rather than closing it.
   const restated = parsed.alternateStyle === "slash";
+  const carriesMore = hasEmbeddedMeasure(parsed.item, language);
+  // A further quantity beside a mass or a volume restates or qualifies it, and
+  // it did not move, so the line as a whole is not the exact product of what
+  // the page published. Beside a counted container the same figure gives the
+  // size of one of them, which is a thing the factor must leave alone: "2
+  // boîtes de 400 g" is exactly twice "1 boîte de 400 g".
+  const leftover = carriesMore && parsed.unit?.kind === "measured";
 
   const low = primaryBounds[0]!;
   const high = primaryBounds[1] ?? null;
@@ -1088,24 +1174,34 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
       : "";
   const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
   const alternateTexts = alternates.map((entry) => entry.text);
-  // Equivalents go back the way the line offered them: inside brackets, or
-  // after a slash beside the amount they restate.
+  const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
+  const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
+  // Equivalents go back where the line offered them: inside brackets beside the
+  // amount, after a slash, or in the bracket the line closes on.
   const altLabel =
     alternates.length === 0
       ? ""
       : parsed.alternateStyle === "slash"
         ? ` / ${alternateTexts.join(" / ")}`
-        : ` (${alternateTexts.join(" / ")})`;
+        : parsed.alternateStyle === "trailing"
+          ? ""
+          : bracketed;
+  const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
+  // What a container holds is the page's figure and not the factor's, so it
+  // goes back between the count and the container, exactly as published.
+  const capacityLabel = parsed.capacity ? ` ${parsed.capacity}` : "";
   // A measure needs the partitive that French puts between it and what it
   // measures. A counted item stands straight after its number in both
   // languages, and agrees with it: "1 egg yolk", "3 brioches".
-  const counted = agreeWithAmount(parsed.item, shown, language);
+  const counted = parsed.capacity
+    ? agreeCountedContainer(parsed.item, shown, language)
+    : agreeWithAmount(parsed.item, shown, language);
   const itemLabel = named ? joinItem(parsed.item, language) : counted ? ` ${counted}` : "";
 
   const result: ScaledIngredient = {
-    text: `${parsed.approximation ?? ""}${amountText}${unitLabel}${altLabel}${itemLabel}`.trim(),
+    text: `${parsed.decoration ? `${parsed.decoration} ` : ""}${parsed.approximation ?? ""}${amountText}${unitLabel}${capacityLabel}${altLabel}${itemLabel}${trailingLabel}`.trim(),
     original: parsed.original,
-    scaling: movedPrimary || movedAlternate || restated ? "rounded" : "scaled",
+    scaling: movedPrimary || movedAlternate || restated || leftover ? "rounded" : "scaled",
     amount: low.amount,
     amountMax: collapsed ? null : (high?.amount ?? null),
     unit: named?.canonical ?? null,
@@ -1137,7 +1233,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     // range the two ends can move opposite ways, and reporting one of them as
     // though it spoke for both states the wrong direction for half the
     // quantity.
-    const moved = primaryBounds.filter((bound) => !landedExactly(bound.exact, bound.amount));
+    const moved = primaryBounds.filter((bound) => !boundLandedExactly(bound));
     sentences.push(
       moved
         .map(
@@ -1168,10 +1264,18 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   // scaled, and a substitute left at its published size contradicts it. This is
   // said whatever else happened to the line: a line that was also rounded is the
   // one where a stale second quantity is hardest to spot.
-  if (hasEmbeddedMeasure(parsed.item, language)) {
+  if (carriesMore) {
     sentences.push(
       "This line carries a further quantity after the first one, and only the first was scaled. " +
         "Read the rest as published.",
+    );
+  }
+
+  if (parsed.capacity) {
+    sentences.push(
+      `${parsed.capacity} is what one container holds, so it stays as published and the count is ` +
+        "what the factor moved. Scaling this line is a matter of opening that many containers of " +
+        "the size named.",
     );
   }
 

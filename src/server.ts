@@ -58,9 +58,7 @@ const READ_ONLY = {
  * so the sentence stays true when the registry grows. What it says about them
  * holds for any corpus this server reads.
  */
-export function buildInstructions(
-  sources: Array<{ name: string; language: string }>,
-): string {
+export function buildInstructions(sources: Array<{ name: string; language: string }>): string {
   const named = sources.map((source) => `${source.name} (${source.language})`).join(", ");
 
   return [

@@ -19,13 +19,22 @@ import {
   createLogger,
   loadConfig,
 } from "../config.js";
-import { invalidInput, timeout as timedOut, toRecipesError } from "../errors.js";
-import type { MergedSearch, RecipeDetail, RecipeRow, SourceId, SourceReport } from "../types.js";
+import { fromSource, invalidInput, timeout as timedOut } from "../errors.js";
+import type {
+  MergedSearch,
+  RecipeDetail,
+  RecipeRow,
+  SourceId,
+  SourceReport,
+  WordingAttempt,
+} from "../types.js";
 import type { SourceAdapter } from "./adapter.js";
 import { resolveId } from "./ids.js";
 import type { ResolvedId } from "./ids.js";
 import { buildSources, selectSources } from "./registry.js";
 import type { Readers } from "./registry.js";
+import { MAX_WORDINGS_PER_SOURCE, deriveWordings, namesDish } from "./wordings.js";
+import type { Wording } from "./wordings.js";
 
 export type { SourceAdapter, ReadRecipe, ReadRows } from "./adapter.js";
 export type { CookbookReader } from "./cookbook.js";
@@ -38,9 +47,12 @@ export type {
   SourceId,
   SourceProfile,
   SourceReport,
+  WordingAttempt,
 } from "../types.js";
 export { SOURCE_IDS } from "./registry.js";
 export { namespacedId, resolveId } from "./ids.js";
+export { MAX_WORDINGS_PER_SOURCE, deriveWordings, namesDish, readConditions } from "./wordings.js";
+export type { Conditions, Wording } from "./wordings.js";
 
 export interface RecipesClientOptions {
   config?: Partial<Config>;
@@ -53,6 +65,20 @@ export interface RecipesClientOptions {
 
 /** The largest number of rows any one source is asked for in a single call. */
 export const MAX_LIMIT_PER_SOURCE = 25;
+
+export interface SearchOptions {
+  /**
+   * Whether a question may be sent in wordings derived from it as well as in
+   * the words it was written in.
+   *
+   * On unless a caller turns it off. A recipe index answers the words it is
+   * handed, so a question written as a sentence comes back empty from a corpus
+   * holding several of the dish, and an empty answer is read as a corpus that
+   * holds nothing. Off, a caller gets exactly the wording they typed and the
+   * answer names the wordings that were not sent.
+   */
+  fanOut?: boolean;
+}
 
 /**
  * The pacing this server owes each source, applied to whatever it is handed.
@@ -113,9 +139,7 @@ function withDeadline<T>(work: Promise<T>, ms: number, source: SourceAdapter): P
     timer = setTimeout(
       () =>
         reject(
-          timedOut(
-            `${source.name} did not answer within ${ms}ms and was left out of this answer.`,
-          ),
+          timedOut(`${source.name} did not answer within ${ms}ms and was left out of this answer.`),
         ),
       ms,
     );
@@ -129,11 +153,14 @@ function withDeadline<T>(work: Promise<T>, ms: number, source: SourceAdapter): P
 interface Attempt {
   source: SourceAdapter;
   rows: RecipeRow[];
+  /** Whether rows naming the dish were put in front of rows that do not. */
+  preferredByName: boolean;
   cached: boolean;
   reportedTotal: number | null;
   reportedTotalMeans: string | null;
   skipped: number;
   error: { code: string; message: string; hint?: string } | null;
+  wordings: WordingAttempt[];
 }
 
 function reportOf(attempt: Attempt, count: number): SourceReport {
@@ -148,6 +175,21 @@ function reportOf(attempt: Attempt, count: number): SourceReport {
     mixesReferencePages: attempt.source.mixesReferencePages,
     cached: attempt.cached,
     error: attempt.error,
+    wordings: attempt.wordings,
+    preferredByName: attempt.preferredByName,
+  };
+}
+
+/** A wording that was never sent, and the reason it was not. */
+function heldBack(wording: Wording, because: string): WordingAttempt {
+  return {
+    query: wording.query,
+    derivation: wording.derivation,
+    ran: false,
+    count: null,
+    added: null,
+    notRunBecause: because,
+    error: null,
   };
 }
 
@@ -231,17 +273,29 @@ export class RecipesClient {
     query: string,
     limitPerSource: number,
     wanted?: readonly SourceId[],
+    options: SearchOptions = {},
   ): Promise<MergedSearch> {
     const trimmed = query.trim();
     if (trimmed === "") {
       throw invalidInput("A search needs something to look for.", "Name a dish or an ingredient.");
     }
+    // A recipe index handed nothing it can match on answers with the page it
+    // shows by default, and those rows would come back as this question's
+    // recipes. One character is a word in the scripts that write one that way,
+    // so what is asked for is a letter or a digit rather than a length.
+    if (!/[\p{L}\p{N}]/u.test(trimmed)) {
+      throw invalidInput(
+        `"${trimmed}" carries no letter and no digit, so there is no word to search for.`,
+        "Name a dish or an ingredient.",
+      );
+    }
 
     const chosen = selectSources(this.sources, wanted);
     const limit = Math.max(1, Math.min(MAX_LIMIT_PER_SOURCE, Math.trunc(limitPerSource)));
+    const fanOut = options.fanOut ?? true;
 
     const attempts = await Promise.all(
-      chosen.map((source) => this.searchOne(source, trimmed, limit)),
+      chosen.map((source) => this.searchOne(source, trimmed, limit, fanOut)),
     );
 
     const groups = attempts.map((attempt) => attempt.rows.slice(0, limit));
@@ -251,44 +305,169 @@ export class RecipesClient {
     };
   }
 
+  /**
+   * Ask one source the question in several wordings, and union what comes back.
+   *
+   * The wordings go out one after another rather than together, because each
+   * source is paced and a burst would spend the whole ladder's politeness at
+   * once. They stop early: a wording is only sent when the ones before it left
+   * the source short of what was asked for, so the ordinary case where the
+   * question names a dish costs one request.
+   *
+   * Each wording is a different search rather than a further page of the same
+   * one. One of these sites serves a single page of results and disallows
+   * paging past it, so a second page is never asked for, here or anywhere else.
+   */
   private async searchOne(
     source: SourceAdapter,
-    query: string,
+    question: string,
     limit: number,
+    fanOut: boolean,
   ): Promise<Attempt> {
-    try {
-      const read = await withDeadline(source.search(query, limit), this.deadlineMs, source);
-      if (read.skipped > 0) {
-        this.logger.warn(
-          `${source.name} sent ${read.skipped} row(s) this server could not read; they were left out.`,
+    const derived = deriveWordings(question);
+    const wordings: WordingAttempt[] = [];
+    const rows: RecipeRow[] = [];
+    const seen = new Set<string>();
+
+    let cached = false;
+    let skipped = 0;
+    let reportedTotal: number | null = null;
+    let reportedTotalMeans: string | null = null;
+    let answered = false;
+    let failure: { code: string; message: string; hint?: string } | null = null;
+    /**
+     * Rows whose title carries a word naming the dish.
+     *
+     * This is what "enough" counts, rather than rows. A source that ranks on
+     * the words it was handed fills a page with recipes sharing a question's
+     * framing words, and stopping on the size of that page would stop on the
+     * evidence that the dish has not been found. Every row is kept either way.
+     */
+    let onTopic = 0;
+
+    for (const [index, wording] of derived.entries()) {
+      if (index > 0 && !fanOut) {
+        wordings.push(
+          heldBack(wording, "fan_out was turned off, so only the words as asked were sent"),
         );
+        continue;
       }
-      return {
-        source,
-        rows: read.rows,
-        cached: read.cached,
-        reportedTotal: read.reportedTotal,
-        reportedTotalMeans: read.reportedTotalMeans,
-        skipped: read.skipped,
-        error: null,
-      };
-    } catch (error) {
-      const known = toRecipesError(error);
-      this.logger.warn(`${source.name} did not answer: [${known.code}] ${known.message}`);
-      return {
-        source,
-        rows: [],
-        cached: false,
-        reportedTotal: null,
-        reportedTotalMeans: null,
-        skipped: 0,
-        error: {
+      if (index >= MAX_WORDINGS_PER_SOURCE) {
+        wordings.push(
+          heldBack(
+            wording,
+            `the ceiling of ${MAX_WORDINGS_PER_SOURCE} searches of one source was reached`,
+          ),
+        );
+        continue;
+      }
+      if (failure !== null) {
+        wordings.push(
+          heldBack(wording, `${source.name} did not answer the wording before this one`),
+        );
+        continue;
+      }
+      if (onTopic >= limit) {
+        wordings.push(
+          heldBack(
+            wording,
+            "the wordings already sent returned as many rows naming the dish as were asked for",
+          ),
+        );
+        continue;
+      }
+
+      try {
+        const read = await withDeadline(
+          source.search(wording.query, limit),
+          this.deadlineMs,
+          source,
+        );
+        answered = true;
+        cached = cached || read.cached;
+        skipped += read.skipped;
+        if (reportedTotal === null && reportedTotalMeans === null) {
+          reportedTotal = read.reportedTotal;
+          reportedTotalMeans = read.reportedTotalMeans;
+        }
+        if (read.skipped > 0) {
+          this.logger.warn(
+            `${source.name} sent ${read.skipped} row(s) this server could not read; they were left out.`,
+          );
+        }
+
+        let added = 0;
+        for (const row of read.rows) {
+          // The identifier names its source, so two sources minting the same
+          // reference stay two rows while one recipe reached twice stays one.
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          rows.push(row);
+          added += 1;
+          if (namesDish(row.title, question)) onTopic += 1;
+        }
+
+        wordings.push({
+          query: wording.query,
+          derivation: wording.derivation,
+          ran: true,
+          count: read.rows.length,
+          added,
+          notRunBecause: null,
+          error: null,
+        });
+      } catch (error) {
+        const known = fromSource(error, source.name);
+        this.logger.warn(
+          `${source.name} did not answer "${wording.query}": [${known.code}] ${known.message}`,
+        );
+        const reason = {
           code: known.code,
           message: known.message,
           ...(known.details.hint ? { hint: known.details.hint } : {}),
-        },
-      };
+        };
+        wordings.push({
+          query: wording.query,
+          derivation: wording.derivation,
+          ran: true,
+          count: null,
+          added: null,
+          notRunBecause: null,
+          error: reason,
+        });
+        failure = reason;
+      }
     }
+
+    // Where several wordings contributed, the rows naming the dish are put in
+    // front of the rows that do not, each group keeping the order it arrived
+    // in. Without this, a first wording answering with a page of near-misses
+    // fills the limit and cuts away the rows a later wording found. A single
+    // wording is left in the order its source returned it, since there is
+    // nothing to rescue it from.
+    const contributing = wordings.filter((attempt) => (attempt.added ?? 0) > 0).length;
+    const ordered =
+      contributing > 1
+        ? [
+            ...rows.filter((row) => namesDish(row.title, question)),
+            ...rows.filter((row) => !namesDish(row.title, question)),
+          ]
+        : rows;
+
+    // A source that answered one wording answered. Reporting it as failed
+    // because a later wording timed out would hide the rows it did return
+    // behind a claim that it said nothing.
+    return {
+      source,
+      rows: ordered,
+      preferredByName: contributing > 1,
+      cached,
+      reportedTotal,
+      reportedTotalMeans,
+      skipped,
+      error: answered ? null : failure,
+      wordings,
+    };
   }
 
   /**
@@ -298,7 +477,9 @@ export class RecipesClient {
    * source has no page by this name" into somebody else's recipe with a
    * different title, which is a worse answer than the absence it replaced.
    */
-  async getRecipe(id: string): Promise<{ recipe: RecipeDetail; cached: boolean; read: ResolvedId }> {
+  async getRecipe(
+    id: string,
+  ): Promise<{ recipe: RecipeDetail; cached: boolean; read: ResolvedId }> {
     const read = resolveId(id, this.sources);
     try {
       const outcome = await withDeadline(
@@ -308,7 +489,7 @@ export class RecipesClient {
       );
       return { recipe: outcome.recipe, cached: outcome.cached, read };
     } catch (error) {
-      throw toRecipesError(error);
+      throw fromSource(error, read.source.name);
     }
   }
 }

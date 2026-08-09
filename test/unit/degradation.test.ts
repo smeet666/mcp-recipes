@@ -14,7 +14,7 @@ import { resolveId } from "../../src/sources/ids.js";
 import { runCompareRecipes } from "../../src/tools/compareRecipes.js";
 import { runGetRecipe } from "../../src/tools/getRecipe.js";
 import { runSearchRecipes } from "../../src/tools/searchRecipes.js";
-import { MAX_TEXT_CHARS, ok } from "../../src/tools/shared.js";
+import { MAX_TEXT_CHARS, mustKeep, ok } from "../../src/tools/shared.js";
 import {
   FakeSourceError,
   cookbookRecipe,
@@ -46,7 +46,11 @@ function malformed(shape: unknown) {
 describe("a row a site sent in a shape this server cannot read", () => {
   it("drops that row and keeps the rest of the answer", async () => {
     const rows = [
-      { ...marmitonRows[0]!, title: null as unknown as string, url: undefined as unknown as string },
+      {
+        ...marmitonRows[0]!,
+        title: null as unknown as string,
+        url: undefined as unknown as string,
+      },
       marmitonRows[1]!,
     ];
     const client = new RecipesClient({
@@ -167,7 +171,7 @@ describe("search_recipes when nothing answered", () => {
 
   it("does not open with a sentence that reads as an absence", async () => {
     const text = textOf(
-      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5 }),
+      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5, fan_out: true }),
     );
     expect(text).not.toMatch(/^Nothing came back/);
     expect(text).toMatch(/No source answered/);
@@ -175,7 +179,7 @@ describe("search_recipes when nothing answered", () => {
 
   it("does not claim another source found something when none did", async () => {
     const text = textOf(
-      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5 }),
+      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5, fan_out: true }),
     );
     expect(text).not.toMatch(/holds what the other sources found/);
   });
@@ -184,7 +188,7 @@ describe("search_recipes when nothing answered", () => {
     const text = textOf(
       await runSearchRecipes(
         fakeClient({ marmiton: { fail: new FakeSourceError("timeout", "too slow") } }),
-        { query: "crepes", limit_per_source: 5, sources: ["marmiton"] },
+        { query: "crepes", limit_per_source: 5, sources: ["marmiton"], fan_out: true },
       ),
     );
     expect(text).not.toMatch(/holds what the other sources found/);
@@ -254,7 +258,7 @@ describe("the credit names the sites that actually contributed", () => {
     const text = textOf(
       await runSearchRecipes(
         fakeClient({ marmiton: { fail: new FakeSourceError("timeout", "too slow") } }),
-        { query: "crepes", limit_per_source: 5 },
+        { query: "crepes", limit_per_source: 5, fan_out: true },
       ),
     );
     const credit = text.split("\n").at(-1)!;
@@ -264,11 +268,14 @@ describe("the credit names the sites that actually contributed", () => {
 });
 
 describe("a note that qualifies a degraded answer survives the budget", () => {
+  /** Notes worth reading, none of which the answer misleads without. */
+  const filler = Array.from(
+    { length: 60 },
+    (_, index) => `a detail worth knowing, number ${index}`,
+  );
+
   it("keeps a failure note when the notes have to be cut", () => {
-    const notes = [
-      ...Array.from({ length: 60 }, (_, index) => `a detail worth knowing, number ${index}`),
-      "Marmiton did not answer (timeout): it took too long.",
-    ];
+    const notes = [...filler, mustKeep("Marmiton did not answer (timeout): it took too long.")];
     const text = textOf(ok({}, "the answer", { notes }));
     expect(text).toContain("Marmiton did not answer");
     expect(text.length).toBeLessThanOrEqual(MAX_TEXT_CHARS + 200);
@@ -276,10 +283,25 @@ describe("a note that qualifies a degraded answer survives the budget", () => {
 
   it("keeps a licence when the notes have to be cut", () => {
     const notes = [
-      ...Array.from({ length: 60 }, (_, index) => `a detail worth knowing, number ${index}`),
-      "Published under Creative Commons Attribution-Share Alike 4.0: https://example.invalid/by-sa",
+      ...filler,
+      mustKeep(
+        "Published under Creative Commons Attribution-Share Alike 4.0: https://example.invalid/by-sa",
+      ),
     ];
     expect(textOf(ok({}, "the answer", { notes }))).toContain("Creative Commons");
+  });
+
+  it("keeps every note the answer misleads without, however they are worded", () => {
+    // What a note is for is what decides whether it can go, and a note saying so
+    // for itself is what keeps the next rewording of a warning from becoming a
+    // warning that can be dropped.
+    const warnings = Array.from({ length: 40 }, (_, index) =>
+      mustKeep(`the answer cannot be read safely without this, number ${index}`),
+    );
+    const text = textOf(ok({}, "the answer", { notes: [...filler, ...warnings] }));
+
+    for (const warning of warnings) expect(text).toContain(warning.text);
+    expect(text).not.toContain("a detail worth knowing");
   });
 });
 
@@ -295,7 +317,10 @@ describe("get_recipe says what was not asked for, apart from what a site does no
 
   it("returns a time the source does publish, once the section is asked for", async () => {
     const payload = payloadOf<{ recipe: { total_minutes: number | null } }>(
-      await runGetRecipe(fakeClient(), recipeArgs({ id: "cookbook:Cookbook:Crepes", sections: ["times"] })),
+      await runGetRecipe(
+        fakeClient(),
+        recipeArgs({ id: "cookbook:Cookbook:Crepes", sections: ["times"] }),
+      ),
     );
     expect(payload.recipe.total_minutes).toBe(45);
   });
@@ -303,9 +328,9 @@ describe("get_recipe says what was not asked for, apart from what a site does no
 
 describe("an identifier that cannot be decoded", () => {
   it("is refused as bad input rather than reported as a network failure", () => {
-    expect(() => resolveId("https://en.wikibooks.org/wiki/Cookbook:100%_rye", fakeSources())).toThrow(
-      /percent sign/i,
-    );
+    expect(() =>
+      resolveId("https://en.wikibooks.org/wiki/Cookbook:100%_rye", fakeSources()),
+    ).toThrow(/percent sign/i);
   });
 
   it("refuses a bare dish name rather than guessing a page from it", () => {

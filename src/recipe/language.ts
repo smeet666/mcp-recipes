@@ -77,7 +77,10 @@ export interface LanguageEvidence {
  */
 export function readLanguage(
   line: string,
-  evidence: { frenchUnit: boolean; englishUnit: boolean } = { frenchUnit: false, englishUnit: false },
+  evidence: { frenchUnit: boolean; englishUnit: boolean } = {
+    frenchUnit: false,
+    englishUnit: false,
+  },
 ): LanguageEvidence {
   let french = 0;
   let english = 0;

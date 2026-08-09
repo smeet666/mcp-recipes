@@ -106,6 +106,19 @@ export function resolveFactor(args: ScaleIngredientsArgs): number {
   );
 }
 
+/**
+ * The factor as a reader can check the quantities against.
+ *
+ * A pair of serving counts divides into a repeating decimal, so what is stated
+ * is shortened. Shortening it to three places puts a small factor at zero, and
+ * "Scaled by 0" beside quantities that are not zero contradicts the answer it
+ * introduces; below that, the significant digits are what says what happened.
+ */
+function statedFactor(factor: number): number {
+  const shortened = Math.round(factor * 1000) / 1000;
+  return shortened === 0 ? Number(factor.toPrecision(3)) : shortened;
+}
+
 export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
   try {
     const factor = resolveFactor(args);
@@ -153,13 +166,13 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
 
     return ok(
       {
-        factor: Math.round(factor * 1000) / 1000,
+        factor: statedFactor(factor),
         language: args.language,
         ingredients: scaled.map(toIngredientPayload),
         ...counts,
         notes,
       },
-      `Scaled by ${Math.round(factor * 1000) / 1000}:\n${body}`,
+      `Scaled by ${statedFactor(factor)}:\n${body}`,
       { notes, credit: "Source: the list you supplied. Scaled offline; nothing was fetched." },
     );
   } catch (error) {

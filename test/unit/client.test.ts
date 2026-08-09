@@ -143,7 +143,22 @@ describe("a search that cannot be made", () => {
   });
 
   it("refuses a request naming no source at all", async () => {
-    await expect(fakeClient().searchRecipes("crepes", 5, [])).rejects.toThrow(/at least one source/);
+    await expect(fakeClient().searchRecipes("crepes", 5, [])).rejects.toThrow(
+      /at least one source/,
+    );
+  });
+
+  it("refuses a query carrying no word to look for", async () => {
+    // An index handed nothing to match on answers with whatever it shows by
+    // default, and those rows would be served as recipes for this query.
+    await expect(fakeClient().searchRecipes("!!!", 5)).rejects.toMatchObject({
+      code: "invalid_input",
+    });
+    await expect(fakeClient().searchRecipes("--- ...", 5)).rejects.toMatchObject({
+      code: "invalid_input",
+    });
+    // One character is a word in the scripts that write one that way.
+    await expect(fakeClient().searchRecipes("米", 5)).resolves.toBeDefined();
   });
 });
 
@@ -166,5 +181,26 @@ describe("reading one recipe", () => {
   it("gives back an identifier that names the source it came from", async () => {
     const read = await fakeClient().getRecipe("marmiton:1001");
     expect(read.recipe.id).toBe("marmiton:1001");
+  });
+
+  it("answers in its own words, quoting what the site said", async () => {
+    const upstream = new FakeSourceError(
+      "not_found",
+      "The specified title (Cookbook:) does not refer to a wiki page.",
+      { hint: "Please report this at https://example.invalid/another-project/issues" },
+    );
+    const failing = fakeClient({ cookbook: { failRecipe: upstream } });
+
+    const raised = await failing
+      .getRecipe("cookbook:Cookbook:Crepes")
+      .then(() => null)
+      .catch((error: unknown) => error as RecipesError);
+
+    expect(raised?.code).toBe("not_found");
+    // The site's own sentence is quoted and credited to the site, rather than
+    // served as this server's finding.
+    expect(raised?.message).toMatch(/^Wikibooks Cookbook holds nothing/);
+    expect(raised?.message).toContain('"The specified title (Cookbook:) does not refer');
+    expect(raised?.details.hint ?? "").not.toContain("example.invalid");
   });
 });

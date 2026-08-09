@@ -64,6 +64,36 @@ export const reportSchema = z.object({
     .int()
     .describe("Rows this source sent in a shape the server could not read, and left out."),
   cached: z.boolean().describe("Served from this server's short-lived in-memory cache."),
+  preferred_by_name: z
+    .boolean()
+    .describe(
+      "Whether this source's rows were arranged so the ones whose title names the dish come first. An order over one source's own rows, never a score against another source.",
+    ),
+  wordings: z
+    .array(
+      z.object({
+        query: z.string().describe("What was sent to this source, or would have been."),
+        derivation: z.string().describe("How this wording was derived from the question."),
+        ran: z.boolean(),
+        count: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Rows this wording returned. Null when it did not run."),
+        added: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Rows it returned that no earlier wording had."),
+        not_run_because: z.string().nullable().describe("Why it was held back. Null when it ran."),
+        error: z
+          .object({ code: z.string(), message: z.string(), hint: z.string().optional() })
+          .nullable(),
+      }),
+    )
+    .describe(
+      "Every wording this source was sent or held back from, in the order tried. A question written as a sentence is also sent in wordings derived from it, because these indexes answer the words they are handed. Counts here belong to one wording each and are never added.",
+    ),
   error: z
     .object({
       code: z.string(),
@@ -147,6 +177,16 @@ export function toReportPayload(report: SourceReport): z.infer<typeof reportSche
     reported_total_means: report.reportedTotalMeans,
     skipped: report.skipped,
     cached: report.cached,
+    preferred_by_name: report.preferredByName,
+    wordings: report.wordings.map((attempt) => ({
+      query: attempt.query,
+      derivation: attempt.derivation,
+      ran: attempt.ran,
+      count: attempt.count,
+      added: attempt.added,
+      not_run_because: attempt.notRunBecause,
+      error: attempt.error,
+    })),
     error: report.error ?? null,
     // A search alone opens nothing, so only a tool that reads a row fills this
     // in, through `withRead`.
@@ -163,13 +203,49 @@ export function withRead(
 }
 
 /**
+ * A sentence qualifying an answer.
+ *
+ * The text block has room for a limited number of them, so something gives when
+ * an answer carries more, and a note the answer would mislead without says so
+ * for itself. Whoever writes a note knows what it is for; deciding it later
+ * from the words the note happens to use makes every rewording of a warning a
+ * warning that can be dropped, and the notes most often reworded are the ones
+ * written to correct a specific misreading.
+ */
+export type Note = string | EssentialNote;
+
+export interface EssentialNote {
+  text: string;
+  /** The answer misleads without this sentence. */
+  essential: true;
+}
+
+/** Mark a note the answer cannot be read safely without. */
+export function mustKeep(text: string): EssentialNote {
+  return { text, essential: true };
+}
+
+export function noteText(note: Note): string {
+  return typeof note === "string" ? note : note.text;
+}
+
+export function noteTexts(notes: readonly Note[]): string[] {
+  return notes.map(noteText);
+}
+
+/** Name the recipe a note is about, keeping what the note is worth. */
+export function labelNote(label: string, note: Note): Note {
+  return typeof note === "string" ? `${label}: ${note}` : mustKeep(`${label}: ${note.text}`);
+}
+
+/**
  * Turn the per-source reports into sentences a reader can act on.
  *
  * A failed source is named with the reason, so an answer holding part of what
  * was asked for never reads as the whole of what exists.
  */
-export function reportNotes(reports: SourceReport[]): string[] {
-  const notes: string[] = [];
+export function reportNotes(reports: SourceReport[]): Note[] {
+  const notes: Note[] = [];
 
   const answered = reports.filter((report) => report.status === "answered");
   const failed = reports.filter((report) => report.status === "failed");
@@ -183,25 +259,57 @@ export function reportNotes(reports: SourceReport[]): string[] {
         ? `This answer holds what the other sources found, and says nothing about what ${report.name} holds.`
         : "Nothing here is evidence about what it holds.";
     notes.push(
-      `${report.name} did not answer (${report.error?.code}): ${report.error?.message} ${consolation}`,
+      mustKeep(
+        `${report.name} did not answer (${report.error?.code}): ${report.error?.message} ${consolation}`,
+      ),
     );
   }
 
   for (const report of answered) {
+    const sent = report.wordings.filter((attempt) => attempt.ran && attempt.error === null);
+
     if (report.count === 0) {
       notes.push(
-        `${report.name} answered and offered no row for this wording. That is a statement about ` +
-          "the wording as much as about the corpus: try the dish's name in another language, or a " +
-          "main ingredient.",
+        mustKeep(
+          sent.length > 1
+            ? `${report.name} answered and offered no row for any of the ${sent.length} wordings it was ` +
+                `sent (${sent.map((attempt) => `"${attempt.query}"`).join(", ")}). Each of those is a ` +
+                "statement about a wording; together they are the closest this server comes to saying " +
+                "the corpus holds nothing. Try a main ingredient, or the dish's name in the language " +
+                "that source publishes in."
+            : `${report.name} answered and offered no row for this wording. That is a statement about ` +
+                "the wording as much as about the corpus: try the dish's name in another language, or a " +
+                "main ingredient.",
+        ),
+      );
+    }
+    if (sent.length > 1) {
+      notes.push(
+        `${report.name} was asked ${sent.length} wordings and these rows are their union: ${sent
+          .map((attempt) => `"${attempt.query}" (${attempt.count ?? 0})`)
+          .join(", ")}. Those counts are per wording and are never added.`,
+      );
+    }
+    if (report.preferredByName) {
+      notes.push(
+        `${report.name}'s rows are arranged with the ones naming the dish first, so a wording that ` +
+          "returned near-misses cannot crowd out what another wording found. That is an order over " +
+          "one source's own rows and not a score against any other source.",
       );
     }
     if (report.skipped > 0) {
       notes.push(
-        `${report.name} sent ${report.skipped} row(s) in a shape this server could not read, and they were left out.`,
+        mustKeep(
+          `${report.name} sent ${report.skipped} row(s) in a shape this server could not read, and they were left out.`,
+        ),
       );
     }
     if (report.reportedTotal !== null && report.reportedTotalMeans !== null) {
-      notes.push(`${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.`);
+      const forWording =
+        sent.length > 1 ? ` That number belongs to "${sent[0]!.query}" alone.` : "";
+      notes.push(
+        `${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.${forWording}`,
+      );
     } else {
       notes.push(
         `${report.name} states no total and offers no second page, so a short list here is not evidence that little exists.`,
@@ -214,7 +322,7 @@ export function reportNotes(reports: SourceReport[]): string[] {
     notes.push(
       `${mixing.map((report) => report.name).join(" and ")} files pages about an ingredient beside ` +
         "recipes using it, so a row here can be a page about an ingredient rather than a recipe. " +
-        "get_recipe says when a page carries no ingredient list.",
+        "get_recipe says what it read off the page.",
     );
   }
 
@@ -289,17 +397,6 @@ export function quoteForeign(value: string): string {
 }
 
 /**
- * Notes that have to survive when the block is too long for all of them.
- *
- * A note saying a source failed, a note carrying the terms a page is published
- * under, and a note saying an answer is smaller than it looks are the ones a
- * reader most needs and the ones an over-long answer is most likely to have.
- * Dropping from the end alone would drop exactly these.
- */
-const LOAD_BEARING =
-  /did not answer|could not be read|no longer holds its share|Published under|licen[cs]e|https?:\/\/|rather than a comparison|states no number of servings|no ingredient list|offered no row/i;
-
-/**
  * How much of the block the notes may take.
  *
  * Enough for the sentences that qualify an answer, while leaving the answer
@@ -309,47 +406,48 @@ const LOAD_BEARING =
 const NOTE_BUDGET = Math.round(MAX_TEXT_CHARS * 0.55);
 
 export interface OkOptions {
-  notes?: string[];
+  notes?: readonly Note[];
   /** The line that credits whoever published what the answer holds. */
   credit?: string;
 }
 
 /**
- * Build a result whose text block ends with its notes and its credit.
- *
- * The body is cut to fit around the trailer rather than the whole block being
- * cut afterwards. Appending the credit and then truncating loses exactly the
- * credit, which is the one line that must survive.
- *
- * Notes qualify an answer: that a source failed, that a quantity was rounded,
- * that a count means one thing here and another there. A client that shows only
- * the text would otherwise present an unqualified answer, so they travel with
- * the credit.
- */
-/**
  * The notes the block will carry, and the trailer they make with the credit.
  *
- * A long run of notes must not crowd out the answer it qualifies. What goes
- * first is the last note that qualifies the answer least, so the ones a reader
- * cannot do without are still there when the room runs out. Whatever is dropped
- * stays in the structured output.
+ * A long run of notes must not crowd out the answer it qualifies, so the last
+ * note the answer reads correctly without goes first and the ones it misleads
+ * without are still there when the room runs out. Whatever is dropped stays in
+ * the structured output.
  */
 function buildTrailer(options: OkOptions): string {
-  const credit = options.credit ?? "Source: this server called none.";
-  const kept = [...new Set(options.notes ?? [])];
+  const kept: Note[] = [];
+  const held = new Set<string>();
+  for (const note of options.notes ?? []) {
+    const text = noteText(note);
+    if (held.has(text)) continue;
+    held.add(text);
+    kept.push(note);
+  }
 
-  while (kept.length > 0 && kept.join("\n").length > NOTE_BUDGET) {
-    let victim = kept.length - 1;
+  const length = (): number => kept.map(noteText).join("\n").length;
+
+  while (kept.length > 0 && length() > NOTE_BUDGET) {
+    let victim = -1;
     for (let index = kept.length - 1; index >= 0; index -= 1) {
-      if (!LOAD_BEARING.test(kept[index]!)) {
+      if (typeof kept[index] === "string") {
         victim = index;
         break;
       }
     }
+    // Room runs out with nothing but the sentences the answer misleads without.
+    // Dropping one of those buys space by removing the warning the answer most
+    // needed, so the body gives up its own room instead.
+    if (victim === -1) break;
     kept.splice(victim, 1);
   }
 
-  return [...kept.map((note) => `Note: ${note}`), credit].join("\n");
+  const credit = options.credit ?? "Source: this server called none.";
+  return [...kept.map((note) => `Note: ${noteText(note)}`), credit].join("\n");
 }
 
 /**
@@ -404,6 +502,41 @@ export function toToolError(error: unknown): ToolResult {
  */
 export function roomForBody(options: OkOptions = {}): number {
   return Math.max(200, MAX_TEXT_CHARS - buildTrailer(options).length - 60);
+}
+
+/**
+ * The opening of a list, and how much of it is not here.
+ *
+ * The sentences qualifying an answer keep their room, which leaves the result
+ * lines as the thing that gives way when a block runs short. Giving way to
+ * nothing at all, in silence, is what turns a hundred ingredients into a recipe
+ * that appears to need none, so a few lines are kept whatever the room allows
+ * and the caller is told how many are missing.
+ */
+export interface FittedLines {
+  lines: string[];
+  hidden: number;
+}
+
+/** Lines that were always going to be shown, however tight the block is. */
+const ALWAYS_SHOWN = 3;
+
+export function fitLines(lines: readonly string[], room: number): FittedLines {
+  const kept: string[] = [];
+  let used = 0;
+
+  for (const line of lines) {
+    if (kept.length >= ALWAYS_SHOWN && used + line.length > room) break;
+    kept.push(line);
+    used += line.length + 1;
+  }
+
+  return { lines: kept, hidden: lines.length - kept.length };
+}
+
+/** What a block says about the rows it had no room for. */
+export function omittedLinesLine(shown: number, total: number, what: string): string {
+  return `… ${shown} of ${total} ${what} shown here; all ${total} are in the structured output`;
 }
 
 export function truncate(text: string, maxChars: number): string {

@@ -40,7 +40,13 @@ describe("five consecutive passes agree", () => {
   it("on a search across every source", async () => {
     identical(
       await fiveTimes(async () =>
-        textOf(await runSearchRecipes(fakeClient(), { query: "crepes", limit_per_source: 5 })),
+        textOf(
+          await runSearchRecipes(fakeClient(), {
+            query: "crepes",
+            limit_per_source: 5,
+            fan_out: true,
+          }),
+        ),
       ),
     );
   });
@@ -49,7 +55,10 @@ describe("five consecutive passes agree", () => {
     identical(
       await fiveTimes(async () =>
         textOf(
-          await runGetRecipe(fakeClient(), recipeArgs({ id: "marmiton:1001", servings: 9, sections: ["ingredients", "steps"] })),
+          await runGetRecipe(
+            fakeClient(),
+            recipeArgs({ id: "marmiton:1001", servings: 9, sections: ["ingredients", "steps"] }),
+          ),
         ),
       ),
     );
@@ -58,9 +67,7 @@ describe("five consecutive passes agree", () => {
   it("on a comparison", async () => {
     identical(
       await fiveTimes(async () =>
-        textOf(
-          await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes", servings: 7 })),
-        ),
+        textOf(await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes", servings: 7 }))),
       ),
     );
   });
@@ -83,7 +90,10 @@ describe("five consecutive passes agree", () => {
 describe("nothing in an answer is a clock reading", () => {
   it("carries no timestamp and no elapsed time", async () => {
     const text = textOf(
-      await runGetRecipe(fakeClient(), recipeArgs({ id: "marmiton:1001", servings: 8, sections: ["ingredients", "times"] })),
+      await runGetRecipe(
+        fakeClient(),
+        recipeArgs({ id: "marmiton:1001", servings: 8, sections: ["ingredients", "times"] }),
+      ),
     );
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
     expect(text).not.toMatch(/\bms\b|\belapsed\b|\btook \d/);
@@ -93,7 +103,11 @@ describe("nothing in an answer is a clock reading", () => {
     const at = async (instant: string) => {
       vi.setSystemTime(new Date(instant));
       return textOf(
-        await runSearchRecipes(fakeClient(), { query: "crepes", limit_per_source: 5 }),
+        await runSearchRecipes(fakeClient(), {
+          query: "crepes",
+          limit_per_source: 5,
+          fan_out: true,
+        }),
       );
     };
     expect(await at("2020-01-01T00:00:00.000Z")).toBe(await at("2030-12-31T23:59:59.000Z"));

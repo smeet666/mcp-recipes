@@ -95,7 +95,7 @@ describe("an argument no tool declares", () => {
   it("lists the names the tool does take", async () => {
     const client = await connect();
     const result = await call(client, "search_recipes", { query: "carbonara", limit: 3 });
-    expect(result.text).toContain("This tool takes: query, limit_per_source, sources.");
+    expect(result.text).toContain("This tool takes: query, limit_per_source, sources, fan_out.");
     await client.close();
   });
 

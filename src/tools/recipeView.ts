@@ -10,8 +10,18 @@
 import { z } from "zod";
 import { passthroughIngredients, scaleIngredients } from "../recipe/scale.js";
 import type { ScaledIngredient } from "../recipe/scale.js";
+import { headingFor } from "../recipe/sections.js";
+import type { PagePart } from "../recipe/sections.js";
 import type { RecipeDetail } from "../types.js";
-import { ingredientSchema, quoteForeign, toIngredientPayload, truncate } from "./shared.js";
+import {
+  ingredientSchema,
+  labelNote,
+  mustKeep,
+  quoteForeign,
+  toIngredientPayload,
+  truncate,
+} from "./shared.js";
+import type { Note } from "./shared.js";
 
 export const yieldSchema = z.object({
   original_count: z
@@ -109,7 +119,7 @@ export type Section = (typeof SECTIONS)[number];
 
 export interface RecipeView {
   payload: RecipePayload;
-  notes: string[];
+  notes: Note[];
   ingredients: ScaledIngredient[];
 }
 
@@ -124,21 +134,23 @@ export interface RecipeView {
 function resolveFactor(
   recipe: RecipeDetail,
   servings: number | null,
-): { factor: number | null; notes: string[] } {
+): { factor: number | null; notes: Note[] } {
   if (servings === null) return { factor: null, notes: [] };
 
   if (recipe.yieldCount === null || recipe.yieldCount <= 0) {
     return {
       factor: null,
       notes: [
-        `${recipe.sourceName} states no number of servings for this recipe, so the quantities are ` +
-          "as published. Use scale_ingredients with a factor you choose if you know what it serves.",
+        mustKeep(
+          `${recipe.sourceName} states no number of servings for this recipe, so the quantities are ` +
+            "as published. Use scale_ingredients with a factor you choose if you know what it serves.",
+        ),
       ],
     };
   }
 
   const factor = servings / recipe.yieldCount;
-  const notes: string[] = [];
+  const notes: Note[] = [];
 
   if (factor === 1) {
     return {
@@ -174,6 +186,80 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+/** One part of a recipe, in the words an answer needs to talk about it. */
+interface PartWords {
+  part: PagePart;
+  /** A single entry of it, as a sentence names one. */
+  entry: string;
+  /** The whole of it, as a page publishes it. */
+  whole: string;
+  /** The reading of an empty one that has to be shut off. */
+  caution: string;
+}
+
+const INGREDIENTS_PART: PartWords = {
+  part: "ingredients",
+  entry: "ingredient line",
+  whole: "ingredient list",
+  caution: "An empty list here is never evidence that an ingredient is absent from the dish.",
+};
+
+const METHOD_PART: PartWords = {
+  part: "method",
+  entry: "step of method",
+  whole: "method",
+  caution: "An empty method here is never evidence that the dish is made without one.",
+};
+
+/**
+ * What a part of a recipe that came back empty is allowed to say.
+ *
+ * Reading nothing off a page is a fact about this server, and stating it as a
+ * fact about the page turns a failure of this reader into a claim the page
+ * never made. Someone looking for a dish without butter, told that a page
+ * publishes no ingredients, concludes there is no butter in it; the page can
+ * open on butter.
+ *
+ * Two things the page itself shows settle it. A heading announcing the part
+ * says the page published one. Another part of the recipe that was read says
+ * the page is a recipe. Either of them makes an empty result this server's
+ * failure, and the answer says so. Where the page shows neither, the answer
+ * says the two cannot be told apart from here rather than picking whichever
+ * reads more fluently.
+ */
+function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
+  const heading = headingFor(words.part, recipe.publishedSections);
+  const counterpart =
+    words.part === "ingredients"
+      ? recipe.steps.length > 0
+        ? `${recipe.steps.length} step(s) of method were read from it`
+        : null
+      : recipe.ingredients.length > 0
+        ? `${recipe.ingredients.length} ingredient line(s) were read from it`
+        : null;
+
+  const shown = [
+    heading === null ? null : `the page heads a section "${quoteForeign(heading)}"`,
+    counterpart,
+  ].filter((clause): clause is string => clause !== null);
+
+  if (shown.length > 0) {
+    return mustKeep(
+      `No ${words.entry} was read from this page, yet ${shown.join(" and ")}. This server failed ` +
+        `to read the ${words.whole} the page carries; read it at the url. ${words.caution}`,
+    );
+  }
+
+  // Naming the headings as evidence requires having seen them, and a source
+  // that reports none has shown nothing either way.
+  const looked = recipe.publishedSections === null ? "" : ", which heads no section announcing one";
+  return mustKeep(
+    `No ${words.entry} was read from this page${looked}. A page publishing no ${words.whole} and ` +
+      `one written in a layout this server cannot follow look the same from here, so read the url ` +
+      `before settling which this is. ${words.caution}`,
+  );
+}
+
 export interface BuildOptions {
   servings: number | null;
   sections: readonly Section[];
@@ -203,17 +289,15 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
       ? passthroughIngredients(recipe.ingredients, recipe.language)
       : scaleIngredients(recipe.ingredients, { factor, language: recipe.language });
 
-  const notes: string[] = [...yieldNotes];
+  const notes: Note[] = [...yieldNotes];
 
-  // A page can carry no ingredient list at all, and only reading it tells that
-  // apart from a recipe. Returning an empty list in silence reads as a recipe
-  // that needs no ingredients.
-  if (recipe.ingredients.length === 0) {
-    notes.push(
-      `${recipe.sourceName} publishes no ingredient list on this page. It is likely a page about ` +
-        "the dish rather than a recipe for it, so there is nothing here to scale. Search again " +
-        "and pick another row.",
-    );
+  // Returning an empty list in silence reads as a recipe that needs no
+  // ingredients, and an empty method as a dish that needs no cooking.
+  if (wants("ingredients") && recipe.ingredients.length === 0) {
+    notes.push(emptyPartNote(recipe, INGREDIENTS_PART));
+  }
+  if (wants("steps") && recipe.steps.length === 0) {
+    notes.push(emptyPartNote(recipe, METHOD_PART));
   }
 
   const rounded = ingredients.filter((entry) => entry.scaling === "rounded");
@@ -232,7 +316,9 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
   }
   if (recipe.license) {
     notes.push(
-      `Published under ${quoteForeign(recipe.license.title)}: ${quoteForeign(recipe.license.url)}`,
+      mustKeep(
+        `Published under ${quoteForeign(recipe.license.title)}: ${quoteForeign(recipe.license.url)}`,
+      ),
     );
   }
 
@@ -294,7 +380,7 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
 
   if (options.label) {
     const label = quoteForeign(options.label);
-    return { payload, notes: notes.map((line) => `${label}: ${line}`), ingredients };
+    return { payload, notes: notes.map((line) => labelNote(label, line)), ingredients };
   }
   return { payload, notes, ingredients };
 }

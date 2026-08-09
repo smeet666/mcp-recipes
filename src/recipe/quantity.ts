@@ -11,6 +11,8 @@ import type { Language, LanguageChoice, LanguageEvidence } from "./language.js";
 import { readLanguage } from "./language.js";
 import type { UnitInfo } from "./units.js";
 import {
+  CONTAINER_NOUN,
+  demoteUnit,
   lookupUnit,
   normalizeUnitKey,
   readContainerLoad,
@@ -169,6 +171,110 @@ function isStatedSize(text: string): boolean {
 
   return !CONTAINER_CONTENTS.test(measure.rest);
 }
+
+/**
+ * A second measure a line writes straight after the first, both of them naming
+ * one quantity: "1 lb 4 oz beef", "2 kg 300 g de farine", and the French
+ * "1 kg 500", which leaves the smaller unit for the reader to supply.
+ *
+ * What joins the two members is the ladder: the second is written in the unit
+ * the first steps down to, and it holds less than one of the first. A measure
+ * from another ladder restates the quantity instead of continuing it, and a
+ * number followed by a food names a second ingredient; neither is folded in
+ * here.
+ *
+ * The share the second member adds is returned rather than the number itself,
+ * so the quantity comes out as one amount in the unit the line opened with:
+ * 1 lb 4 oz is 1.25 lb, and doubling it gives the 2.5 lb a butcher weighs.
+ * Reading only the first member leaves the rest of the quantity sitting in the
+ * item name, where doubling the line loses it.
+ *
+ * The two members can be joined by a sign or a word saying they add up, as in
+ * "2 c. à s. + 1 c. à c.". The joiner is read wherever the same ladder relation
+ * holds, since it states outright what juxtaposition leaves implicit.
+ */
+function takeCompoundMember(
+  text: string,
+  unit: UnitInfo | null,
+  language: Language,
+): { adds: number; rest: string } | null {
+  if (!unit) return null;
+  const step = demoteUnit(unit);
+  if (!step) return null;
+
+  const joiner = ADDS_UP.exec(text);
+  if (joiner) text = text.slice(joiner[0].length);
+
+  const second = parseLeadingQuantity(text, language);
+  if (!second || second.amount <= 0 || second.amount >= step.per) return null;
+
+  const after = text.slice(second.length);
+  const measure = takeUnit(after.trimStart(), language);
+  if (measure.unit) {
+    if (measure.unit.canonical !== step.unit.canonical) return null;
+    return { adds: second.amount / step.per, rest: measure.rest.trimStart() };
+  }
+
+  // The unwritten form: "1 kg 500" is a kilo and five hundred grams. It is read
+  // only where a mass or a volume opened the line, and only where nothing but
+  // the partitive follows the figure, so "1 cup 2 eggs" stays two eggs.
+  if (unit.kind !== "measured") return null;
+  if (!Number.isInteger(second.amount)) return null;
+  const trailing = after.trimStart();
+  if (trailing !== "" && !/^(?:de\s|d'|du\s|des\s|,)/i.test(trailing)) return null;
+
+  return { adds: second.amount / step.per, rest: trailing };
+}
+
+/** How a line joins two measures that add up to one quantity. */
+const ADDS_UP = /^\s*(?:\+|et|and|plus)\s+/i;
+
+/**
+ * A mark a page opens an ingredient line with, in front of the quantity.
+ *
+ * A bullet, a dash or a picture of the food is decoration: it says nothing
+ * about how much, and a reader stopping at it answers that the line carries no
+ * quantity, so a doubled recipe keeps the published amount of whatever the mark
+ * stood in front of. It is set aside for reading and put back for writing.
+ *
+ * The signs that say an amount is loose are excluded, because those do carry a
+ * claim about the figure behind them, and the mark has to be followed by space
+ * so that a bracket or a decimal point opening a line is left where it is.
+ */
+const LEADING_DECORATION = /^(?:(?!~|≈|\()[^\p{L}\p{N}\s])+(?=\s)/u;
+
+/** The mark a line opens with, or null when it opens on the quantity. */
+function takeDecoration(text: string): string | null {
+  const match = LEADING_DECORATION.exec(text);
+  return match ? match[0] : null;
+}
+
+/** Whether a word names something a food is sold in. */
+function namesContainer(word: string | undefined): boolean {
+  return word !== undefined && CONTAINER_NOUN.test(normalizeUnitKey(word));
+}
+
+/**
+ * Measures of time, in either language.
+ *
+ * An ingredient list carries lines that state a length rather than an amount:
+ * a rest, a proof, a marinade, a bake. The factor says how much of the dish to
+ * make, and how long a dough takes to rise is no part of that.
+ */
+const TIME_UNIT: Record<Language, RegExp> = {
+  en: /^(?:h|hr|hrs|hours?|mins?|minutes?|secs?|seconds?|days?|nights?|weeks?)\b/i,
+  fr: /^(?:h|mn|heures?|mins?|minutes?|secs?|secondes?|jours?|nuits?|semaines?)\b/i,
+};
+
+/**
+ * The letters a language glues to a figure to make it a rank: the "er" of
+ * "1er choix", the "e" of "2e couche", the "st" of "1st choice".
+ *
+ * A rank names a position rather than an amount, so the line carries nothing to
+ * multiply. The letters have to sit against the figure; a line that puts a
+ * space between them wrote a number and then a word.
+ */
+const ORDINAL_SUFFIX = /^(?:ers?|[eè]res?|[eè]mes?|es?|st|nd|rd|th)\b/i;
 
 /**
  * A line that states its amount for one eater.
@@ -435,8 +541,12 @@ export type HeldBack =
   | "sizeQualifier"
   /** "1 dinde de 3 kg": the measure behind the item weighs one of them. */
   | "itemSize"
+  /** "12 oz can tomatoes": the measure gives what the tin holds, and no count is written. */
+  | "containerSize"
   /** "2 pommes de terre par personne": the amount is already stated for one eater. */
   | "perPerson"
+  /** "2 h de repos": the figure measures a length of time rather than an amount. */
+  | "duration"
   /** "1,500 g" with nothing to say whether the comma groups or divides. */
   | "ambiguousDecimal";
 
@@ -450,6 +560,11 @@ export interface ParsedIngredient {
    * reason. Null for the ordinary line, whose amount is the factor's to scale.
    */
   heldBack: HeldBack | null;
+  /**
+   * The mark the page opened the line with, in front of the quantity, such as a
+   * bullet or a picture of the food. It goes back where the page had it.
+   */
+  decoration: string | null;
   /**
    * The sign or word the page put before the amount to say it is loose, as in
    * the "~" of "~1 cup water". Null when the page stated the amount plainly.
@@ -477,11 +592,23 @@ export interface ParsedIngredient {
    */
   alternates: Measure[];
   /**
-   * How the line introduced its equivalents: in brackets, as in "450 g (1
-   * pound)", or after a slash, as in "500 g / 1.1 lb". The rewrite puts them
-   * back the way the line offered them.
+   * How the line introduced its equivalents: in brackets beside the amount, as
+   * in "450 g (1 pound)", after a slash, as in "500 g / 1.1 lb", or in a
+   * bracket closing the line, as in "1 cup milk (240 ml)". The rewrite puts
+   * them back the way the line offered them.
    */
-  alternateStyle: "bracket" | "slash" | null;
+  alternateStyle: "bracket" | "slash" | "trailing" | null;
+  /**
+   * The word the bracket opened on, as in the "soit" of "(soit 3/4 de tasse)".
+   * Null when the line stated the equivalent without one.
+   */
+  alternateIntro: string | null;
+  /**
+   * A bracket giving what one container holds, as in "1 (14 oz) can", exactly
+   * as the page wrote it. The count is the factor's to multiply and this figure
+   * is not, so it goes back untouched.
+   */
+  capacity: string | null;
   /** What the amount and the measure apply to, such as "farine" or "egg yolks". */
   item: string;
   /**
@@ -498,8 +625,16 @@ export interface ParsedIngredient {
   countMultiplier: number | null;
 }
 
-/** Articles a French line writes where a digit would go, and what they count as. */
-const FRENCH_ARTICLES: Record<string, number> = { un: 1, une: 1, quelques: 3 };
+/**
+ * Articles a French line writes where a digit would go, and what they count as.
+ *
+ * "un" and "une" are the number one written out, so a line using one has stated
+ * a count. A word that says merely that there are several, "quelques" as much
+ * as "plusieurs" or the English "a few", has stated none: any figure put behind
+ * it is this server's reading rather than the page's quantity, and a reading
+ * multiplied is a number nobody wrote.
+ */
+const FRENCH_ARTICLES: Record<string, number> = { un: 1, une: 1 };
 
 /**
  * Take a measure off the front of `text`, longest spelling first, so "cuillère
@@ -515,11 +650,9 @@ export function takeUnit(
     if (normalized !== key && !normalized.startsWith(`${key} `)) continue;
     const unit = lookupUnit(key, language);
     if (!unit) continue;
-    // Consume the same number of words from the original text, which may be
-    // spelled with accents the normalized key has lost.
-    const wordCount = key.split(" ").length;
-    const words = text.trim().split(/\s+/);
-    return { unit, rest: words.slice(wordCount).join(" ") };
+    const rest = afterKey(text, key);
+    if (rest === null) continue;
+    return { unit, rest };
   }
 
   if (language === "en") {
@@ -529,6 +662,25 @@ export function takeUnit(
   }
 
   return { unit: null, rest: text };
+}
+
+/**
+ * What stands after the measure a key names, or null when the key does not line
+ * up with the words the line is written in.
+ *
+ * How many words a key spells and how many words the line spends on it are
+ * different numbers: normalising turns the abbreviation "c.à.s" into the three
+ * words "c a s", and the line writes it as one. Consuming the key's own word
+ * count would take two words of the ingredient with it, so the words the line
+ * wrote are consumed one at a time until they normalise to the key.
+ */
+function afterKey(text: string, key: string): string | null {
+  const words = text.trim().split(/\s+/);
+  for (let count = 1; count <= words.length; count += 1) {
+    if (normalizeUnitKey(words.slice(0, count).join(" ")) !== key) continue;
+    return words.slice(count).join(" ");
+  }
+  return null;
 }
 
 /**
@@ -578,7 +730,9 @@ function readEvidence(line: string): LanguageEvidence {
  */
 export function parseIngredient(line: string, choice: LanguageChoice = "auto"): ParsedIngredient {
   const original = line;
-  const text = readable(line);
+  const marked = readable(line);
+  const decoration = takeDecoration(marked);
+  const text = decoration ? marked.slice(decoration.length).trimStart() : marked;
   const evidence = readEvidence(text);
   const language = choice === "auto" ? evidence.language : choice;
 
@@ -586,6 +740,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     original,
     language,
     heldBack,
+    decoration,
     approximation: null,
     measureAdjective: null,
     amount: null,
@@ -594,6 +749,8 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     unit: null,
     alternates: [],
     alternateStyle: null,
+    alternateIntro: null,
+    capacity: null,
     item: text,
     articleWord: null,
     countMultiplier: null,
@@ -611,7 +768,14 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "4 to 5-pound roast" is one roast that weighs that much.
-  if (/^-\p{L}/u.test(stated.slice(quantity.length))) return empty("sizeQualifier");
+  const behindFigure = stated.slice(quantity.length);
+  if (/^-\p{L}/u.test(behindFigure)) return empty("sizeQualifier");
+
+  // A rank names a position in an order, and there is no amount in it.
+  if (quantity !== article && ORDINAL_SUFFIX.test(behindFigure)) return empty(null);
+
+  // A length of time belongs to the method rather than to the proportions.
+  if (TIME_UNIT[language].test(behindFigure.trimStart())) return empty("duration");
 
   let rest = stated.slice(quantity.length).trimStart();
   // "two thirds of a cup" names a share of one cup, and the measure stands
@@ -637,13 +801,42 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   const leading = direct.unit ? direct : behind?.unit ? behind : direct;
   rest = leading.rest;
 
-  const bracketed = takeAlternates(rest, language);
-  rest = bracketed.rest;
+  // A range gives two amounts, and a second member behind it would belong to
+  // one of them without saying which.
+  const compound = range ? null : takeCompoundMember(rest, leading.unit, language);
+  if (compound) rest = compound.rest;
+  const whole = quantity.amount + (compound?.adds ?? 0);
+
+  // The partitive can stand between the measure and the bracket restating it,
+  // as in "150 g de (3/4 de tasse) de sucre". It introduces the equivalent
+  // rather than the food, so it is stepped over and the bracket read behind it.
+  const introducedBracket = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i.exec(rest);
+  const bracketed = takeAlternates(
+    introducedBracket ? rest.slice(introducedBracket[0].length) : rest,
+    language,
+  );
+  rest = bracketed.measures.length > 0 ? bracketed.rest : rest;
 
   const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest, language);
   if (slashed) rest = slashed.rest;
 
-  const item = stripItemLead(rest, language);
+  let item = stripItemLead(rest, language);
+
+  const trailing =
+    bracketed.measures.length === 0 && !slashed ? takeTrailingAlternates(item, language) : null;
+  if (trailing) item = trailing.item;
+
+  const group = trailing ?? (bracketed.measures.length > 0 ? bracketed : null);
+  // A measure inside a bracket beside a container gives what one of them holds,
+  // as in "1 (14 oz) can". The recipe's proportion lives in how many tins are
+  // opened, and a tin of twice the size is a tin no shop sells, so the figure
+  // goes back exactly as the page wrote it.
+  const capacity =
+    group !== null &&
+    group.measures.every((measure) => measure.unit?.kind === "measured") &&
+    (namesContainer(leading.unit?.canonical) || namesContainer(item))
+      ? group.published
+      : null;
 
   // A counted thing whose size the line states: the number the line opens with
   // is one bird, and the measure behind it is what that bird weighs.
@@ -656,19 +849,31 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   // it is the size of one of them.
   if (language === "fr" && leading.partitive && isStatedSize(item)) return empty("itemSize");
 
+  // "12 oz can tomatoes": the measure qualifies the tin, and how many tins the
+  // recipe wants is not written anywhere on the line.
+  if (leading.unit?.kind === "measured" && CONTAINER_NOUN.test(normalizeUnitKey(item))) {
+    return empty("containerSize");
+  }
+
+  const alternates = capacity !== null ? [] : (slashed?.measures ?? group?.measures ?? []);
+
   return {
     original,
     language,
     heldBack: PER_PERSON[language].test(text) ? "perPerson" : null,
+    decoration,
     approximation: loose ? loose[0] : null,
     measureAdjective: behind?.unit ? described.adjective : null,
-    amount: quantity.amount * times,
+    amount: whole * times,
     amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
     unit: leading.unit,
-    alternates: slashed ? slashed.measures : bracketed.measures,
-    alternateStyle: slashed ? "slash" : bracketed.measures.length > 0 ? "bracket" : null,
-    item: stripItemLead(rest, language),
+    alternates,
+    alternateStyle:
+      alternates.length === 0 ? null : slashed ? "slash" : trailing ? "trailing" : "bracket",
+    alternateIntro: capacity !== null ? null : (group?.intro ?? null),
+    capacity,
+    item,
     articleWord: fromArticle ? (article?.word ?? null) : null,
     countMultiplier: multiplier?.times ?? null,
   };
@@ -713,7 +918,7 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
     takeLeadingUnit(rest, language, true).unit !== null || readCountMultiplier(rest) !== null;
 
   if (language === "fr") {
-    const match = /^\s*(un|une|quelques)\b\s*/i.exec(text);
+    const match = /^\s*(un|une)\b\s*/i.exec(text);
     if (!match) return null;
     if (!counts(text.slice(match[0].length))) return null;
     const word = match[1]!;
@@ -815,24 +1020,80 @@ function stripItemLead(text: string, language: Language): string {
  * "(cup)", stays in the item text where it belongs, because scaling it would
  * mean scaling prose.
  */
-function takeAlternates(text: string, language: Language): { measures: Measure[]; rest: string } {
-  if (!text.startsWith("(")) return { measures: [], rest: text };
+function takeAlternates(text: string, language: Language): BracketedMeasures {
+  const none: BracketedMeasures = { measures: [], intro: null, published: "", rest: text };
+  if (!text.startsWith("(")) return none;
   const close = text.indexOf(")");
-  if (close < 0) return { measures: [], rest: text };
+  if (close < 0) return none;
 
-  const inside = text.slice(1, close);
-  const parts = inside.split("/").map((part) => part.trim());
+  const read = readBracket(text.slice(0, close + 1), language);
+  if (!read) return none;
+  return { ...read, rest: text.slice(close + 1).trimStart() };
+}
+
+interface BracketedMeasures {
+  measures: Measure[];
+  /** What introduced the restatement, as the line wrote it. */
+  intro: string | null;
+  /** The bracket exactly as published, for a figure that must not be scaled. */
+  published: string;
+  rest: string;
+}
+
+/**
+ * Words a page puts inside a bracket to announce that what follows restates the
+ * quantity beside it rather than adding to it.
+ */
+const EQUIVALENT_INTRODUCER = /^(?:soit|environ|about|approx\.?|approximately|or|ou|=)\s*/i;
+
+/**
+ * The partitive a line can put between a figure and the measure it names.
+ *
+ * "3/4 de tasse" and "3/4 tasse" are one quantity written two ways, and a
+ * reader that only knows the second leaves the first sitting in prose beside an
+ * amount that moved.
+ */
+const MEASURE_PARTITIVE = /^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+|of\s+)/i;
+
+/** The measure a figure names, allowing for the partitive introducing it. */
+function takeMeasureAfterQuantity(
+  text: string,
+  language: Language,
+): { unit: UnitInfo | null; rest: string } {
+  const direct = takeUnitEitherLanguage(text, language);
+  if (direct.unit) return direct;
+
+  const partitive = MEASURE_PARTITIVE.exec(text);
+  if (!partitive) return direct;
+  return takeUnitEitherLanguage(text.slice(partitive[0].length), language);
+}
+
+/**
+ * Read a whole bracket as a group of equivalent measures, or nothing.
+ *
+ * The group is only taken when every part of it reads as an amount with a
+ * measure. A bracket holding a remark, as in "(the riper the better)" or
+ * "(cup)", is prose, and scaling prose is not something a reader can check.
+ */
+function readBracket(bracket: string, language: Language): Omit<BracketedMeasures, "rest"> | null {
+  const inside = bracket.slice(1, -1);
+  const intro = EQUIVALENT_INTRODUCER.exec(inside);
+  const body = intro ? inside.slice(intro[0].length) : inside;
+  // A slash separates two ways of stating the quantity, and it also writes a
+  // fraction. One sitting between two digits belongs to the number, so
+  // "(3/4 de tasse)" is one measure rather than a three and a four.
+  const parts = body.split(/(?<!\d)\/|\/(?!\d)/).map((part) => part.trim());
   const measures: Measure[] = [];
 
   for (const part of parts) {
     const range = parseLeadingRange(part, language);
     const quantity = range ?? parseLeadingQuantity(part, language);
-    if (!quantity) return { measures: [], rest: text };
+    if (!quantity) return null;
 
-    const after = takeUnitEitherLanguage(part.slice(quantity.length).trimStart(), language);
+    const after = takeMeasureAfterQuantity(part.slice(quantity.length).trimStart(), language);
     // A trailing word means the bracket is not purely a measure, as in
     // "(1-inch pieces)", so the whole group is left as prose.
-    if (!after.unit || after.rest.trim() !== "") return { measures: [], rest: text };
+    if (!after.unit || after.rest.trim() !== "") return null;
 
     measures.push({
       amount: quantity.amount,
@@ -842,8 +1103,35 @@ function takeAlternates(text: string, language: Language): { measures: Measure[]
     });
   }
 
-  if (measures.length === 0) return { measures: [], rest: text };
-  return { measures, rest: text.slice(close + 1).trimStart() };
+  if (measures.length === 0) return null;
+  return { measures, intro: intro ? intro[0].trim() : null, published: bracket };
+}
+
+/**
+ * Read a bracket a line closes on, as in "150 g de sucre (soit 3/4 de tasse)".
+ *
+ * A page states an equivalence wherever it reads best, and after the name of
+ * the food is as common as beside the figure. Both say the same thing about the
+ * same quantity, so both move with it: a doubled line whose closing bracket
+ * still reads as published tells the cook that 300 g is three quarters of a
+ * cup.
+ */
+function takeTrailingAlternates(
+  item: string,
+  language: Language,
+): (Omit<BracketedMeasures, "rest"> & { item: string }) | null {
+  const closing = /\s*(\([^()]*\))\s*$/.exec(item);
+  if (!closing) return null;
+
+  const read = readBracket(closing[1]!, language);
+  if (!read) return null;
+
+  const head = item.slice(0, closing.index).trim();
+  // A bracket standing on its own is the quantity itself rather than a
+  // restatement of one, and there would be nothing left for it to qualify.
+  if (head === "") return null;
+
+  return { ...read, item: head };
 }
 
 /**

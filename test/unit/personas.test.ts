@@ -19,13 +19,18 @@ describe("Ben asks for a filter the sources do not offer", () => {
     const result = await runSearchRecipes(fakeClient(), {
       query: "vegan gluten-free dessert under 300 calories",
       limit_per_source: 3,
+      fan_out: true,
     });
     expect(textOf(result)).toMatch(/free text/i);
     expect(textOf(result)).toMatch(/no filter/i);
   });
 
   it("keeps quiet about it on a plain two-word question", async () => {
-    const result = await runSearchRecipes(fakeClient(), { query: "crepes", limit_per_source: 3 });
+    const result = await runSearchRecipes(fakeClient(), {
+      query: "crepes",
+      limit_per_source: 3,
+      fan_out: true,
+    });
     expect(textOf(result)).not.toMatch(/no filter/i);
   });
 });
@@ -35,12 +40,17 @@ describe("Marcus misspells the dish and only one source recognises it", () => {
     const result = await runSearchRecipes(fakeClient({ cookbook: { rows: [] } }), {
       query: "tarte tatan",
       limit_per_source: 4,
+      fan_out: true,
     });
     expect(textOf(result)).toMatch(/Wikibooks Cookbook answered and offered no row/);
   });
 
   it("does not say that of a source that contributed", async () => {
-    const result = await runSearchRecipes(fakeClient(), { query: "crepes", limit_per_source: 4 });
+    const result = await runSearchRecipes(fakeClient(), {
+      query: "crepes",
+      limit_per_source: 4,
+      fan_out: true,
+    });
     expect(textOf(result)).not.toMatch(/offered no row/);
   });
 });
@@ -50,6 +60,7 @@ describe("Amara asks vaguely and gets a page about an ingredient", () => {
     const result = await runSearchRecipes(fakeClient(), {
       query: "something with chicken and rice",
       limit_per_source: 3,
+      fan_out: true,
     });
     expect(textOf(result)).toMatch(/page about an ingredient rather than a recipe/);
   });
@@ -58,6 +69,7 @@ describe("Amara asks vaguely and gets a page about an ingredient", () => {
     const result = await runSearchRecipes(fakeClient(), {
       query: "crepes",
       limit_per_source: 3,
+      fan_out: true,
       sources: ["marmiton"],
     });
     expect(textOf(result)).not.toMatch(/page about an ingredient/);

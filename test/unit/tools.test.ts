@@ -21,7 +21,7 @@ import {
   compareArgs,
 } from "./support.js";
 
-const searchArgs: SearchRecipesArgs = { query: "crepes", limit_per_source: 5 };
+const searchArgs: SearchRecipesArgs = { query: "crepes", limit_per_source: 5, fan_out: true };
 
 describe("search_recipes", () => {
   it("returns rows from every source, each naming the one it came from", async () => {
@@ -227,6 +227,16 @@ describe("scale_ingredients", () => {
     expect(runScaleIngredients({ ingredients: ["2 eggs"], ...base }).isError).toBe(true);
   });
 
+  it("states the factor the quantities were actually multiplied by", () => {
+    const result = runScaleIngredients({
+      ingredients: ["1000 g de farine"],
+      factor: 0.0001,
+      ...base,
+    });
+    expect(payloadOf<{ factor: number }>(result).factor).toBe(0.0001);
+    expect(textOf(result)).toContain("Scaled by 0.0001");
+  });
+
   it("counts what it did to every line", () => {
     const payload = payloadOf<{
       scaled_count: number;
@@ -311,6 +321,34 @@ describe("compare_recipes", () => {
       compareArgs({ dish: "crepes" }),
     );
     expect(textOf(result)).toMatch(/answered and offered nothing close enough/);
+  });
+
+  it("states no difference about a section it did not return", async () => {
+    const result = await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes" }));
+    const payload = payloadOf<{ differences: string[] }>(result);
+
+    // The stand-ins state 30 and 45 minutes, so a comparison of times is there
+    // to be made; the call asked for ingredients alone, and the answer carries
+    // no time to read the claim against.
+    expect(payload.differences.some((line) => /minutes|no time/i.test(line))).toBe(false);
+  });
+
+  it("compares times when times were asked for", async () => {
+    const payload = payloadOf<{ differences: string[] }>(
+      await runCompareRecipes(
+        fakeClient(),
+        compareArgs({ dish: "crepes", sections: ["ingredients", "times"] }),
+      ),
+    );
+    expect(payload.differences.some((line) => /minutes/i.test(line))).toBe(true);
+  });
+
+  it("says a yield was rescaled where it stands above a rescaled list", async () => {
+    const result = await runCompareRecipes(
+      fakeClient(),
+      compareArgs({ dish: "crepes", servings: 8 }),
+    );
+    expect(textOf(result)).toContain("Yields 4 personnes as published, scaled by 2 for 8.");
   });
 
   it("names which version each note is about", async () => {

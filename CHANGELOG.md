@@ -4,6 +4,245 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0
+
+### Added
+
+- A question asked in a sentence is sent in shorter wordings as well as in the
+  words it was written in. These indexes answer the words they are handed: one
+  requires every word given to appear on the same page, so "comment faire un
+  ceviche de truite à l'origan" came back empty from a corpus holding four
+  ceviche recipes, and the other ranks on the words received, so the words
+  framing a question pulled up whatever shared them and pushed the dish out of
+  the list. A question now becomes an ordered ladder of at most three wordings,
+  tried in order and stopped as soon as enough rows have come back, and the rows
+  are the union deduplicated on the id naming its source. `per_source` lists
+  every wording, what each returned, and the ones held back with the reason.
+  Nothing is translated between the sources' languages.
+
+- `search_recipes` takes `fan_out`, on unless a caller turns it off, which sends
+  exactly the words typed and still names the wordings that were withheld.
+
+### Changed
+
+- A condition a question sets is handled as a condition rather than as a word to
+  find. "sans beurre", "gluten free" and "pour 6 personnes" stay in the wording
+  sent first, where a source whose index carries them can match, and are set
+  aside from the derived wordings, since no page is named for what it leaves out
+  and a number of eaters is not printed in a title. Every condition set aside is
+  named back in the notes with a reminder to read the ingredient list, because a
+  recipe found this way can hold exactly what was being avoided. A number of
+  servings is pointed at the `servings` argument.
+
+- A condition is read by the role its words play rather than by the turn of
+  phrase they are written in. Reading it off the phrasings "sans X", "without X"
+  and "X-free" left an allergen a person had declared to become a positive
+  search term: "je suis allergique aux noix" put "noix" into a derived wording,
+  which pulled a coconut cake to the second row of a lasagne search with nothing
+  said about nuts. An exclusion written "no butter" or "pas de beurre" raised no
+  warning at all, and a diet named in one word was not treated as a condition,
+  so "recette vegane au foie gras" returned foie gras at the first row unmarked.
+  Three roles are now read: a negation, whichever of the closed class of
+  negating words carries it; a sentence about the eater rather than the dish,
+  which is named back as an allergy because that is the condition whose failure
+  is a matter of health; and a diet named in one word. All three are set aside
+  from the derived wordings and named back in the notes. A question can still
+  phrase one in a way this reading misses, and the notes say so instead of
+  presenting the conditions read as the only ones present. The reading is made
+  once for the whole question, so the words set aside as a condition and the
+  words searched for as a dish can no longer disagree.
+
+- A quantity written across two measures is read as one quantity. "1 lb 4 oz
+  beef" doubled came back as "2 lb 4 oz beef", a tenth short of the answer and
+  marked as the exact product, and "1 kg 500 de farine" came back as "2 kg de
+  500 de farine". Two measures off the same ladder written side by side, with
+  the second holding less than one of the first, are one amount: they give
+  "2.5 lb beef" and "3 kg de farine". The French form that leaves the smaller
+  unit unwritten is read the same way.
+
+- A measure standing in front of a container is read as the size of one of them.
+  "12 oz can tomatoes" doubled came back as "1.5 lb can tomatoes", which asks
+  for a bigger tin where the recipe wants a second one. Lines of that shape come
+  back as published, with a note saying what the measure gives and that the line
+  states no count.
+
+- A further quantity on a line is seen where the measure stands behind the word
+  introducing it. "150 g de sucre (soit 3/4 de tasse)" doubled came back as
+  "300 g de sucre (soit 3/4 de tasse)" marked as exact, so the line claimed
+  300 g was three quarters of a cup. A quantity left as published beside a mass
+  or a volume now shows on the line's own `scaling`, which no longer reads
+  `scaled`. A container's stated capacity is not one of those: "2 boîtes de
+  400 g" is exactly twice "1 boîte de 400 g" and stays `scaled`.
+
+- A count read from a word that names no number is not reported as exact
+  arithmetic. "quelques feuilles de basilic" doubled gave six leaves marked
+  `scaled`, which put the weight of arithmetic behind a reading of "quelques".
+  The line comes back `rounded`, and the note says the figure is that reading
+  multiplied rather than a count the page gave.
+
+- `compare_recipes` says when no version carries a word of the dish in its
+  title. One of these indexes answers almost any spelling with its closest row,
+  so a dish nobody publishes came back as a doughnut recipe presented as a
+  source's version of it, closing on an invitation to read it as what that
+  source publishes. That invitation is now withheld in exactly that case, and
+  the answer says the rows are candidates to check.
+
+- A part of a recipe that comes back empty is reported as something this server
+  read nothing from rather than as something the page does not publish. Where
+  the page shows a sign of it anyway, a heading announcing that part or another
+  part of the recipe that was read, the answer states that this server failed to
+  read what the page carries. Where the page shows neither, the answer states
+  that a page publishing nothing and a layout this reader cannot follow are
+  indistinguishable from here. Both wordings close on the same warning: an empty
+  ingredient list is no evidence that an ingredient is absent from the dish.
+  This covers an empty method the same way. The note is only raised for a
+  section that was asked for.
+
+### Fixed
+
+- An allergy stated with the food before the marker is read. Scoping a condition
+  forwards alone reads the French order, "allergique aux noix", and misses the
+  English one, so "cookies peanut allergy" searched for the nut, returned peanut
+  butter and said nothing about an allergy; "pancakes, I am lactose intolerant"
+  did the same with lactose. A marker now takes its food from whichever side of
+  it the sentence put one: a joining word straight after it says the food
+  follows, and with no such word the food is the one the marker was written onto
+  the end of.
+
+- An exclusion and the dish no longer swap places. "a dessert free of dairy"
+  reported the dessert as the thing to leave out and searched for the dairy.
+  "free" is read the same way as any other marker, so "free of dairy" leaves out
+  the dairy and "gluten free" leaves out the gluten.
+
+- A condition ends at the food it names. A fixed span of words let a condition
+  written at the head of a question swallow the dish behind it, so "sans gluten
+  gateau au chocolat" reported a recipe free of "gluten gateau au". A food's
+  name now runs on only through a word that carries it into a second noun, as in
+  "farine de blé", and stops everywhere else.
+
+- A marker with a food on neither side of it is reported as a condition whose
+  food was not read, rather than passing unmentioned or taking a word at random.
+  Naming the wrong word hides a dish and searches for the food being avoided at
+  the same time, so the answer states that a condition was set and that this
+  server did not read what it covers.
+
+- The note that says a diet was not filtered on reaches the text block. Notes
+  are dropped from that block when an answer carries more than it has room for,
+  and which ones could go was decided by matching their wording, so the diet
+  note went with the rest and "recette vegane au foie gras" rendered pan-fried
+  foie gras at the first row with nothing said about the diet. A note now
+  carries whether the answer misleads without it, set where the note is written,
+  and the block gives up body text before it gives up such a note.
+
+- A comparison confronts two versions only where both titles carry the dish.
+  Sharing one word of a name is what makes a row worth offering and not what
+  makes it the dish, so "biscuits and gravy" put a tin of Christmas biscuits
+  beside the American dish and reported their yields, their times and their
+  ingredient counts as the difference between two traditions. A version whose
+  title leaves a word of the dish unanswered is now named, with the words it
+  does not carry and an invitation to read it as a candidate to check, and
+  nothing is set side by side until every version answers to the same name.
+
+- A bracket the line closes on is scaled with the amount it restates.
+  "150 g de sucre (soit 3/4 de tasse)" doubled came back with the bracket as
+  published, so the line claimed that 300 g is three quarters of a cup. A
+  closing bracket that reads entirely as measures now moves with the figure it
+  restates, and it is read through the word that introduces it and through the
+  partitive between the number and the measure, so "soit 3/4 de tasse" is the
+  same quantity as "0,75 tasse". A slash inside a bracket separates two
+  statements of one quantity, and one sitting between two digits belongs to the
+  fraction it writes.
+
+- A capacity in brackets counts containers rather than measuring one out.
+  "1 (14 oz) can" doubled came back as "2 (1.75 lb) can", which asks for a tin
+  no shop sells and converts a quantity into another system on the way. A
+  measure inside a bracket standing beside a container is what one of them
+  holds: it goes back exactly as published, the count is what the factor moves,
+  the container agrees with that count, and the line says which figure is
+  whose.
+
+- A bracket a French line closes on moves with the rest of the line.
+  "1 demi verre de lait (10 cl)" tripled instructed the reader to take the ten
+  centilitres as published while asking for three times the milk.
+
+- A measure written in abbreviations keeps what stands behind it.
+  "2 c.à.s d'huile" doubled came back as "4 cuillères à soupe", with the oil
+  gone from the recipe, and "2 c.à.s + 1 c.à.c d'huile" came back as
+  "4 cuillères à soupe de c.à.c d'huile". Normalising an abbreviation spells it
+  as several words where the line writes one, and that difference was consuming
+  words of the ingredient; the words the line wrote are now consumed until they
+  match the measure. Two measures joined by a sign or a word saying they add up
+  are read as one quantity, as two measures written side by side already were.
+
+- A mass keeps the precision the arithmetic gave it. "1234 g" doubled came back
+  as "2,47 kg" marked as the exact product, where the exact product is 2468 g:
+  a whole number of grams was being snapped to a multiple of five, and the
+  result was then read in kilos, where a hundredth of the unit is ten grams and
+  every gap looks small. A whole number is what a scale shows and is left where
+  the arithmetic put it, a quantity moves up to a bigger unit only where that
+  unit states it as precisely, and whether a value landed exactly is judged in
+  the finer of the two units.
+
+- A mark standing in front of the amount is not the amount. A line opening on a
+  bullet, a dash or a picture of the food was answered as a line carrying no
+  quantity, so 200 g of cheese stayed 200 g in a doubled recipe with nothing
+  said, and the mark also silenced the measure the language is read from. Such
+  a mark is set aside for reading and put back for writing.
+
+- A text block that runs out of room says what it left out. Sentences
+  qualifying an answer keep their room, which leaves the result lines as the
+  thing that gives way, and a list of 119 ingredients gave way to nothing at
+  all in silence, which reads as a recipe needing no ingredients. A list now
+  keeps its opening whatever the room allows, states how many of how many lines
+  are shown, and points at the structured output for the rest. A recipe's
+  ingredients and its method share what is left rather than the first of them
+  filling the block.
+
+- A length of time is no longer multiplied like an ingredient. Ingredient lists
+  carry a rest, a proof or a marinade among the quantities, and "2 h de repos"
+  tripled came back as "6 h de repos". A figure followed by a measure of time,
+  in either language, is returned as published with a note saying that a rest
+  takes as long for a large batch as for a small one.
+
+- A word that names no number no longer produces one. "quelques feuilles de
+  basilic" tripled came back as "9 feuilles de basilic", while "a few basil
+  leaves" and "plusieurs feuilles de basilic" were returned as published, so
+  three ways of writing the same vagueness got three answers. All three are read
+  the same way now: the line carries no count, so it is repeated as published
+  and flagged as carrying nothing to multiply.
+
+- The factor stated is the factor applied. It was shortened to three decimals
+  while the arithmetic was not, so `factor: 0.0001` rendered "Scaled by 0" and
+  put a zero in the payload beside quantities that were not zero. Below three
+  decimals the significant digits are stated instead.
+
+- One quantity gives one answer however the page spelled it. "1234 g de farine"
+  and "1 kg 234 de farine" doubled came back 32 g apart, one of them called
+  exact and the other rounded, because the kilo cannot state 2468 g in the two
+  decimals a kitchen reads. A measured amount now moves down to the unit that
+  states it exactly, the way it already moved up only to a unit that could hold
+  it, so both lines answer "2468 g de farine".
+
+- `compare_recipes` states differences about the parts it returned. It compared
+  the times of versions whose times the same answer said were not requested and
+  not returned, leaving a reader with a claim they had no way to check; a
+  difference is now stated only about a section the call asked for. Each
+  version's yield is also written the way the rest of the answer writes one, as
+  published and with the factor and the number of servings it was rescaled for,
+  rather than as a bare published yield standing above a rescaled list.
+
+- Four smaller repairs. A query carrying no letter and no digit is refused
+  rather than sent, since an index handed nothing to match on answers with the
+  page it shows by default and those rows came back as recipes for "!!!". A
+  failure raised while reading a source is restated in this server's own words,
+  with what the site said quoted and credited to it and with any advice it
+  carried dropped, rather than served as this server's own sentence pointing
+  somewhere this server cannot answer for. A figure glued to an ordinal ending
+  is a rank rather than an amount, so "1er choix de boeuf" doubled no longer
+  reads "2 er choix de boeuf". And a rewritten line keeps the case the page
+  used, "1 TOMATO" tripled giving "3 TOMATOES", while a French noun in -ou takes
+  the plural French gives it: three choux, not three chous.
+
 ## [1.2.0] - 2026-08-07
 
 ### Changed

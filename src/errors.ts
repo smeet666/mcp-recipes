@@ -100,3 +100,46 @@ export function toRecipesError(error: unknown): RecipesError {
 
   return new RecipesError(known ?? "network_error", message, details);
 }
+
+/**
+ * Adopt a failure raised while reading a source, in this server's own words.
+ *
+ * The code is kept, since that is the taxonomy every layer branches on. The
+ * sentence is not: what arrives with such a failure is written by whoever the
+ * reader was talking to, in their vocabulary and about their internals, and
+ * serving it as this answer's own sentence states as this server's finding
+ * something it never established. It is quoted and credited to the source
+ * instead, on one line, so the diagnostic survives without borrowing a voice
+ * or a shape it has no claim to. The advice that came with it goes, because
+ * advice addressed to somebody else's reader sends a caller somewhere this
+ * server cannot answer for.
+ */
+export function fromSource(error: unknown, sourceName: string): RecipesError {
+  if (error instanceof RecipesError) return error;
+
+  const known = toRecipesError(error);
+  const reported = known.message.replace(/\s+/g, " ").trim();
+  const opening =
+    known.code === "not_found"
+      ? `${sourceName} holds nothing under this name.`
+      : `${sourceName} could not be read.`;
+  const message = reported === "" ? opening : `${opening} It reports: "${reported}"`;
+  const details: ErrorDetails = {};
+  if (known.details.url !== undefined) details.url = known.details.url;
+  if (known.details.status !== undefined) details.status = known.details.status;
+
+  switch (known.code) {
+    case "not_found":
+      return notFound(message, details);
+    case "invalid_input":
+      return invalidInput(message);
+    case "rate_limited":
+      return rateLimited(message, details);
+    case "parse_failure":
+      return parseFailure(message, details);
+    case "timeout":
+      return timeout(message, details);
+    default:
+      return networkError(message, details);
+  }
+}

@@ -48,6 +48,7 @@ export interface CookbookRecipe {
   steps: string[];
   tips: string[];
   nutrition: unknown;
+  sectionTitles: string[];
 }
 
 /** The part of the Cookbook's client this server uses. */
@@ -188,6 +189,9 @@ export function cookbookDetail(payload: unknown): RecipeDetail {
     yieldUnit: text(recipe.yieldUnit) ?? span.unit,
     ingredients: textList(recipe.ingredients),
     steps: textList(recipe.steps),
+    // The page's own headings, which the reader reports. An answer holding no
+    // ingredient line uses them to say whether the page announced a list.
+    publishedSections: Array.isArray(recipe.sectionTitles) ? textList(recipe.sectionTitles) : null,
     // The Cookbook publishes one time for a recipe rather than splitting it.
     prepMinutes: null,
     cookMinutes: null,

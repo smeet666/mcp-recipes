@@ -100,6 +100,17 @@ clou de girofle, and a count of those lands on a whole number.
   other is the page's own claim.
 - `4 tablespoons` at a tenth comes down to **1.2 teaspoons**. A measurement moves
   to a smaller unit _before_ it is rounded, so a small share survives.
+- `1 lb 4 oz beef` doubled gives **2.5 lb beef**, and `1 kg 500 de farine` gives
+  **3 kg de farine**. Two measures off one ladder written side by side are one
+  quantity, and the smaller one can be left unwritten.
+- `12 oz can tomatoes` comes back as published, with a note saying the measure
+  gives what one tin holds and that the line states no count of them.
+- `2 h de repos` comes back as published. A rest, a proof or a bake takes as long
+  for a large batch as for a small one, so a length of time is not a proportion.
+- `quelques feuilles de basilic` comes back as published, as do `a few basil
+leaves` and the same line with `plusieurs`. A word saying there are several
+  states no count, and any figure put behind it would be this server's reading
+  rather than the page's quantity.
 
 Every line comes back with a `scaling` field: `scaled` when the arithmetic
 landed on the exact product, `rounded` when something had to move for the line
@@ -151,11 +162,69 @@ one costs.
 | `query`            | string                        | A dish or an ingredient, in any language a source publishes in |
 | `limit_per_source` | integer, 1 to 25, default 5   | Rows to take from each source                                  |
 | `sources`          | array of source ids, optional | Left out, every source is asked                                |
+| `fan_out`          | boolean, default true         | Whether shorter wordings derived from the question go out too  |
 
 The query goes to each source's own search as free text. There is no filtering:
 a word naming a diet, a time or a calorie count matches only where that source's
 index happens to carry it, and a question long enough to read like a request for
 conditions gets a note saying so.
+
+**A question asked in a sentence is also sent in shorter wordings.** These
+indexes answer the words they are handed. One of them requires every word given
+to appear on the same page, so "comment faire un ceviche de truite à l'origan"
+comes back empty from a corpus holding four ceviche recipes; the other ranks on
+the words it was handed, so "comment faire" pulls up whatever shares those words
+and the dish falls out of the list. Both reach a reader looking like a statement
+about a corpus when they are statements about a wording.
+
+So a question is turned into an ordered ladder of at most three wordings: the
+words as asked, the words naming the dish with the framing words set aside, and
+the leading dish word on its own. They go out in that order, one at a time, and
+stop as soon as enough rows have come back, so a query that already names a dish
+costs one request. What comes back is unioned and deduplicated on the id naming
+its source. `per_source` lists every wording, what each returned, and the ones
+held back and why. Nothing is translated between the sources' languages: a
+guessed translation is a word nobody wrote, and a source that publishes in
+another language and holds nothing under the words written is an honest absence.
+
+**A condition is not a keyword.** "sans beurre", "gluten free" and "pour 6
+personnes" say what a recipe must avoid or serve. No page is named for what it
+leaves out, and the number of people at a table is not printed in a title, so
+searching for those words buries the dish. They stay in the wording sent first,
+where a source whose index carries them can still match, and they are set aside
+from the derived wordings. Dropping them quietly would be the worse move, since
+a recipe found this way can hold exactly what the person was avoiding, so every
+condition set aside is named back in the notes with a reminder to check the
+ingredient list. A number of servings is pointed at the `servings` argument,
+which is what actually rescales a recipe.
+
+A condition is read by the role its words play rather than by the turn of phrase
+they are written in, because a list of phrasings has a hole at the first one
+nobody thought of. Three roles put a food out of a dish: a negation, whatever
+word carries it, since negations are a closed class of function words and
+"without butter", "no butter" and "pas de beurre" are all built on one; a
+sentence about the eater rather than the dish, as in "je suis allergique aux
+noix", which is named back as an allergy because that is the condition whose
+failure is a matter of health; and a diet named in one word, which is a class of
+recipes defined by what it leaves out and so states an exclusion with no
+negation written anywhere. A question can still phrase one in a way this reading
+does not catch, and the answer says so rather than presenting the ones it caught
+as all there were.
+
+Which words a condition covers is read off the sentence. A joining word straight
+after the marker says its food follows, as in "allergique aux noix", "allergic
+to peanuts" or "free of dairy"; with no such word, the food is the one the
+marker was written onto the end of, as in "peanut allergy", "lactose intolerant"
+or "gluten free". Both orders are needed, since the two languages these sources
+publish in put the food on opposite sides. A food's name ends where nothing
+carries it further, so "sans gluten gateau au chocolat" leaves out gluten and
+looks for the cake. Where a marker has a food on neither side, the answer says a
+condition was stated and that its food was not read: naming the wrong word hides
+a dish and leaves the food being avoided in the search at the same time, and an
+allergen is not something to guess at.
+
+Setting `fan_out` to false sends exactly the words typed. The wordings that were
+not sent are still named, so a caller can see what turning it back on would buy.
 
 Rows are interleaved one source at a time. No score orders them against each
 other, because the sources share none: one carries reader ratings and another
@@ -194,8 +263,17 @@ the lower end, and the answer gives the factor the upper end would have needed.
 
 Some sources keep recipes and reference pages under one namespace, so a search
 row can be a page _about_ a dish rather than a recipe _for_ it. Only reading the
-page tells them apart, and this tool says when a page carries no ingredient
-list.
+page tells them apart.
+
+A part of a recipe this answer holds nothing for is never reported as an absence
+on the page, because reading nothing is a fact about this server and only the
+page can say whether there was anything to read. Where the page shows a sign of
+the part all the same, a heading announcing it or another part of the recipe
+that was read, the answer states that this server failed to read what the page
+carries. Where the page shows neither, it states that the two cannot be told
+apart from here. Either way an empty ingredient list is never evidence that an
+ingredient is absent from the dish: someone avoiding butter has to open the page
+before ruling it out.
 
 ### `scale_ingredients`
 
@@ -472,6 +550,18 @@ d'œuf se compte entier, le blanc de poulet est une viande et se coupe en deux.
   vaut l'autre, c'est la page qui l'affirme.
 - `4 tablespoons` au dixième descend à **1.2 teaspoons**. Une mesure passe à une
   unité plus petite _avant_ d'être arrondie, pour qu'une petite part survive.
+- `1 lb 4 oz beef` doublé donne **2.5 lb beef**, et `1 kg 500 de farine` donne
+  **3 kg de farine**. Deux mesures d'une même échelle écrites côte à côte sont
+  une seule quantité, et la plus petite peut rester sous-entendue.
+- `12 oz can tomatoes` revient telle que publiée, avec la mention que la mesure
+  donne ce que tient une boîte et que la ligne n'énonce aucun nombre de boîtes.
+- `2 h de repos` revient telle que publiée. Un repos, une pousse ou une cuisson
+  durent autant pour une grande fournée que pour une petite : une durée n'est pas
+  une proportion.
+- `quelques feuilles de basilic` revient telle que publiée, comme `a few basil
+leaves` et comme la même ligne avec `plusieurs`. Un mot qui dit qu'il y en a
+  plusieurs n'énonce aucun compte, et tout chiffre placé derrière lui serait une
+  lecture de ce serveur plutôt qu'une quantité de la page.
 
 Chaque ligne revient avec un champ `scaling` : `scaled` quand le calcul est tombé
 juste, `rounded` quand quelque chose a dû bouger pour que la ligne reste
@@ -510,16 +600,77 @@ npx -y mcp-recipes
 Interroge toutes les sources en parallèle : les demander toutes coûte à peu près
 ce que coûte en demander une.
 
-| Argument           | Type                                        | Sens                                                       |
-| ------------------ | ------------------------------------------- | ---------------------------------------------------------- |
-| `query`            | string                                      | Un plat ou un ingrédient, dans une des langues des sources |
-| `limit_per_source` | entier, 1 à 25, défaut 5                    | Lignes prises à chaque source                              |
-| `sources`          | tableau d'identifiants de source, optionnel | Absent, toutes sont interrogées                            |
+| Argument           | Type                                        | Sens                                                                |
+| ------------------ | ------------------------------------------- | ------------------------------------------------------------------- |
+| `query`            | string                                      | Un plat ou un ingrédient, dans une des langues des sources          |
+| `limit_per_source` | entier, 1 à 25, défaut 5                    | Lignes prises à chaque source                                       |
+| `sources`          | tableau d'identifiants de source, optionnel | Absent, toutes sont interrogées                                     |
+| `fan_out`          | booléen, défaut true                        | Envoyer aussi des formulations plus courtes dérivées de la question |
 
 La requête part vers la recherche de chaque source en texte libre. Il n'y a
 aucun filtrage : un mot désignant un régime, un temps ou un nombre de calories
 ne compte que si l'index de la source le porte, et une question assez longue
 pour ressembler à une demande de conditions reçoit une note qui le dit.
+
+**Une question posée en phrase part aussi sous des formulations plus courtes.**
+Ces index répondent aux mots qu'on leur donne. L'un exige que chaque mot fourni
+figure sur la même page : « comment faire un ceviche de truite à l'origan » en
+revient vide alors que le corpus tient quatre recettes de ceviche. L'autre
+classe sur les mots reçus : « comment faire » remonte tout ce qui les partage et
+le plat sort de la liste. Dans les deux cas, le lecteur reçoit ce qui ressemble
+à un constat sur un corpus alors que c'est un constat sur une formulation.
+
+Une question devient donc une échelle ordonnée d'au plus trois formulations :
+les mots tels quels, les mots qui nomment le plat une fois écartés ceux qui
+encadrent la question, puis le premier mot du plat seul. Elles partent dans cet
+ordre, une à la fois, et s'arrêtent dès qu'il y a assez de lignes : une requête
+qui nomme déjà un plat coûte une requête. Ce qui revient est réuni et dédupliqué
+sur l'identifiant qui nomme sa source. `per_source` liste chaque formulation, ce
+qu'elle a rendu, et celles qui ont été retenues avec la raison. Rien n'est
+traduit d'une langue de source vers l'autre : une traduction devinée est un mot
+que personne n'a écrit, et une source qui publie dans une autre langue et ne
+tient rien sous les mots écrits est une absence honnête.
+
+**Une contrainte n'est pas un mot-clé.** « sans beurre », « gluten free » et
+« pour 6 personnes » disent ce que la recette doit éviter ou servir. Aucune page
+n'est nommée d'après ce qu'elle exclut, et le nombre de convives ne figure pas
+dans un titre : chercher ces mots enterre le plat. Ils restent dans la
+formulation envoyée en premier, où une source dont l'index les porte peut encore
+les faire correspondre, et ils sont écartés des formulations dérivées. Les
+laisser tomber en silence serait pire, puisque la recette trouvée peut contenir
+exactement ce que la personne évitait : chaque contrainte écartée est donc
+rappelée dans les notes, avec l'invitation à vérifier la liste d'ingrédients. Un
+nombre de parts est renvoyé vers l'argument `servings`, qui est ce qui remet
+réellement une recette à l'échelle.
+
+Une contrainte se lit au rôle que jouent ses mots, pas à la tournure dans
+laquelle ils sont écrits : une liste de tournures se troue au premier cas non
+prévu. Trois rôles sortent un aliment du plat. Une négation, quel que soit le
+mot qui la porte, puisque les négations forment une classe fermée de mots
+grammaticaux et que « sans beurre », « no butter » et « pas de beurre » reposent
+toutes sur l'une d'elles. Une phrase sur la personne plutôt que sur le plat,
+comme « je suis allergique aux noix », rappelée comme une allergie parce que
+c'est la contrainte dont l'échec relève de la santé. Et un régime nommé en un
+mot, qui est une classe de recettes définie par ce qu'elle exclut et énonce donc
+une exclusion sans qu'aucune négation soit écrite. Une question peut encore
+formuler une contrainte que cette lecture ne saisit pas, et la réponse le dit
+plutôt que de présenter les contraintes lues comme les seules présentes.
+
+La portée d'une contrainte se lit dans la phrase. Un mot de liaison juste après
+le marqueur dit que l'aliment le suit : « allergique aux noix », « allergic to
+peanuts », « free of dairy ». Sans ce mot, l'aliment est celui sur lequel le
+marqueur a été accolé : « peanut allergy », « lactose intolerant », « gluten
+free ». Les deux ordres sont nécessaires, puisque les deux langues que publient
+ces sources placent l'aliment de part et d'autre. Le nom d'un aliment s'arrête
+là où plus rien ne le prolonge, si bien que « sans gluten gateau au chocolat »
+écarte le gluten et cherche le gâteau. Quand un marqueur n'a d'aliment d'aucun
+côté, la réponse dit qu'une contrainte a été énoncée et que son aliment n'a pas
+été lu : nommer le mauvais mot cache un plat et laisse en même temps dans la
+recherche l'aliment que l'on évite, et un allergène ne se devine pas.
+
+Mettre `fan_out` à false envoie exactement les mots saisis. Les formulations non
+envoyées sont quand même nommées, pour qu'un appelant voie ce que le réactiver
+lui apporterait.
 
 Les lignes alternent d'une source à l'autre. Aucune note ne les classe les unes
 contre les autres, faute d'échelle commune : l'une porte des avis de lecteurs,
@@ -557,6 +708,16 @@ Une page qui n'annonce aucun nombre de parts revient telle que publiée, en
 disant pourquoi. Une page qui annonce une fourchette, « 4 à 6 personnes », est
 recalculée depuis la borne basse, et la réponse donne le facteur qu'aurait
 demandé la borne haute.
+
+Une partie de recette dont cette réponse ne tient rien n'est jamais rapportée
+comme une absence sur la page : n'avoir rien lu est un fait sur ce serveur, et
+seule la page peut dire s'il y avait quelque chose à lire. Quand la page en
+montre malgré tout un signe, un titre de section qui l'annonce ou une autre
+partie de la recette qui a été lue, la réponse dit que ce serveur n'a pas su
+lire ce que la page porte. Quand la page n'en montre aucun, elle dit que les
+deux cas sont indiscernables d'ici. Dans les deux cas, une liste d'ingrédients
+vide ne prouve jamais qu'un ingrédient est absent du plat : qui évite le beurre
+doit ouvrir la page avant de l'écarter.
 
 ### `scale_ingredients`
 

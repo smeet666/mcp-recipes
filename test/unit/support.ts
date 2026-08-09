@@ -8,9 +8,17 @@
 
 import { RecipesClient } from "../../src/sources/client.js";
 import { cookbookAdapter } from "../../src/sources/cookbook.js";
-import type { CookbookReader, CookbookRecipe, CookbookSummary } from "../../src/sources/cookbook.js";
+import type {
+  CookbookReader,
+  CookbookRecipe,
+  CookbookSummary,
+} from "../../src/sources/cookbook.js";
 import { marmitonAdapter } from "../../src/sources/marmiton.js";
-import type { MarmitonReader, MarmitonRecipe, MarmitonSummary } from "../../src/sources/marmiton.js";
+import type {
+  MarmitonReader,
+  MarmitonRecipe,
+  MarmitonSummary,
+} from "../../src/sources/marmiton.js";
 
 /** A failure shaped the way a source's own reader raises one. */
 export class FakeSourceError extends Error {
@@ -108,6 +116,43 @@ export const cookbookRecipe: CookbookRecipe = {
   steps: ["Whisk the flour and the eggs.", "Add the milk gradually.", "Rest the batter."],
   tips: ["A rested batter cooks more evenly."],
   nutrition: null,
+  sectionTitles: ["Ingredients", "Procedure", "Notes, tips, and variations"],
+};
+
+/**
+ * A page heading an ingredient list that came back holding no line, which is
+ * what a list written in a layout the reader cannot follow looks like.
+ */
+export const unreadIngredientsRecipe: CookbookRecipe = {
+  ...cookbookRecipe,
+  key: "Cookbook:Almond Cake",
+  title: "Cookbook:Almond Cake",
+  sourceUrl: "https://en.wikibooks.org/wiki/Cookbook:Almond_Cake",
+  ingredients: [],
+  sectionTitles: ["Ingredients", "Cake", "Glaze", "Procedure"],
+};
+
+/** A page heading a method that came back holding no step. */
+export const unreadStepsRecipe: CookbookRecipe = {
+  ...cookbookRecipe,
+  key: "Cookbook:Almond Tart",
+  title: "Cookbook:Almond Tart",
+  sourceUrl: "https://en.wikibooks.org/wiki/Cookbook:Almond_Tart",
+  steps: [],
+  sectionTitles: ["Ingredients", "Procedure", "Cake", "Glaze"],
+};
+
+/** A page listing other pages, which heads neither part of a recipe. */
+export const referencePage: CookbookRecipe = {
+  ...cookbookRecipe,
+  key: "Cookbook:Cake",
+  title: "Cookbook:Cake",
+  sourceUrl: "https://en.wikibooks.org/wiki/Cookbook:Cake",
+  ingredients: [],
+  steps: [],
+  tips: [],
+  equipment: [],
+  sectionTitles: ["Recipes", "Variations"],
 };
 
 /** A page whose yield the source never stated, which cannot be rescaled. */
@@ -118,6 +163,7 @@ export const yieldlessRecipe: CookbookRecipe = {
   sourceUrl: "https://en.wikibooks.org/wiki/Cookbook:Pancake_Batter",
   servings: null,
   yieldText: null,
+  sectionTitles: ["Ingredients", "Procedure"],
 };
 
 export interface FakeOptions {
@@ -195,6 +241,13 @@ export function payloadOf<T = Record<string, unknown>>(result: {
 }): T {
   if (!result.structuredContent) throw new Error("the tool returned no structured content");
   return result.structuredContent as T;
+}
+
+/** The arguments a caller sends search_recipes, with the defaults filled in. */
+export function searchArgs(
+  over: Partial<import("../../src/tools/searchRecipes.js").SearchRecipesArgs> & { query: string },
+): import("../../src/tools/searchRecipes.js").SearchRecipesArgs {
+  return { limit_per_source: 5, fan_out: true, ...over };
 }
 
 /** The arguments a caller sends get_recipe, with the defaults the schema fills in. */

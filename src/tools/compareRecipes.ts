@@ -12,11 +12,16 @@
 
 import { z } from "zod";
 import type { RecipesClient } from "../sources/client.js";
+import { dishWordsMissing } from "../sources/wordings.js";
 import type { RecipeDetail, SourceId, SourceReport } from "../types.js";
-import { buildRecipeView, recipeSchema, SECTIONS } from "./recipeView.js";
+import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
 import type { RecipePayload, Section } from "./recipeView.js";
 import {
   creditLine,
+  fitLines,
+  mustKeep,
+  omittedLinesLine,
+  noteTexts,
   ok,
   quoteForeign,
   roomForBody,
@@ -26,6 +31,7 @@ import {
   toToolError,
   withRead,
 } from "./shared.js";
+import type { Note } from "./shared.js";
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
 
@@ -96,8 +102,17 @@ function listNames(names: string[]): string {
  * has no author because everyone edited the page, which says nothing about the
  * recipe. Where every version says the same thing there is no difference to
  * report, and reporting one anyway costs a reader's trust in the rest.
+ *
+ * A difference is only stated about a part of the recipe the answer carries.
+ * The sections a call leaves out come back empty, and the answer says so, so a
+ * sentence comparing one of them describes something the reader was told is not
+ * there and cannot check.
  */
-function describeDifferences(recipes: RecipeDetail[], payloads: RecipePayload[]): string[] {
+function describeDifferences(
+  recipes: RecipeDetail[],
+  payloads: RecipePayload[],
+  sections: readonly Section[],
+): string[] {
   if (recipes.length < 2) return [];
   const differences: string[] = [];
   const nameOf = (recipe: RecipeDetail) => recipe.sourceName;
@@ -123,17 +138,19 @@ function describeDifferences(recipes: RecipeDetail[], payloads: RecipePayload[])
     );
   }
 
-  const timed = recipes.filter((recipe) => recipe.totalMinutes !== null);
-  const untimed = recipes.filter((recipe) => recipe.totalMinutes === null);
-  if (timed.length > 0 && new Set(timed.map((recipe) => recipe.totalMinutes)).size > 1) {
-    differences.push(
-      `${timed.map((recipe) => `${nameOf(recipe)} states ${recipe.totalMinutes} minutes`).join("; ")}.`,
-    );
-  }
-  if (timed.length > 0 && untimed.length > 0) {
-    differences.push(
-      `${listNames(untimed.map(nameOf))} states no time for this recipe, so there is nothing there to compare against.`,
-    );
+  if (sections.includes("times")) {
+    const timed = recipes.filter((recipe) => recipe.totalMinutes !== null);
+    const untimed = recipes.filter((recipe) => recipe.totalMinutes === null);
+    if (timed.length > 0 && new Set(timed.map((recipe) => recipe.totalMinutes)).size > 1) {
+      differences.push(
+        `${timed.map((recipe) => `${nameOf(recipe)} states ${recipe.totalMinutes} minutes`).join("; ")}.`,
+      );
+    }
+    if (timed.length > 0 && untimed.length > 0) {
+      differences.push(
+        `${listNames(untimed.map(nameOf))} states no time for this recipe, so there is nothing there to compare against.`,
+      );
+    }
   }
 
   const rated = recipes.filter((recipe) => recipe.rating !== null);
@@ -217,7 +234,7 @@ export async function runCompareRecipes(
     );
     const payloads = views.map((view) => view.payload);
 
-    const notes = reportNotes(merged.reports);
+    const notes: Note[] = reportNotes(merged.reports);
     for (const view of views) notes.push(...view.notes);
 
     const omitted = SECTIONS.filter((section) => !args.sections.includes(section));
@@ -236,30 +253,84 @@ export async function runCompareRecipes(
       const failedRead = unread.get(report.source);
       if (report.status === "failed") {
         notes.push(
-          `${report.name} is missing from this comparison because its search did not answer (${quoteForeign(
-            `${report.error?.code ?? "unknown"}: ${report.error?.message ?? "unknown"}`,
-          )}). Nothing here is evidence about what it holds.`,
+          mustKeep(
+            `${report.name} is missing from this comparison because its search did not answer (${quoteForeign(
+              `${report.error?.code ?? "unknown"}: ${report.error?.message ?? "unknown"}`,
+            )}). Nothing here is evidence about what it holds.`,
+          ),
         );
       } else if (failedRead) {
         notes.push(
-          `${report.name}'s search answered and offered a version, and that version could not be read (${quoteForeign(
-            `${failedRead.code}: ${failedRead.message}`,
-          )}). The failure is in the reading, so nothing here says whether ${report.name} holds this dish.`,
+          mustKeep(
+            `${report.name}'s search answered and offered a version, and that version could not be read (${quoteForeign(
+              `${failedRead.code}: ${failedRead.message}`,
+            )}). The failure is in the reading, so nothing here says whether ${report.name} holds this dish.`,
+          ),
         );
       } else {
         notes.push(
-          `${report.name} answered and offered nothing close enough to "${quoteForeign(args.dish)}" to compare.`,
+          mustKeep(
+            `${report.name} answered and offered nothing close enough to "${quoteForeign(args.dish)}" to compare.`,
+          ),
         );
       }
     }
 
-    if (payloads.length === 1) {
+    // One of these indexes answers almost any spelling with its closest row, so
+    // a dish nobody publishes still comes back as a recipe. Presenting that row
+    // as a source's version of the dish states as fact the one thing the search
+    // did not establish, and sharing one word of a name is not carrying it:
+    // "biscuits and gravy" and a tin of Christmas biscuits share the biscuit.
+    const shortfall = payloads.map((payload) => dishWordsMissing(payload.title, args.dish));
+    const named = payloads.filter((_payload, index) => shortfall[index]!.length === 0);
+    const carriesDish = named.length > 0;
+
+    payloads.forEach((payload, index) => {
+      const missing = shortfall[index]!;
+      if (missing.length === 0) return;
       notes.push(
-        "This is one version rather than a comparison. Read it as what that one source publishes.",
+        mustKeep(
+          `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
+            `carries no ${missing.map((word) => `"${quoteForeign(word)}"`).join(" and no ")}. ` +
+            "Read it as a candidate to check rather than as that dish.",
+        ),
+      );
+    });
+
+    if (payloads.length > 0 && !carriesDish) {
+      notes.push(
+        `No version here carries the whole of "${quoteForeign(args.dish)}" in its title. These are ` +
+          "the closest rows each source returned for that spelling, so read them as candidates to " +
+          "check rather than as that dish.",
       );
     }
 
-    const differences = describeDifferences(recipes, payloads);
+    if (payloads.length === 1 && carriesDish) {
+      notes.push(
+        mustKeep(
+          "This is one version rather than a comparison. Read it as what that one source publishes.",
+        ),
+      );
+    }
+
+    // A difference is a statement about one dish written two ways. Setting a
+    // row that answers to another name beside it turns a search that missed
+    // into a claim about two traditions.
+    const comparable = recipes.filter((recipe) =>
+      named.some((payload) => payload.id === recipe.id && payload.source === recipe.source),
+    );
+    const differences =
+      comparable.length === payloads.length
+        ? describeDifferences(recipes, payloads, args.sections as readonly Section[])
+        : [];
+    if (payloads.length > 1 && differences.length === 0 && comparable.length < payloads.length) {
+      notes.push(
+        mustKeep(
+          "Nothing is set side by side here: not every version's title carries the dish that was " +
+            "asked for, so what separates them may be that they are different dishes.",
+        ),
+      );
+    }
     if (payloads.length > 1) {
       notes.push(
         "Quantities are shown in the units each source published. Nothing was converted between " +
@@ -297,24 +368,23 @@ export async function runCompareRecipes(
       const head = [
         `${quoteForeign(payload.source_name)}: ${quoteForeign(payload.title)}`,
         `  ${quoteForeign(payload.url)}`,
-        `  yields ${quoteForeign(payload.yield.original_text ?? "an unstated amount")}${
-          payload.yield.factor === null ? "" : `, scaled by ${payload.yield.factor}`
-        }`,
+        // The yield is the page's, and the list under it is the one the factor
+        // produced. Stating the first alone above the second reads as a list
+        // for that many people.
+        `  ${renderYield(payload)}`,
       ];
-      const lines = [...head];
-      let used = head.join("\n").length;
+      const offered = payload.ingredients
+        .slice(0, TEXT_INGREDIENT_LINES)
+        .map((entry) => `  - ${quoteForeign(entry.text)}`);
+      const fitted = fitLines(offered, share - head.join("\n").length);
 
-      let shown = 0;
-      for (const entry of payload.ingredients.slice(0, TEXT_INGREDIENT_LINES)) {
-        const line = `  - ${quoteForeign(entry.text)}`;
-        if (used + line.length > share) break;
-        lines.push(line);
-        used += line.length + 1;
-        shown += 1;
+      const lines = [...head, ...fitted.lines];
+      const hidden = payload.ingredients.length - fitted.lines.length;
+      if (hidden > 0) {
+        lines.push(
+          `  ${omittedLinesLine(fitted.lines.length, payload.ingredients.length, "ingredient lines")}`,
+        );
       }
-
-      const hidden = payload.ingredients.length - shown;
-      if (hidden > 0) lines.push(`  … and ${hidden} more, in full in the structured output`);
       return lines.join("\n");
     });
 
@@ -348,7 +418,7 @@ export async function runCompareRecipes(
               : { status: "read", error: null },
           );
         }),
-        notes,
+        notes: noteTexts(notes),
       },
       summary,
       { notes, credit },

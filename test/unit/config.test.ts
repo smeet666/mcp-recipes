@@ -61,9 +61,7 @@ describe("a value the environment sets", () => {
   });
 
   it("falls back and says so when it cannot be read", () => {
-    expect(loadConfig({ RECIPES_MIN_INTERVAL_MS: "soon" }).minIntervalMs).toBe(
-      DEFAULT_INTERVAL_MS,
-    );
+    expect(loadConfig({ RECIPES_MIN_INTERVAL_MS: "soon" }).minIntervalMs).toBe(DEFAULT_INTERVAL_MS);
     expect(written.join("")).toMatch(/is not a whole number/);
   });
 
@@ -118,8 +116,9 @@ describe("the pacing floor holds however a setting arrives", () => {
   });
 
   it("stays below the ceiling that would make a request look hung", () => {
-    expect(loadConfig({ RECIPES_MIN_INTERVAL_MS: String(MAX_ALLOWED_INTERVAL_MS + 1) })
-      .minIntervalMs).toBe(DEFAULT_INTERVAL_MS);
+    expect(
+      loadConfig({ RECIPES_MIN_INTERVAL_MS: String(MAX_ALLOWED_INTERVAL_MS + 1) }).minIntervalMs,
+    ).toBe(DEFAULT_INTERVAL_MS);
   });
 });
 

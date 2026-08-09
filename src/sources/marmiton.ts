@@ -184,6 +184,10 @@ export function marmitonDetail(payload: unknown): RecipeDetail {
     yieldUnit: span.unit ?? text(yields.unit),
     ingredients: textList(recipe.ingredients),
     steps: textList(recipe.steps),
+    // The reader hands over the parts of a page it recognised and not the
+    // headings the page carries, so there is nothing here to say how it is
+    // laid out.
+    publishedSections: null,
     prepMinutes: count(recipe.prepMinutes),
     cookMinutes: count(recipe.cookMinutes),
     totalMinutes: count(recipe.totalMinutes),

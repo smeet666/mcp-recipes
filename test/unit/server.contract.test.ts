@@ -11,10 +11,7 @@ import { loadConfig } from "../../src/config.js";
 import { INSTRUCTIONS, createServer } from "../../src/server.js";
 import { compareRecipesInput, compareRecipesOutput } from "../../src/tools/compareRecipes.js";
 import { getRecipeInput, getRecipeOutput } from "../../src/tools/getRecipe.js";
-import {
-  scaleIngredientsInput,
-  scaleIngredientsOutput,
-} from "../../src/tools/scaleIngredients.js";
+import { scaleIngredientsInput, scaleIngredientsOutput } from "../../src/tools/scaleIngredients.js";
 import { searchRecipesInput, searchRecipesOutput } from "../../src/tools/searchRecipes.js";
 import { fakeClient } from "./support.js";
 

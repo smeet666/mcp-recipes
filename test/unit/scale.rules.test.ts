@@ -154,6 +154,78 @@ describe("a restated quantity moves with the one it restates", () => {
   });
 });
 
+describe("one quantity written across two measures", () => {
+  it("reads both members of a compound measure as one amount", () => {
+    const scaled = scale("1 lb 4 oz beef", 2);
+    expect(scaled.text).toBe("2.5 lb beef");
+    expect(scaled.amount).toBe(2.5);
+    expect(scaled.scaling).toBe("scaled");
+  });
+
+  it("reads the smaller unit a French line leaves unwritten", () => {
+    const scaled = scale("1 kg 500 de farine", 2);
+    expect(scaled.text).toBe("3 kg de farine");
+    expect(scaled.amount).toBe(3);
+    expect(scaled.scaling).toBe("scaled");
+  });
+});
+
+describe("a measure standing in front of a container", () => {
+  it("reads a tin's capacity as the size of one rather than as the amount", () => {
+    const scaled = scale("12 oz can tomatoes", 2);
+    expect(scaled.text).toBe("12 oz can tomatoes");
+    expect(scaled.scaling).toBe("unscaled");
+    expect(scaled.note).toMatch(/size of one|how many/i);
+  });
+});
+
+describe("a line is exact only when every quantity on it moved", () => {
+  it("sees a quantity written with a partitive between the number and the measure", () => {
+    // The second figure names an ingredient of its own rather than restating
+    // the first, so it stays as the page wrote it and the line says so.
+    const scaled = scale("150 g de sucre pour 3/4 de tasse de lait", 2);
+    expect(scaled.scaling).not.toBe("scaled");
+    expect(scaled.note).toMatch(/further quantity/i);
+  });
+
+  it("multiplies no count where the line named none", () => {
+    // Three vague words, one answer: none of them puts a figure on the page.
+    for (const line of [
+      "quelques feuilles de basilic",
+      "plusieurs feuilles de basilic",
+      "a few basil leaves",
+    ]) {
+      const scaled = scale(line, 2);
+      expect(scaled.scaling).toBe("unscaled");
+      expect(scaled.text).toBe(line);
+      expect(scaled.amount).toBeNull();
+    }
+  });
+
+  it("leaves a rank where the page put it", () => {
+    expect(scale("1er choix de boeuf", 2).text).toBe("1er choix de boeuf");
+    expect(scale("1st choice beef", 2).text).toBe("1st choice beef");
+  });
+});
+
+describe("a rewritten line reads the way the page wrote it", () => {
+  it("keeps the case of a name whose plural is irregular", () => {
+    expect(scale("1 TOMATO", 3).text).toBe("3 TOMATOES");
+    expect(scale("3 LOAVES", 0.34).text).toBe("1 LOAF");
+    // A capitalised name keeps its one capital rather than gaining more.
+    expect(scale("1 Tomato", 3).text).toBe("3 Tomatoes");
+  });
+
+  it("gives a French noun in -ou the plural French gives it", () => {
+    const french = (line: string, factor: number) =>
+      scaleIngredient(line, { factor, language: "fr" }).text;
+    expect(french("1 chou", 3)).toBe("3 choux");
+    expect(french("3 choux", 0.34)).toBe("1 chou");
+    // The ending decides nothing on its own: a clou takes the ordinary -s.
+    expect(french("1 clou de girofle", 3)).toBe("3 clous de girofle");
+  });
+});
+
 describe("ranges keep both ends", () => {
   it("scales both bounds together", () => {
     expect(scale("225–500 g guanciale", 2).text).toBe("450–1000 g guanciale");

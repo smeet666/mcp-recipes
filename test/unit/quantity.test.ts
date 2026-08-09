@@ -93,10 +93,18 @@ describe("splitting a line into amount, measure and item", () => {
     expect(parseIngredient("a ripe avocado").amount).toBeNull();
   });
 
-  it("reads 'quelques' as the handful it names, and says which word it came from", () => {
-    const parsed = parseIngredient("quelques pincées de sel");
-    expect(parsed.amount).toBe(3);
-    expect(parsed.articleWord).toBe("quelques");
+  it("reads no number from a word that names none, whichever language names it", () => {
+    expect(parseIngredient("quelques pincées de sel").amount).toBeNull();
+    expect(parseIngredient("plusieurs pincées de sel").amount).toBeNull();
+    expect(parseIngredient("a few pinches of salt").amount).toBeNull();
+  });
+
+  it("reads a figure glued to an ordinal ending as a rank rather than an amount", () => {
+    expect(parseIngredient("1er choix de boeuf").amount).toBeNull();
+    expect(parseIngredient("2e couche de pâte").amount).toBeNull();
+    expect(parseIngredient("1st choice beef").amount).toBeNull();
+    // A figure the line keeps apart from what follows it is still an amount.
+    expect(parseIngredient("1 escalope de veau").amount).toBe(1);
   });
 
   it("takes a bracket that is purely a measure, and leaves prose alone", () => {
