@@ -2,9 +2,11 @@
 
 [![npm](https://img.shields.io/npm/v/mcp-recipes.svg)](https://www.npmjs.com/package/mcp-recipes)
 [![CI](https://github.com/smeet666/mcp-recipes/actions/workflows/ci.yml/badge.svg)](https://github.com/smeet666/mcp-recipes/actions/workflows/ci.yml)
-[![license](https://img.shields.io/npm/l/mcp-recipes.svg)](LICENSE)
+[![license](https://img.shields.io/npm/l/mcp-recipes.svg)](./LICENSE)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.smeet666/mcp-recipes)
 [![Glama](https://glama.ai/mcp/servers/smeet666/mcp-recipes/badges/score.svg)](https://glama.ai/mcp/servers/smeet666/mcp-recipes)
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=recipes&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm1jcC1yZWNpcGVzIl19)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=recipes&config=%7B%22name%22%3A%22recipes%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22mcp-recipes%22%5D%7D)
 
 One question, several kitchens. An MCP server that asks every recipe source it
 reads at the same time, merges what they say, and scales quantities in French
