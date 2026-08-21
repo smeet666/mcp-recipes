@@ -146,8 +146,9 @@ export function readYieldSpan(published: string | null): {
     published,
   );
   if (span) {
-    const low = Number(span[1]!.replace(",", "."));
-    const high = Number(span[2]!.replace(",", "."));
+    const [lowText = "", highText = ""] = span.slice(1);
+    const low = Number(lowText.replace(",", "."));
+    const high = Number(highText.replace(",", "."));
     if (Number.isFinite(low) && Number.isFinite(high) && high > low) {
       return { count: low, max: high, unit: text(span[3]) };
     }
@@ -155,7 +156,8 @@ export function readYieldSpan(published: string | null): {
 
   const single = /^\s*(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(published);
   if (single) {
-    const value = Number(single[1]!.replace(",", "."));
+    const [figure = ""] = single.slice(1);
+    const value = Number(figure.replace(",", "."));
     if (Number.isFinite(value)) return { count: value, max: null, unit: text(single[2]) };
   }
 

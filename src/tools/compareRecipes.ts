@@ -117,12 +117,13 @@ function describeDifferences(
   const differences: string[] = [];
   const nameOf = (recipe: RecipeDetail) => recipe.sourceName;
 
-  const yields = payloads.map((payload) => payload.yield.original_text ?? "no stated amount");
-  if (new Set(yields).size > 1) {
+  const stated = payloads.map((payload) => ({
+    name: payload.source_name,
+    text: payload.yield.original_text ?? "no stated amount",
+  }));
+  if (new Set(stated.map((one) => one.text)).size > 1) {
     differences.push(
-      `${payloads
-        .map((payload, index) => `${payload.source_name} yields ${quoteForeign(yields[index]!)}`)
-        .join("; ")}.`,
+      `${stated.map((one) => `${one.name} yields ${quoteForeign(one.text)}`).join("; ")}.`,
     );
   }
 
@@ -167,14 +168,15 @@ function describeDifferences(
     );
   }
 
-  const licensed = recipes.filter((recipe) => recipe.license !== null);
-  for (const recipe of licensed) {
+  for (const recipe of recipes) {
+    const license = recipe.license;
+    if (license === null) continue;
     differences.push(
-      `${nameOf(recipe)} publishes under ${quoteForeign(recipe.license!.title)}, which asks for attribution.`,
+      `${nameOf(recipe)} publishes under ${quoteForeign(license.title)}, which asks for attribution.`,
     );
   }
   const silent = recipes.filter((recipe) => recipe.license === null);
-  if (silent.length > 0 && licensed.length > 0) {
+  if (silent.length > 0 && silent.length < recipes.length) {
     differences.push(
       `${listNames(silent.map(nameOf))} states no terms of use. Silence is not permission.`,
     );
@@ -207,7 +209,8 @@ export async function runCompareRecipes(
     const opened = new Set<SourceId>();
 
     reads.forEach((read, index) => {
-      const source = offered[index]![0];
+      const source = offered[index]?.[0];
+      if (source === undefined) return;
       opened.add(source);
       if (read.status === "fulfilled") {
         recipes.push(read.value.recipe);
@@ -281,12 +284,13 @@ export async function runCompareRecipes(
     // as a source's version of the dish states as fact the one thing the search
     // did not establish, and sharing one word of a name is not carrying it:
     // "biscuits and gravy" and a tin of Christmas biscuits share the biscuit.
-    const shortfall = payloads.map((payload) => dishWordsMissing(payload.title, args.dish));
-    const named = payloads.filter((_payload, index) => shortfall[index]!.length === 0);
-    const carriesDish = named.length > 0;
+    const weighed = payloads.map((payload) => ({
+      payload,
+      missing: dishWordsMissing(payload.title, args.dish),
+    }));
+    const carriesDish = weighed.some((one) => one.missing.length === 0);
 
-    payloads.forEach((payload, index) => {
-      const missing = shortfall[index]!;
+    weighed.forEach(({ payload, missing }) => {
       if (missing.length === 0) return;
       notes.push(
         mustKeep(
@@ -317,7 +321,10 @@ export async function runCompareRecipes(
     // row that answers to another name beside it turns a search that missed
     // into a claim about two traditions.
     const comparable = recipes.filter((recipe) =>
-      named.some((payload) => payload.id === recipe.id && payload.source === recipe.source),
+      weighed.some(
+        ({ payload, missing }) =>
+          missing.length === 0 && payload.id === recipe.id && payload.source === recipe.source,
+      ),
     );
     const differences =
       comparable.length === payloads.length

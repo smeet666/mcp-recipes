@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import type { z } from "zod";
 import { loadConfig } from "../../src/config.js";
 import { INSTRUCTIONS, createServer } from "../../src/server.js";
 import { compareRecipesInput, compareRecipesOutput } from "../../src/tools/compareRecipes.js";

@@ -515,7 +515,7 @@ function readQuestion(question: string): ReadQuestion {
   };
 
   for (let index = 0; index < words.length; index += 1) {
-    const word = words[index]!;
+    const word = words[index] ?? "";
     const key = foldWord(word);
 
     // A hyphen joins everywhere else, so "sans-gluten" and "no-sugar" arrive as
@@ -529,7 +529,7 @@ function readQuestion(question: string): ReadQuestion {
     // "gluten-free" writes the food and the marker as one word.
     const free = FREE_OF.exec(word);
     if (free) {
-      state(free[1]!, "excluded");
+      state(free[1] ?? "", "excluded");
       continue;
     }
 
@@ -633,12 +633,13 @@ function takeFood(words: string[], from: number): { named: string; next: number 
   let index = from;
   // An article or a quantifier can stand between the marker and the food:
   // "pas de beurre", "without any butter".
-  while (index < words.length && isFiller(words[index]!)) index += 1;
+  while (index < words.length && isFiller(words[index] ?? "")) index += 1;
 
   const named: string[] = [];
   while (index < words.length && named.length < CONDITION_WORDS) {
-    if (!namesFood(words[index]!)) break;
-    named.push(words[index]!);
+    const word = words[index] ?? "";
+    if (!namesFood(word)) break;
+    named.push(word);
     index += 1;
 
     const beyond = words[index + 1];
@@ -648,7 +649,7 @@ function takeFood(words: string[], from: number): { named: string; next: number 
       beyond !== undefined &&
       namesFood(beyond)
     ) {
-      named.push(words[index]!);
+      named.push(words[index] ?? "");
       index += 1;
       continue;
     }
