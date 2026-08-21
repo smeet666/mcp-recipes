@@ -97,7 +97,9 @@ export async function runGetRecipe(
           "Spell an id with its source to leave nothing to infer.",
       );
     }
-    if (cached) notes.push("Served from this server's short-lived in-memory cache.");
+    if (cached) {
+      notes.push("Served from this server's short-lived in-memory cache.");
+    }
 
     const payload = view.payload;
     const credit = creditLine([{ attribution: payload.attribution, url: payload.url }]);

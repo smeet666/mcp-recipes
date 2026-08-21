@@ -478,12 +478,20 @@ const NOT_A_MEASURE = new Set([
  */
 export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
   const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const [word = ""] = match.slice(1);
-  if (word.length < 3) return null;
-  if (NOT_A_MEASURE.has(normalizeUnitKey(word))) return null;
-  if (lookupUnit(word, "fr")) return null;
+  if (word.length < 3) {
+    return null;
+  }
+  if (NOT_A_MEASURE.has(normalizeUnitKey(word))) {
+    return null;
+  }
+  if (lookupUnit(word, "fr")) {
+    return null;
+  }
 
   const canonical = frenchSingular(word);
   return {
@@ -514,7 +522,9 @@ export function readContainerLoad(word: string): UnitInfo | null {
   const key = normalizeUnitKey(word);
   // At least three letters name the container, which keeps "awful" out of the
   // kitchen.
-  if (!/^[a-z]{3,}fuls?$/.test(key)) return null;
+  if (!/^[a-z]{3,}fuls?$/.test(key)) {
+    return null;
+  }
 
   const canonical = key.endsWith("fuls") ? key.slice(0, -1) : key;
   return { canonical, kind: "approximate", system: "none", plural: `${canonical}s` };
@@ -529,18 +539,32 @@ export function readContainerLoad(word: string): UnitInfo | null {
  * alone.
  */
 function frenchSingular(word: string): string {
-  if (/eaux$/i.test(word)) return word.slice(0, -1);
-  if (/aux$/i.test(word)) return `${word.slice(0, -3)}al`;
-  if (/[aiou]s$/i.test(word)) return word;
-  if (/s$/i.test(word) && word.length > 3) return word.slice(0, -1);
+  if (/eaux$/i.test(word)) {
+    return word.slice(0, -1);
+  }
+  if (/aux$/i.test(word)) {
+    return `${word.slice(0, -3)}al`;
+  }
+  if (/[aiou]s$/i.test(word)) {
+    return word;
+  }
+  if (/s$/i.test(word) && word.length > 3) {
+    return word.slice(0, -1);
+  }
   return word;
 }
 
 /** The plural French writes for a noun, or the noun itself when it takes no mark. */
 function frenchPlural(word: string): string {
-  if (/[sxz]$/i.test(word)) return word;
-  if (/eau$/i.test(word)) return `${word}x`;
-  if (/al$/i.test(word)) return `${word.slice(0, -2)}aux`;
+  if (/[sxz]$/i.test(word)) {
+    return word;
+  }
+  if (/eau$/i.test(word)) {
+    return `${word}x`;
+  }
+  if (/al$/i.test(word)) {
+    return `${word.slice(0, -2)}aux`;
+  }
   return `${word}s`;
 }
 
@@ -637,7 +661,9 @@ const DEMOTIONS: Record<string, UnitStep> = {
  */
 export function demoteUnit(unit: UnitInfo): { unit: UnitInfo; per: number } | null {
   const step = DEMOTIONS[normalizeUnitKey(unit.canonical)];
-  if (!step) return null;
+  if (!step) {
+    return null;
+  }
   const target = lookupUnit(step.to, step.language);
   return target ? { unit: target, per: step.per } : null;
 }
@@ -687,7 +713,9 @@ export type Divisibility =
  * one thing that does not divide is decided from the item's own name.
  */
 export function unitDivisibility(unit: UnitInfo): Divisibility {
-  if (unit.kind === "approximate") return "whole";
+  if (unit.kind === "approximate") {
+    return "whole";
+  }
   return QUARTERED_MEASURE.test(unit.canonical) ? "quarter" : "half";
 }
 
@@ -763,7 +791,9 @@ export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
 
   while (amount * ratio < 1) {
     const step = demoteUnit(current);
-    if (!step) break;
+    if (!step) {
+      break;
+    }
     ratio *= step.per;
     current = step.unit;
   }
@@ -779,7 +809,9 @@ export function chooseReadableUnit(unit: UnitInfo, amount: number): ChosenUnit {
 
   while (!writesExactly(amount * ratio)) {
     const step = demoteUnit(current);
-    if (!step) break;
+    if (!step) {
+      break;
+    }
     ratio *= step.per;
     current = step.unit;
   }
@@ -800,8 +832,12 @@ function writesExactly(value: number): boolean {
  * singular: "1,5 cuillère à soupe".
  */
 export function formatUnit(unit: UnitInfo, amount: number, language: Language): string {
-  if (unit.symbol) return unit.canonical;
+  if (unit.symbol) {
+    return unit.canonical;
+  }
   const singular = language === "fr" ? amount < 2 : amount <= 1;
-  if (singular) return unit.canonical;
+  if (singular) {
+    return unit.canonical;
+  }
   return unit.plural ?? `${unit.canonical}s`;
 }

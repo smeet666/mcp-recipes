@@ -47,8 +47,8 @@ describe("rows are interleaved rather than ranked", () => {
 });
 
 describe("every source answering", () => {
-  it("returns rows from each, every one naming its source", () => {
-    return fakeClient()
+  it("returns rows from each, every one naming its source", () =>
+    fakeClient()
       .searchRecipes("crepes", 5)
       .then((merged) => {
         expect(merged.rows).toHaveLength(marmitonRows.length + cookbookRows.length);
@@ -59,8 +59,7 @@ describe("every source answering", () => {
           "cookbook",
         ]);
         expect(merged.rows.every((entry) => entry.id.includes(":"))).toBe(true);
-      });
-  });
+      }));
 
   it("reports what each source said its own count meant", async () => {
     const merged = await fakeClient().searchRecipes("crepes", 5);

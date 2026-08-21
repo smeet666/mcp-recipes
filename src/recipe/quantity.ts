@@ -85,7 +85,9 @@ const NAMED_ENTITIES: Record<string, string> = {
  */
 function decodeEntities(text: string): string {
   return text
-    .replace(/&#x([0-9a-f]+);/gi, (whole, hex: string) => codePoint(parseInt(hex, 16), whole))
+    .replace(/&#x([0-9a-f]+);/gi, (whole, hex: string) =>
+      codePoint(Number.parseInt(hex, 16), whole),
+    )
     .replace(/&#(\d+);/g, (whole, digits: string) => codePoint(Number(digits), whole))
     .replace(
       /&([a-z][a-z0-9]*);/gi,
@@ -95,7 +97,9 @@ function decodeEntities(text: string): string {
 
 /** A code point a page named, or the entity as published when it names none. */
 function codePoint(value: number, published: string): string {
-  if (!Number.isInteger(value) || value < 32 || value > 0x10ffff) return published;
+  if (!Number.isInteger(value) || value < 32 || value > 0x10ffff) {
+    return published;
+  }
   try {
     return String.fromCodePoint(value);
   } catch {
@@ -153,10 +157,14 @@ const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
  */
 function statesItemSize(item: string): boolean {
   const attached = /\s+de\s+(?=\d)/i.exec(item);
-  if (!attached) return false;
+  if (!attached) {
+    return false;
+  }
 
   const named = item.slice(0, attached.index).trim();
-  if (!named || /\d/.test(named)) return false;
+  if (!named || /\d/.test(named)) {
+    return false;
+  }
 
   return isStatedSize(item.slice(attached.index + attached[0].length));
 }
@@ -164,10 +172,14 @@ function statesItemSize(item: string): boolean {
 /** A mass or a volume standing on its own, with nothing it is the amount of. */
 function isStatedSize(text: string): boolean {
   const size = parseLeadingQuantity(text, "fr");
-  if (!size) return false;
+  if (!size) {
+    return false;
+  }
 
   const measure = takeUnit(text.slice(size.length).trimStart(), "fr");
-  if (!measure.unit || measure.unit.kind !== "measured") return false;
+  if (measure.unit?.kind !== "measured") {
+    return false;
+  }
 
   return !CONTAINER_CONTENTS.test(measure.rest);
 }
@@ -198,30 +210,46 @@ function takeCompoundMember(
   unit: UnitInfo | null,
   language: Language,
 ): { adds: number; rest: string } | null {
-  if (!unit) return null;
+  if (!unit) {
+    return null;
+  }
   const step = demoteUnit(unit);
-  if (!step) return null;
+  if (!step) {
+    return null;
+  }
 
   const joiner = ADDS_UP.exec(text);
-  if (joiner) text = text.slice(joiner[0].length);
+  if (joiner) {
+    text = text.slice(joiner[0].length);
+  }
 
   const second = parseLeadingQuantity(text, language);
-  if (!second || second.amount <= 0 || second.amount >= step.per) return null;
+  if (!second || second.amount <= 0 || second.amount >= step.per) {
+    return null;
+  }
 
   const after = text.slice(second.length);
   const measure = takeUnit(after.trimStart(), language);
   if (measure.unit) {
-    if (measure.unit.canonical !== step.unit.canonical) return null;
+    if (measure.unit.canonical !== step.unit.canonical) {
+      return null;
+    }
     return { adds: second.amount / step.per, rest: measure.rest.trimStart() };
   }
 
   // The unwritten form: "1 kg 500" is a kilo and five hundred grams. It is read
   // only where a mass or a volume opened the line, and only where nothing but
   // the partitive follows the figure, so "1 cup 2 eggs" stays two eggs.
-  if (unit.kind !== "measured") return null;
-  if (!Number.isInteger(second.amount)) return null;
+  if (unit.kind !== "measured") {
+    return null;
+  }
+  if (!Number.isInteger(second.amount)) {
+    return null;
+  }
   const trailing = after.trimStart();
-  if (trailing !== "" && !/^(?:de\s|d'|du\s|des\s|,)/i.test(trailing)) return null;
+  if (trailing !== "" && !/^(?:de\s|d'|du\s|des\s|,)/i.test(trailing)) {
+    return null;
+  }
 
   return { adds: second.amount / step.per, rest: trailing };
 }
@@ -329,7 +357,9 @@ function takeMeasureAdjective(
   language: Language,
 ): { adjective: string | null; rest: string } {
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
-  if (!match) return { adjective: null, rest: text };
+  if (!match) {
+    return { adjective: null, rest: text };
+  }
 
   const [adjective = ""] = match.slice(1);
   const folded = normalizeUnitKey(adjective);
@@ -338,7 +368,9 @@ function takeMeasureAdjective(
   const listed =
     MEASURE_ADJECTIVES[language].has(folded) ||
     MEASURE_ADJECTIVES[language].has(folded.replace(/s$/, ""));
-  if (!listed) return { adjective: null, rest: text };
+  if (!listed) {
+    return { adjective: null, rest: text };
+  }
 
   return { adjective, rest: text.slice(match[0].length) };
 }
@@ -398,7 +430,9 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
     const denominator = Number(fraction[2]);
     // A denominator of zero is not a quantity. Reading the numerator alone
     // would leave "/0" in the item name and scale a number nobody wrote.
-    if (denominator === 0) return null;
+    if (denominator === 0) {
+      return null;
+    }
     return { amount: Number(fraction[1]) / denominator, length: offset + fraction[0].length };
   }
 
@@ -419,12 +453,16 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
     const amount = Number(
       language === "fr" ? written.replace(",", ".") : written.replace(/,/g, ""),
     );
-    if (Number.isFinite(amount)) return { amount, length: offset + decimal[0].length };
+    if (Number.isFinite(amount)) {
+      return { amount, length: offset + decimal[0].length };
+    }
   }
 
   if (language === "en") {
     const written = parseWrittenFraction(trimmed);
-    if (written) return { amount: written.amount, length: offset + written.length };
+    if (written) {
+      return { amount: written.amount, length: offset + written.length };
+    }
   }
 
   return null;
@@ -464,17 +502,23 @@ function parseWrittenFraction(text: string): ParsedQuantity | null {
     /^(?:(a|an|one|two|three)[\s-]+)?(halves|half|thirds|third|quarters|quarter|fourths|fourth)\b/i.exec(
       text,
     );
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const numerator = match[1] ? WRITTEN_NUMERATORS[match[1].toLowerCase()] : 1;
   const denominator = WRITTEN_DENOMINATORS[(match[2] ?? "").toLowerCase()];
-  if (!numerator || !denominator) return null;
+  if (!numerator || !denominator) {
+    return null;
+  }
 
   const rest = text
     .slice(match[0].length)
     .replace(/^\s*of\s+/i, "")
     .trimStart();
-  if (!/^an?\s/i.test(rest) && !takeUnit(rest, "en").unit) return null;
+  if (!/^an?\s/i.test(rest) && !takeUnit(rest, "en").unit) {
+    return null;
+  }
 
   return { amount: numerator / denominator, length: match[0].length };
 }
@@ -500,17 +544,23 @@ export interface ParsedRange extends ParsedQuantity {
  */
 export function parseLeadingRange(text: string, language: Language): ParsedRange | null {
   const low = parseLeadingQuantity(text, language);
-  if (!low) return null;
+  if (!low) {
+    return null;
+  }
 
   const after = text.slice(low.length);
   // A written separator needs whitespace around it, so "5 tomatoes" is not read
   // as "5 to" followed by an unreadable second bound.
   const written = language === "fr" ? /^\s+(à|a|ou)\s+/i : /^\s+(to|or)\s+/i;
   const separator = written.exec(after) ?? /^\s*(–|—|-)\s*/.exec(after);
-  if (!separator) return null;
+  if (!separator) {
+    return null;
+  }
 
   const high = parseLeadingQuantity(after.slice(separator[0].length), language);
-  if (!high || high.amount <= low.amount) return null;
+  if (!high || high.amount <= low.amount) {
+    return null;
+  }
 
   return {
     amount: low.amount,
@@ -648,18 +698,26 @@ export function takeUnit(
 ): { unit: UnitInfo | null; rest: string } {
   const normalized = normalizeUnitKey(text);
   for (const key of unitKeys(language)) {
-    if (normalized !== key && !normalized.startsWith(`${key} `)) continue;
+    if (normalized !== key && !normalized.startsWith(`${key} `)) {
+      continue;
+    }
     const unit = lookupUnit(key, language);
-    if (!unit) continue;
+    if (!unit) {
+      continue;
+    }
     const rest = afterKey(text, key);
-    if (rest === null) continue;
+    if (rest === null) {
+      continue;
+    }
     return { unit, rest };
   }
 
   if (language === "en") {
     const words = text.trimStart().split(/\s+/);
     const load = words[0] ? readContainerLoad(words[0]) : null;
-    if (load) return { unit: load, rest: words.slice(1).join(" ") };
+    if (load) {
+      return { unit: load, rest: words.slice(1).join(" ") };
+    }
   }
 
   return { unit: null, rest: text };
@@ -678,7 +736,9 @@ export function takeUnit(
 function afterKey(text: string, key: string): string | null {
   const words = text.trim().split(/\s+/);
   for (let count = 1; count <= words.length; count += 1) {
-    if (normalizeUnitKey(words.slice(0, count).join(" ")) !== key) continue;
+    if (normalizeUnitKey(words.slice(0, count).join(" ")) !== key) {
+      continue;
+    }
     return words.slice(count).join(" ");
   }
   return null;
@@ -695,7 +755,9 @@ function takeUnitEitherLanguage(
   language: Language,
 ): { unit: UnitInfo | null; rest: string } {
   const first = takeUnit(text, language);
-  if (first.unit) return first;
+  if (first.unit) {
+    return first;
+  }
   return takeUnit(text, language === "fr" ? "en" : "fr");
 }
 
@@ -757,7 +819,9 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     countMultiplier: null,
   });
 
-  if (unreadableComma(text, language, evidence)) return empty("ambiguousDecimal");
+  if (unreadableComma(text, language, evidence)) {
+    return empty("ambiguousDecimal");
+  }
 
   const loose = APPROXIMATION_PREFIX[language].exec(text);
   const stated = loose ? text.slice(loose[0].length) : text;
@@ -765,29 +829,41 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   const range = parseLeadingRange(stated, language);
   const article = range ? null : readArticle(stated, language);
   const quantity = range ?? parseLeadingQuantity(stated, language) ?? article;
-  if (!quantity) return empty(null);
+  if (!quantity) {
+    return empty(null);
+  }
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "4 to 5-pound roast" is one roast that weighs that much.
   const behindFigure = stated.slice(quantity.length);
-  if (/^-\p{L}/u.test(behindFigure)) return empty("sizeQualifier");
+  if (/^-\p{L}/u.test(behindFigure)) {
+    return empty("sizeQualifier");
+  }
 
   // A rank names a position in an order, and there is no amount in it.
-  if (quantity !== article && ORDINAL_SUFFIX.test(behindFigure)) return empty(null);
+  if (quantity !== article && ORDINAL_SUFFIX.test(behindFigure)) {
+    return empty(null);
+  }
 
   // A length of time belongs to the method rather than to the proportions.
-  if (TIME_UNIT[language].test(behindFigure.trimStart())) return empty("duration");
+  if (TIME_UNIT[language].test(behindFigure.trimStart())) {
+    return empty("duration");
+  }
 
   let rest = stated.slice(quantity.length).trimStart();
   // "two thirds of a cup" names a share of one cup, and the measure stands
   // behind the preposition and the article that introduce it.
-  if (language === "en") rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
+  if (language === "en") {
+    rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
+  }
 
   // "2 dozen mushrooms" counts mushrooms, twelve to the dozen, so the multiplier
   // is folded into the amount and the line goes on to be read as the count of a
   // thing it now is.
   const multiplier = readCountMultiplier(rest);
-  if (multiplier) rest = multiplier.rest;
+  if (multiplier) {
+    rest = multiplier.rest;
+  }
   const times = multiplier?.times ?? 1;
 
   const fromArticle = quantity === article;
@@ -805,7 +881,9 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   // A range gives two amounts, and a second member behind it would belong to
   // one of them without saying which.
   const compound = range ? null : takeCompoundMember(rest, leading.unit, language);
-  if (compound) rest = compound.rest;
+  if (compound) {
+    rest = compound.rest;
+  }
   const whole = quantity.amount + (compound?.adds ?? 0);
 
   // The partitive can stand between the measure and the bracket restating it,
@@ -819,13 +897,17 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   rest = bracketed.measures.length > 0 ? bracketed.rest : rest;
 
   const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest, language);
-  if (slashed) rest = slashed.rest;
+  if (slashed) {
+    rest = slashed.rest;
+  }
 
   let item = stripItemLead(rest, language);
 
   const trailing =
     bracketed.measures.length === 0 && !slashed ? takeTrailingAlternates(item, language) : null;
-  if (trailing) item = trailing.item;
+  if (trailing) {
+    item = trailing.item;
+  }
 
   const group = trailing ?? (bracketed.measures.length > 0 ? bracketed : null);
   // A measure inside a bracket beside a container gives what one of them holds,
@@ -833,22 +915,25 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   // opened, and a tin of twice the size is a tin no shop sells, so the figure
   // goes back exactly as the page wrote it.
   const capacity =
-    group !== null &&
-    group.measures.every((measure) => measure.unit?.kind === "measured") &&
+    group?.measures.every((measure) => measure.unit?.kind === "measured") &&
     (namesContainer(leading.unit?.canonical) || namesContainer(item))
       ? group.published
       : null;
 
   // A counted thing whose size the line states: the number the line opens with
   // is one bird, and the measure behind it is what that bird weighs.
-  if (language === "fr" && !leading.unit && statesItemSize(item)) return empty("itemSize");
+  if (language === "fr" && !leading.unit && statesItemSize(item)) {
+    return empty("itemSize");
+  }
 
   // "une dinde de 3 kg" writes the noun where a measure stands, and the
   // partitive takes it for one. A noun the vocabulary lists as a measure keeps
   // counting, since a pot or a boîte is a thing to buy more of; a noun read as
   // a measure only for standing there names the food itself, and a mass behind
   // it is the size of one of them.
-  if (language === "fr" && leading.partitive && isStatedSize(item)) return empty("itemSize");
+  if (language === "fr" && leading.partitive && isStatedSize(item)) {
+    return empty("itemSize");
+  }
 
   // "12 oz can tomatoes": the measure qualifies the tin, and how many tins the
   // recipe wants is not written anywhere on the line.
@@ -856,7 +941,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     return empty("containerSize");
   }
 
-  const alternates = capacity !== null ? [] : (slashed?.measures ?? group?.measures ?? []);
+  const alternates = capacity === null ? (slashed?.measures ?? group?.measures ?? []) : [];
 
   return {
     original,
@@ -872,7 +957,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     alternates,
     alternateStyle:
       alternates.length === 0 ? null : slashed ? "slash" : trailing ? "trailing" : "bracket",
-    alternateIntro: capacity !== null ? null : (group?.intro ?? null),
+    alternateIntro: capacity === null ? (group?.intro ?? null) : null,
     capacity,
     item,
     articleWord: fromArticle ? (article?.word ?? null) : null,
@@ -894,7 +979,9 @@ function unreadableComma(text: string, language: Language, evidence: LanguageEvi
     const settled = evidence.french !== evidence.english;
     return !settled;
   }
-  if (language === "en") return COMMA_DECIMAL.test(text);
+  if (language === "en") {
+    return COMMA_DECIMAL.test(text);
+  }
   return /^\s*\d+,\d+,\d/.test(text);
 }
 
@@ -920,17 +1007,27 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
 
   if (language === "fr") {
     const match = /^\s*(un|une)\b\s*/i.exec(text);
-    if (!match) return null;
-    if (!counts(text.slice(match[0].length))) return null;
+    if (!match) {
+      return null;
+    }
+    if (!counts(text.slice(match[0].length))) {
+      return null;
+    }
     const [word = ""] = match.slice(1);
     const amount = FRENCH_ARTICLES[word.toLowerCase()];
-    if (amount === undefined) return null;
+    if (amount === undefined) {
+      return null;
+    }
     return { amount, length: match[0].length, word };
   }
 
   const article = /^an?\s+/i.exec(text);
-  if (!article) return null;
-  if (!counts(text.slice(article[0].length))) return null;
+  if (!article) {
+    return null;
+  }
+  if (!counts(text.slice(article[0].length))) {
+    return null;
+  }
   return { amount: 1, length: article[0].length, word: article[0].trim() };
 }
 
@@ -954,11 +1051,15 @@ const COUNT_MULTIPLIERS: Record<string, number> = {
 /** The multiplier a line opens with, and what stands after it. */
 function readCountMultiplier(text: string): { times: number; rest: string } | null {
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   const [word = ""] = match.slice(1);
   const times = COUNT_MULTIPLIERS[normalizeUnitKey(word)];
-  if (times === undefined) return null;
+  if (times === undefined) {
+    return null;
+  }
   return { times, rest: text.slice(match[0].length) };
 }
 
@@ -978,13 +1079,17 @@ function takeLeadingUnit(
   fromArticle: boolean,
 ): { unit: UnitInfo | null; rest: string; partitive: boolean } {
   const taken = takeUnit(text, language);
-  if (taken.unit) return { ...taken, partitive: false };
+  if (taken.unit) {
+    return { ...taken, partitive: false };
+  }
 
   if (language === "fr" && fromArticle) {
     const measure = readPartitiveMeasure(text);
     // A noun the vocabulary never listed, read as a measure for standing
     // between the article and the partitive.
-    if (measure) return { unit: measure.unit, rest: measure.rest, partitive: true };
+    if (measure) {
+      return { unit: measure.unit, rest: measure.rest, partitive: true };
+    }
   }
 
   return { ...taken, partitive: false };
@@ -1026,12 +1131,18 @@ function stripItemLead(text: string, language: Language): string {
  */
 function takeAlternates(text: string, language: Language): BracketedMeasures {
   const none: BracketedMeasures = { measures: [], intro: null, published: "", rest: text };
-  if (!text.startsWith("(")) return none;
+  if (!text.startsWith("(")) {
+    return none;
+  }
   const close = text.indexOf(")");
-  if (close < 0) return none;
+  if (close < 0) {
+    return none;
+  }
 
   const read = readBracket(text.slice(0, close + 1), language);
-  if (!read) return none;
+  if (!read) {
+    return none;
+  }
   return { ...read, rest: text.slice(close + 1).trimStart() };
 }
 
@@ -1065,10 +1176,14 @@ function takeMeasureAfterQuantity(
   language: Language,
 ): { unit: UnitInfo | null; rest: string } {
   const direct = takeUnitEitherLanguage(text, language);
-  if (direct.unit) return direct;
+  if (direct.unit) {
+    return direct;
+  }
 
   const partitive = MEASURE_PARTITIVE.exec(text);
-  if (!partitive) return direct;
+  if (!partitive) {
+    return direct;
+  }
   return takeUnitEitherLanguage(text.slice(partitive[0].length), language);
 }
 
@@ -1092,12 +1207,16 @@ function readBracket(bracket: string, language: Language): Omit<BracketedMeasure
   for (const part of parts) {
     const range = parseLeadingRange(part, language);
     const quantity = range ?? parseLeadingQuantity(part, language);
-    if (!quantity) return null;
+    if (!quantity) {
+      return null;
+    }
 
     const after = takeMeasureAfterQuantity(part.slice(quantity.length).trimStart(), language);
     // A trailing word means the bracket is not purely a measure, as in
     // "(1-inch pieces)", so the whole group is left as prose.
-    if (!after.unit || after.rest.trim() !== "") return null;
+    if (!after.unit || after.rest.trim() !== "") {
+      return null;
+    }
 
     measures.push({
       amount: quantity.amount,
@@ -1107,7 +1226,9 @@ function readBracket(bracket: string, language: Language): Omit<BracketedMeasure
     });
   }
 
-  if (measures.length === 0) return null;
+  if (measures.length === 0) {
+    return null;
+  }
   return { measures, intro: intro ? intro[0].trim() : null, published: bracket };
 }
 
@@ -1125,15 +1246,21 @@ function takeTrailingAlternates(
   language: Language,
 ): (Omit<BracketedMeasures, "rest"> & { item: string }) | null {
   const closing = /\s*(\([^()]*\))\s*$/.exec(item);
-  if (!closing) return null;
+  if (!closing) {
+    return null;
+  }
 
   const read = readBracket(closing[1] ?? "", language);
-  if (!read) return null;
+  if (!read) {
+    return null;
+  }
 
   const head = item.slice(0, closing.index).trim();
   // A bracket standing on its own is the quantity itself rather than a
   // restatement of one, and there would be nothing left for it to qualify.
-  if (head === "") return null;
+  if (head === "") {
+    return null;
+  }
 
   return { ...read, item: head };
 }
@@ -1158,10 +1285,14 @@ function takeSlashAlternates(
     const after = rest.slice(1).trimStart();
     const range = parseLeadingRange(after, language);
     const quantity = range ?? parseLeadingQuantity(after, language);
-    if (!quantity) break;
+    if (!quantity) {
+      break;
+    }
 
     const taken = takeUnitEitherLanguage(after.slice(quantity.length).trimStart(), language);
-    if (!taken.unit) break;
+    if (!taken.unit) {
+      break;
+    }
 
     measures.push({
       amount: quantity.amount,
@@ -1208,13 +1339,19 @@ export function formatAmount(
     return language === "fr" ? rendered.replace(".", ",") : rendered;
   };
 
-  if (!Number.isFinite(amount)) return "";
-  if (Number.isInteger(amount)) return String(amount);
-  if (options.fractions === false) return decimal(amount);
+  if (!Number.isFinite(amount)) {
+    return "";
+  }
+  if (Number.isInteger(amount)) {
+    return String(amount);
+  }
+  if (options.fractions === false) {
+    return decimal(amount);
+  }
 
   const whole = Math.floor(amount);
   const rest = amount - whole;
-  const known: Array<[number, string]> = [
+  const known: [number, string][] = [
     [0.25, "1/4"],
     [1 / 3, "1/3"],
     [0.5, "1/2"],
@@ -1222,7 +1359,9 @@ export function formatAmount(
     [0.75, "3/4"],
   ];
   for (const [value, label] of known) {
-    if (Math.abs(rest - value) < 0.02) return whole > 0 ? `${whole} ${label}` : label;
+    if (Math.abs(rest - value) < 0.02) {
+      return whole > 0 ? `${whole} ${label}` : label;
+    }
   }
 
   return decimal(amount);

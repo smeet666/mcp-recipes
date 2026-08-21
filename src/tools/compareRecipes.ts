@@ -90,8 +90,10 @@ const TEXT_DIFFERENCE_LINES = 4;
 
 /** Sources named the way a sentence names them. */
 function listNames(names: string[]): string {
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  if (names.length <= 1) {
+    return names.join("");
+  }
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 /**
@@ -113,7 +115,9 @@ function describeDifferences(
   payloads: RecipePayload[],
   sections: readonly Section[],
 ): string[] {
-  if (recipes.length < 2) return [];
+  if (recipes.length < 2) {
+    return [];
+  }
   const differences: string[] = [];
   const nameOf = (recipe: RecipeDetail) => recipe.sourceName;
 
@@ -170,7 +174,9 @@ function describeDifferences(
 
   for (const recipe of recipes) {
     const license = recipe.license;
-    if (license === null) continue;
+    if (license === null) {
+      continue;
+    }
     differences.push(
       `${nameOf(recipe)} publishes under ${quoteForeign(license.title)}, which asks for attribution.`,
     );
@@ -196,7 +202,9 @@ export async function runCompareRecipes(
 
     const best = new Map<SourceId, string>();
     for (const row of merged.rows) {
-      if (!best.has(row.source)) best.set(row.source, row.id);
+      if (!best.has(row.source)) {
+        best.set(row.source, row.id);
+      }
     }
 
     const offered = [...best.entries()];
@@ -210,7 +218,9 @@ export async function runCompareRecipes(
 
     reads.forEach((read, index) => {
       const source = offered[index]?.[0];
-      if (source === undefined) return;
+      if (source === undefined) {
+        return;
+      }
       opened.add(source);
       if (read.status === "fulfilled") {
         recipes.push(read.value.recipe);
@@ -238,7 +248,9 @@ export async function runCompareRecipes(
     const payloads = views.map((view) => view.payload);
 
     const notes: Note[] = reportNotes(merged.reports);
-    for (const view of views) notes.push(...view.notes);
+    for (const view of views) {
+      notes.push(...view.notes);
+    }
 
     const omitted = SECTIONS.filter((section) => !args.sections.includes(section));
     if (omitted.length > 0) {
@@ -252,7 +264,9 @@ export async function runCompareRecipes(
     // "that source offered nothing" is the one that turns a bad minute into a
     // claim about what a corpus holds.
     for (const report of merged.reports) {
-      if (recipes.some((recipe) => recipe.source === report.source)) continue;
+      if (recipes.some((recipe) => recipe.source === report.source)) {
+        continue;
+      }
       const failedRead = unread.get(report.source);
       if (report.status === "failed") {
         notes.push(
@@ -291,7 +305,9 @@ export async function runCompareRecipes(
     const carriesDish = weighed.some((one) => one.missing.length === 0);
 
     weighed.forEach(({ payload, missing }) => {
-      if (missing.length === 0) return;
+      if (missing.length === 0) {
+        return;
+      }
       notes.push(
         mustKeep(
           `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
@@ -416,7 +432,9 @@ export async function runCompareRecipes(
         // what became of the row it offered.
         per_source: merged.reports.map((report) => {
           const payload = toReportPayload(report);
-          if (!opened.has(report.source)) return payload;
+          if (!opened.has(report.source)) {
+            return payload;
+          }
           const failedRead = unread.get(report.source);
           return withRead(
             payload,

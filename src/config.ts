@@ -56,7 +56,9 @@ export interface Logger {
 export function createLogger(level: LogLevel): Logger {
   const rank = LOG_LEVELS.indexOf(level);
   const write = (at: LogLevel, message: string) => {
-    if (rank === 0 || LOG_LEVELS.indexOf(at) > rank) return;
+    if (rank === 0 || LOG_LEVELS.indexOf(at) > rank) {
+      return;
+    }
     process.stderr.write(`[mcp-recipes] ${at}: ${message}\n`);
   };
   return {
@@ -77,7 +79,9 @@ function readInteger(
   max: number,
 ): number {
   const raw = env[name];
-  if (raw === undefined || raw.trim() === "") return fallback;
+  if (raw === undefined || raw.trim() === "") {
+    return fallback;
+  }
 
   const value = Number(raw);
   if (!Number.isFinite(value) || !Number.isInteger(value)) {

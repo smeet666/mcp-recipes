@@ -95,7 +95,9 @@ function withGuarantees(config: Config): Config {
 
   const bounded = (value: unknown, fallback: number, min: number, max: number): number => {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return fallback;
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
     return Math.min(max, Math.max(min, parsed));
   };
 
@@ -209,7 +211,9 @@ export function interleave(groups: RecipeRow[][]): RecipeRow[] {
   for (let index = 0; index < longest; index += 1) {
     for (const group of groups) {
       const row = group[index];
-      if (row) merged.push(row);
+      if (row) {
+        merged.push(row);
+      }
     }
   }
   return merged;
@@ -400,11 +404,15 @@ export class RecipesClient {
         for (const row of read.rows) {
           // The identifier names its source, so two sources minting the same
           // reference stay two rows while one recipe reached twice stays one.
-          if (seen.has(row.id)) continue;
+          if (seen.has(row.id)) {
+            continue;
+          }
           seen.add(row.id);
           rows.push(row);
           added += 1;
-          if (namesDish(row.title, question)) onTopic += 1;
+          if (namesDish(row.title, question)) {
+            onTopic += 1;
+          }
         }
 
         wordings.push({

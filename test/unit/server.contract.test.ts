@@ -64,7 +64,9 @@ describe("what the server offers", () => {
   });
 
   it("names every tool in the guidance a model reads first", () => {
-    for (const name of TOOLS) expect(INSTRUCTIONS).toContain(name);
+    for (const name of TOOLS) {
+      expect(INSTRUCTIONS).toContain(name);
+    }
   });
 });
 
@@ -142,7 +144,7 @@ describe("what each tool takes", () => {
 });
 
 describe("what each tool promises to return", () => {
-  const shapes: Array<[string, z.ZodObject<z.ZodRawShape>]> = [
+  const shapes: [string, z.ZodObject<z.ZodRawShape>][] = [
     ["search_recipes", searchRecipesOutput],
     ["get_recipe", getRecipeOutput],
     ["scale_ingredients", scaleIngredientsOutput],

@@ -135,7 +135,9 @@ function resolveFactor(
   recipe: RecipeDetail,
   servings: number | null,
 ): { factor: number | null; notes: Note[] } {
-  if (servings === null) return { factor: null, notes: [] };
+  if (servings === null) {
+    return { factor: null, notes: [] };
+  }
 
   if (recipe.yieldCount === null || recipe.yieldCount <= 0) {
     return {
@@ -255,7 +257,7 @@ function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
   const looked = recipe.publishedSections === null ? "" : ", which heads no section announcing one";
   return mustKeep(
     `No ${words.entry} was read from this page${looked}. A page publishing no ${words.whole} and ` +
-      `one written in a layout this server cannot follow look the same from here, so read the url ` +
+      "one written in a layout this server cannot follow look the same from here, so read the url " +
       `before settling which this is. ${words.caution}`,
   );
 }
@@ -388,6 +390,8 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
 /** The yield as a reader would say it, with what was asked for beside it. */
 export function renderYield(payload: RecipePayload): string {
   const published = payload.yield.original_text ?? "an amount the page does not state";
-  if (payload.yield.factor === null) return `Yields ${quoteForeign(published)} (as published).`;
+  if (payload.yield.factor === null) {
+    return `Yields ${quoteForeign(published)} (as published).`;
+  }
   return `Yields ${quoteForeign(published)} as published, scaled by ${payload.yield.factor} for ${payload.yield.requested}.`;
 }

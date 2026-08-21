@@ -44,7 +44,7 @@ async function call(
 }
 
 /** One valid call per tool, so a refusal is never mistaken for a broken tool. */
-const CALLS: Array<[string, Record<string, unknown>]> = [
+const CALLS: [string, Record<string, unknown>][] = [
   ["search_recipes", { query: "crepes" }],
   ["get_recipe", { id: "marmiton:1001" }],
   ["scale_ingredients", { ingredients: ["2 eggs"], factor: 2 }],

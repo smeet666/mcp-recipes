@@ -85,13 +85,27 @@ export function readLanguage(
   let french = 0;
   let english = 0;
 
-  if (FRENCH_WORDS.test(line)) french += STRUCTURAL;
-  if (FRENCH_LETTERS.test(line)) french += STRUCTURAL;
-  if (ENGLISH_WORDS.test(line)) english += STRUCTURAL;
-  if (evidence.frenchUnit) french += VOCABULARY;
-  if (evidence.englishUnit) english += VOCABULARY;
-  if (FRENCH_FOODS.test(line)) french += NAME;
-  if (ENGLISH_FOODS.test(line)) english += NAME;
+  if (FRENCH_WORDS.test(line)) {
+    french += STRUCTURAL;
+  }
+  if (FRENCH_LETTERS.test(line)) {
+    french += STRUCTURAL;
+  }
+  if (ENGLISH_WORDS.test(line)) {
+    english += STRUCTURAL;
+  }
+  if (evidence.frenchUnit) {
+    french += VOCABULARY;
+  }
+  if (evidence.englishUnit) {
+    english += VOCABULARY;
+  }
+  if (FRENCH_FOODS.test(line)) {
+    french += NAME;
+  }
+  if (ENGLISH_FOODS.test(line)) {
+    english += NAME;
+  }
 
   return { language: french > english ? "fr" : "en", french, english };
 }

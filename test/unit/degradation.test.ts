@@ -300,7 +300,9 @@ describe("a note that qualifies a degraded answer survives the budget", () => {
     );
     const text = textOf(ok({}, "the answer", { notes: [...filler, ...warnings] }));
 
-    for (const warning of warnings) expect(text).toContain(warning.text);
+    for (const warning of warnings) {
+      expect(text).toContain(warning.text);
+    }
     expect(text).not.toContain("a detail worth knowing");
   });
 });

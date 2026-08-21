@@ -188,12 +188,18 @@ export interface FakeOptions {
 export function fakeMarmiton(options: NonNullable<FakeOptions["marmiton"]> = {}): MarmitonReader {
   return {
     async search() {
-      if (options.fail) throw options.fail;
+      if (options.fail) {
+        throw options.fail;
+      }
       return { data: options.rows ?? marmitonRows, cached: options.cached ?? false };
     },
     async getRecipe() {
-      if (options.fail) throw options.fail;
-      if (options.failRecipe) throw options.failRecipe;
+      if (options.fail) {
+        throw options.fail;
+      }
+      if (options.failRecipe) {
+        throw options.failRecipe;
+      }
       return { data: options.recipe ?? marmitonRecipe, cached: options.cached ?? false };
     },
   };
@@ -202,12 +208,18 @@ export function fakeMarmiton(options: NonNullable<FakeOptions["marmiton"]> = {})
 export function fakeCookbook(options: NonNullable<FakeOptions["cookbook"]> = {}): CookbookReader {
   return {
     async search() {
-      if (options.fail) throw options.fail;
+      if (options.fail) {
+        throw options.fail;
+      }
       return { data: { results: options.rows ?? cookbookRows }, cached: options.cached ?? false };
     },
     async getRecipe() {
-      if (options.fail) throw options.fail;
-      if (options.failRecipe) throw options.failRecipe;
+      if (options.fail) {
+        throw options.fail;
+      }
+      if (options.failRecipe) {
+        throw options.failRecipe;
+      }
       return { data: options.recipe ?? cookbookRecipe, cached: options.cached ?? false };
     },
   };
@@ -239,7 +251,9 @@ export function textOf(result: { content: Array<{ text: string }> }): string {
 export function payloadOf<T = Record<string, unknown>>(result: {
   structuredContent?: Record<string, unknown>;
 }): T {
-  if (!result.structuredContent) throw new Error("the tool returned no structured content");
+  if (!result.structuredContent) {
+    throw new Error("the tool returned no structured content");
+  }
   return result.structuredContent as T;
 }
 

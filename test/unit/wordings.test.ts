@@ -84,7 +84,9 @@ function scriptedMarmiton(script: Script, log: string[]): MarmitonReader {
     async search(query: string) {
       log.push(`marmiton:${query}`);
       const failure = script.fails?.[query];
-      if (failure) throw failure;
+      if (failure) {
+        throw failure;
+      }
       return { data: (script.answers?.[query] ?? []).map(marmitonRow), cached: false };
     },
     async getRecipe() {
@@ -98,7 +100,9 @@ function scriptedCookbook(script: Script, log: string[]): CookbookReader {
     async search(query: string) {
       log.push(`cookbook:${query}`);
       const failure = script.fails?.[query];
-      if (failure) throw failure;
+      if (failure) {
+        throw failure;
+      }
       return {
         data: { results: (script.answers?.[query] ?? []).map(cookbookRow) },
         cached: false,
@@ -153,7 +157,9 @@ interface SearchPayload {
 
 function reportFor(payload: SearchPayload, source: string) {
   const report = payload.per_source.find((entry) => entry.source === source);
-  if (!report) throw new Error(`no report for ${source}`);
+  if (!report) {
+    throw new Error(`no report for ${source}`);
+  }
   return report;
 }
 
@@ -633,7 +639,9 @@ describe("the number of requests", () => {
     // turning the argument back on would buy.
     const withheld = reportFor(payload, "marmiton").wordings.filter((entry) => !entry.ran);
     expect(withheld.length).toBeGreaterThan(0);
-    for (const entry of withheld) expect(entry.not_run_because).toMatch(/fan_out/);
+    for (const entry of withheld) {
+      expect(entry.not_run_because).toMatch(/fan_out/);
+    }
   });
 
   it("stops asking a source that did not answer the wording before", async () => {

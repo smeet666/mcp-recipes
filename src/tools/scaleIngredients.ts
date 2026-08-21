@@ -90,9 +90,13 @@ export function resolveFactor(args: ScaleIngredientsArgs): number {
     );
   }
 
-  if (args.factor !== undefined) return args.factor;
+  if (args.factor !== undefined) {
+    return args.factor;
+  }
   const { from_servings: from, to_servings: to } = args;
-  if (from !== undefined && to !== undefined) return to / from;
+  if (from !== undefined && to !== undefined) {
+    return to / from;
+  }
 
   if (args.from_servings !== undefined || args.to_servings !== undefined) {
     throw invalidInput(
