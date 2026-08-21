@@ -298,10 +298,10 @@ export class RecipesClient {
       chosen.map((source) => this.searchOne(source, trimmed, limit, fanOut)),
     );
 
-    const groups = attempts.map((attempt) => attempt.rows.slice(0, limit));
+    const answered = attempts.map((attempt) => ({ attempt, rows: attempt.rows.slice(0, limit) }));
     return {
-      rows: interleave(groups),
-      reports: attempts.map((attempt, index) => reportOf(attempt, groups[index]!.length)),
+      rows: interleave(answered.map((one) => one.rows)),
+      reports: answered.map(({ attempt, rows }) => reportOf(attempt, rows.length)),
     };
   }
 

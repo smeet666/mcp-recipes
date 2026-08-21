@@ -110,7 +110,7 @@ export async function runSearchRecipes(
       contributed.length > 1
         ? "One row from each source in turn, in the order each source returned them. No score orders them against each other."
         : contributed.length === 1
-          ? `Every row came from ${contributed[0]!.name}, in the order it returned them.`
+          ? `Every row came from ${contributed[0]?.name}, in the order it returned them.`
           : "No source contributed a row.";
 
     // What a question asks the dish to avoid is the part of it no source can

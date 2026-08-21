@@ -480,7 +480,7 @@ export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: stri
   const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
   if (!match) return null;
 
-  const word = match[1]!;
+  const [word = ""] = match.slice(1);
   if (word.length < 3) return null;
   if (NOT_A_MEASURE.has(normalizeUnitKey(word))) return null;
   if (lookupUnit(word, "fr")) return null;

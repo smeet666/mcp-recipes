@@ -306,7 +306,7 @@ export function reportNotes(reports: SourceReport[]): Note[] {
     }
     if (report.reportedTotal !== null && report.reportedTotalMeans !== null) {
       const forWording =
-        sent.length > 1 ? ` That number belongs to "${sent[0]!.query}" alone.` : "";
+        sent.length > 1 ? ` That number belongs to "${sent[0]?.query}" alone.` : "";
       notes.push(
         `${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.${forWording}`,
       );

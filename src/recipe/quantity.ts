@@ -331,7 +331,8 @@ function takeMeasureAdjective(
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
   if (!match) return { adjective: null, rest: text };
 
-  const folded = normalizeUnitKey(match[1]!);
+  const [adjective = ""] = match.slice(1);
+  const folded = normalizeUnitKey(adjective);
   // The word can be written in the plural where the count is, as in "2 grosses
   // cuillères", and the list carries the singular.
   const listed =
@@ -339,7 +340,7 @@ function takeMeasureAdjective(
     MEASURE_ADJECTIVES[language].has(folded.replace(/s$/, ""));
   if (!listed) return { adjective: null, rest: text };
 
-  return { adjective: match[1]!, rest: text.slice(match[0].length) };
+  return { adjective, rest: text.slice(match[0].length) };
 }
 
 /**
@@ -377,7 +378,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
   const mixedGlyph = new RegExp(`^(\\d+)\\s*([${VULGAR_CLASS}])`).exec(trimmed);
   if (mixedGlyph) {
     const whole = Number(mixedGlyph[1]);
-    const fraction = VULGAR_FRACTIONS[mixedGlyph[2]!]!;
+    const fraction = VULGAR_FRACTIONS[mixedGlyph[2] ?? ""] ?? Number.NaN;
     return { amount: whole + fraction, length: offset + mixedGlyph[0].length };
   }
 
@@ -403,7 +404,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
 
   const glyph = trimmed[0];
   if (glyph && glyph in VULGAR_FRACTIONS) {
-    return { amount: VULGAR_FRACTIONS[glyph]!, length: offset + 1 };
+    return { amount: VULGAR_FRACTIONS[glyph] ?? Number.NaN, length: offset + 1 };
   }
 
   // English groups thousands with the comma it never uses as a decimal mark, so
@@ -414,7 +415,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
     language === "fr" ? /^(\d+(?:[.,]\d+)?)/ : /^(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/
   ).exec(trimmed);
   if (decimal) {
-    const written = decimal[1]!;
+    const [written = ""] = decimal.slice(1);
     const amount = Number(
       language === "fr" ? written.replace(",", ".") : written.replace(/,/g, ""),
     );
@@ -466,7 +467,7 @@ function parseWrittenFraction(text: string): ParsedQuantity | null {
   if (!match) return null;
 
   const numerator = match[1] ? WRITTEN_NUMERATORS[match[1].toLowerCase()] : 1;
-  const denominator = WRITTEN_DENOMINATORS[match[2]!.toLowerCase()];
+  const denominator = WRITTEN_DENOMINATORS[(match[2] ?? "").toLowerCase()];
   if (!numerator || !denominator) return null;
 
   const rest = text
@@ -514,7 +515,7 @@ export function parseLeadingRange(text: string, language: Language): ParsedRange
   return {
     amount: low.amount,
     max: high.amount,
-    separator: separator[1]!,
+    separator: separator[1] ?? "",
     length: low.length + separator[0].length + high.length,
   };
 }
@@ -921,8 +922,10 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
     const match = /^\s*(un|une)\b\s*/i.exec(text);
     if (!match) return null;
     if (!counts(text.slice(match[0].length))) return null;
-    const word = match[1]!;
-    return { amount: FRENCH_ARTICLES[word.toLowerCase()]!, length: match[0].length, word };
+    const [word = ""] = match.slice(1);
+    const amount = FRENCH_ARTICLES[word.toLowerCase()];
+    if (amount === undefined) return null;
+    return { amount, length: match[0].length, word };
   }
 
   const article = /^an?\s+/i.exec(text);
@@ -953,7 +956,8 @@ function readCountMultiplier(text: string): { times: number; rest: string } | nu
   const match = /^\s*(\p{L}+)\s+/u.exec(text);
   if (!match) return null;
 
-  const times = COUNT_MULTIPLIERS[normalizeUnitKey(match[1]!)];
+  const [word = ""] = match.slice(1);
+  const times = COUNT_MULTIPLIERS[normalizeUnitKey(word)];
   if (times === undefined) return null;
   return { times, rest: text.slice(match[0].length) };
 }
@@ -1123,7 +1127,7 @@ function takeTrailingAlternates(
   const closing = /\s*(\([^()]*\))\s*$/.exec(item);
   if (!closing) return null;
 
-  const read = readBracket(closing[1]!, language);
+  const read = readBracket(closing[1] ?? "", language);
   if (!read) return null;
 
   const head = item.slice(0, closing.index).trim();
