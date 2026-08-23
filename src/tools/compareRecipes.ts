@@ -16,6 +16,7 @@ import { dishWordsMissing } from "../sources/wordings.js";
 import type { RecipeDetail, SourceId, SourceReport } from "../types.js";
 import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
 import type { RecipePayload, Section } from "./recipeView.js";
+import type { RecipeView } from "./recipeView.js";
 import {
   creditLine,
   fitLines,
@@ -107,6 +108,61 @@ function listNames(names: string[]): string {
     return names.join("");
   }
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * Which versions actually answer to the dish that was asked for.
+ *
+ * A title sharing one word with the question is not the dish: "biscuits and
+ * gravy" and a tin of Christmas biscuits share the biscuit, and setting them
+ * side by side would present a search that missed as a difference between two
+ * traditions.
+ */
+function weighTitlesAgainstTheDish(
+  payloads: readonly RecipeView["payload"][],
+  dish: string,
+  notes: RecipeView["notes"][number][],
+): Array<{ payload: RecipeView["payload"]; missing: readonly string[] }> {
+  const weighed = payloads.map((payload) => ({
+    payload,
+    missing: dishWordsMissing(payload.title, dish),
+  }));
+  const carriesDish = weighed.some((one) => one.missing.length === 0);
+
+  weighed.forEach(({ payload, missing }) => {
+    if (missing.length === 0) {
+      return;
+    }
+    notes.push(
+      mustKeep(
+        `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
+          `carries no ${missing.map((word) => `"${quoteForeign(word)}"`).join(" and no ")}. ` +
+          "Read it as a candidate to check rather than as that dish.",
+      ),
+    );
+  });
+
+  if (payloads.length > 0 && !carriesDish) {
+    notes.push(
+      `No version here carries the whole of "${quoteForeign(dish)}" in its title. These are ` +
+        "the closest rows each source returned for that spelling, so read them as candidates to " +
+        "check rather than as that dish.",
+    );
+  }
+
+  if (payloads.length === 1 && carriesDish) {
+    notes.push(
+      mustKeep(
+        "This is one version rather than a comparison. Read it as what that one source publishes.",
+      ),
+    );
+  }
+
+  // A difference is a statement about one dish written two ways. Setting a
+  // row that answers to another name beside it turns a search that missed
+  // into a claim about two traditions.
+
+  return weighed;
 }
 
 /**
@@ -311,44 +367,7 @@ export async function runCompareRecipes(
     // as a source's version of the dish states as fact the one thing the search
     // did not establish, and sharing one word of a name is not carrying it:
     // "biscuits and gravy" and a tin of Christmas biscuits share the biscuit.
-    const weighed = payloads.map((payload) => ({
-      payload,
-      missing: dishWordsMissing(payload.title, args.dish),
-    }));
-    const carriesDish = weighed.some((one) => one.missing.length === 0);
-
-    weighed.forEach(({ payload, missing }) => {
-      if (missing.length === 0) {
-        return;
-      }
-      notes.push(
-        mustKeep(
-          `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
-            `carries no ${missing.map((word) => `"${quoteForeign(word)}"`).join(" and no ")}. ` +
-            "Read it as a candidate to check rather than as that dish.",
-        ),
-      );
-    });
-
-    if (payloads.length > 0 && !carriesDish) {
-      notes.push(
-        `No version here carries the whole of "${quoteForeign(args.dish)}" in its title. These are ` +
-          "the closest rows each source returned for that spelling, so read them as candidates to " +
-          "check rather than as that dish.",
-      );
-    }
-
-    if (payloads.length === 1 && carriesDish) {
-      notes.push(
-        mustKeep(
-          "This is one version rather than a comparison. Read it as what that one source publishes.",
-        ),
-      );
-    }
-
-    // A difference is a statement about one dish written two ways. Setting a
-    // row that answers to another name beside it turns a search that missed
-    // into a claim about two traditions.
+    const weighed = weighTitlesAgainstTheDish(payloads, args.dish, notes);
     const comparable = recipes.filter((recipe) =>
       weighed.some(
         ({ payload, missing }) =>

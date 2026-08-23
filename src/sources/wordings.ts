@@ -494,6 +494,29 @@ function foldWord(word: string): string {
 }
 
 /**
+ * Whether a word left over from a question names the dish.
+ *
+ * The framing of a question is not the dish it asks for, a number counts eaters
+ * or minutes rather than naming anything, and what an apostrophe leaves behind
+ * once it has split an elision is not a word at all.
+ */
+function namesTheDish(word: string, key: string): boolean {
+  if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key)) {
+    return false;
+  }
+  if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) {
+    return false;
+  }
+  if (/^\d+$/.test(word)) {
+    return false;
+  }
+  if (word.length < 2) {
+    return false;
+  }
+  return !CONDITION_UNITS.has(word);
+}
+
+/**
  * Read a question once, deciding for every word whether it names the dish or
  * states a condition on it.
  *
@@ -571,25 +594,7 @@ function readQuestion(question: string): ReadQuestion {
       continue;
     }
 
-    if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key)) {
-      continue;
-    }
-    if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) {
-      continue;
-    }
-    // A number counts eaters, minutes or calories. None of them names a dish.
-    if (/^\d+$/.test(word)) {
-      continue;
-    }
-    // What is left of an elision once the apostrophe has split it.
-    if (word.length < 2) {
-      continue;
-    }
-    if (CONDITION_UNITS.has(word)) {
-      continue;
-    }
-
-    if (!dish.includes(word)) {
+    if (namesTheDish(word, key) && !dish.includes(word)) {
       dish.push(word);
     }
   }

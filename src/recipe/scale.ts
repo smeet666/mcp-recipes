@@ -957,6 +957,55 @@ function agreeTrailingAdjective(word: string, wantsPlural: boolean): string | nu
 }
 
 /**
+ * The head of a French noun phrase, put in the number its count asks for.
+ *
+ * The marks are not uniform: "morceau" and "chou" take -x where an ordinary
+ * noun takes -s, "bocal" takes -aux, a word ending in -s, -x or -z takes no
+ * mark at all, and "ananas" or "couscous" carry their -s in the singular. A
+ * head already in the number wanted is left as written.
+ */
+function agreeFrenchHead(
+  head: string,
+  number: { wantsPlural: boolean; isPlural: boolean; ouPlural: boolean },
+): string {
+  const { wantsPlural, isPlural, ouPlural } = number;
+
+  if (wantsPlural && !isPlural) {
+    if (/[sxz]$/i.test(head)) {
+      return head;
+    }
+    if (/eau$/i.test(head)) {
+      return `${head}x`;
+    }
+    if (FRENCH_OU_PLURAL_IN_X.has(foldWord(head))) {
+      return `${head}x`;
+    }
+    if (/al$/i.test(head)) {
+      return `${head.slice(0, -2)}aux`;
+    }
+    return `${head}s`;
+  }
+
+  if (!wantsPlural && isPlural) {
+    if (/eaux$/i.test(head)) {
+      return head.slice(0, -1);
+    }
+    if (/aux$/i.test(head)) {
+      return `${head.slice(0, -3)}al`;
+    }
+    if (ouPlural) {
+      return head.slice(0, -1);
+    }
+    if (INVARIABLE_FRENCH_NOUN.has(foldWord(head))) {
+      return head;
+    }
+    return head.slice(0, -1);
+  }
+
+  return head;
+}
+
+/**
  * Make a French item agree with its number, in both directions.
  *
  * French takes the plural from two onwards, so "2 oeufs" halved reads "1 oeuf"
@@ -986,37 +1035,7 @@ function agreeInFrench(item: string, amount: number): string {
   const ouPlural = /x$/i.test(head) && FRENCH_OU_PLURAL_IN_X.has(foldWord(head.slice(0, -1)));
   const isPlural = /s$|eaux$|aux$/i.test(head) || ouPlural;
 
-  if (wantsPlural && !isPlural) {
-    // Words ending in -s, -x or -z do not take a plural mark.
-    if (/[sxz]$/i.test(head)) {
-      // The head stays as written.
-    }
-    // "morceau", "chou" and "bocal" take -x and -aux where the ordinary noun
-    // takes -s.
-    else if (/eau$/i.test(head)) {
-      words[0] = `${head}x`;
-    } else if (FRENCH_OU_PLURAL_IN_X.has(foldWord(head))) {
-      words[0] = `${head}x`;
-    } else if (/al$/i.test(head)) {
-      words[0] = `${head.slice(0, -2)}aux`;
-    } else {
-      words[0] = `${head}s`;
-    }
-  } else if (!wantsPlural && isPlural) {
-    if (/eaux$/i.test(head)) {
-      words[0] = head.slice(0, -1);
-    } else if (/aux$/i.test(head)) {
-      words[0] = `${head.slice(0, -3)}al`;
-    } else if (ouPlural) {
-      words[0] = head.slice(0, -1);
-    }
-    // "ananas", "anis", "couscous": the -s belongs to the singular.
-    else if (INVARIABLE_FRENCH_NOUN.has(foldWord(head))) {
-      // The head stays as written.
-    } else {
-      words[0] = head.slice(0, -1);
-    }
-  }
+  words[0] = agreeFrenchHead(head, { wantsPlural, isPlural, ouPlural });
 
   const last = words.length - 1;
   const trailing = last > 0 ? words[last] : undefined;
@@ -1435,6 +1454,62 @@ function noteForScaledLine(outcome: LineOutcome): string | undefined {
   return note;
 }
 
+/**
+ * The line as it reads once scaled: the amount, its measure, what the container
+ * holds, the equivalents beside it, and the item they belong to.
+ *
+ * The size word the page put in front of its measure goes back in front of it,
+ * and the equivalents go back the way the line offered them, since a slash and
+ * a bracket are two different ways of restating one quantity.
+ */
+function renderScaledLine(
+  parsed: ParsedIngredient,
+  alternates: ReadonlyArray<{ text: string }>,
+  unit: UnitInfo | null,
+  shown: number,
+  language: Language,
+): {
+  named: UnitInfo | null;
+  unitLabel: string;
+  capacityLabel: string;
+  altLabel: string;
+  trailingLabel: string;
+  itemLabel: string;
+} {
+  const named = unit && !countsBarePieces(unit) ? unit : null;
+  // The size word the page put in front of its measure goes back in front of
+  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
+  const adjective =
+    named && parsed.measureAdjective
+      ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
+      : "";
+  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
+  const alternateTexts = alternates.map((entry) => entry.text);
+  const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
+  const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
+  // Equivalents go back where the line offered them: inside brackets beside the
+  // amount, after a slash, or in the bracket the line closes on.
+  const altLabel = alternateLabel(
+    alternates.length,
+    parsed.alternateStyle,
+    alternateTexts,
+    bracketed,
+  );
+  const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
+  // What a container holds is the page's figure and not the factor's, so it
+  // goes back between the count and the container, exactly as published.
+  const capacityLabel = parsed.capacity ? ` ${parsed.capacity}` : "";
+  // A measure needs the partitive that French puts between it and what it
+  // measures. A counted item stands straight after its number in both
+  // languages, and agrees with it: "1 egg yolk", "3 brioches".
+  const counted = parsed.capacity
+    ? agreeCountedContainer(parsed.item, shown, language)
+    : agreeWithAmount(parsed.item, shown, language);
+  const itemLabel = itemLabelFor(named, parsed.item, counted, language);
+
+  return { named, unitLabel, capacityLabel, altLabel, trailingLabel, itemLabel };
+}
+
 /** Why a line showing a figure came back as the page published it. */
 const HELD_BACK_NOTE: Record<HeldBack, string> = {
   sizeQualifier:
@@ -1519,37 +1594,13 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   // "ea" announces that the figure counts pieces, and names no measure of them,
   // so the line reads as the count of the thing itself and the marker has
   // nothing to say in it.
-  const named = unit && !countsBarePieces(unit) ? unit : null;
-  // The size word the page put in front of its measure goes back in front of
-  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
-  const adjective =
-    named && parsed.measureAdjective
-      ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
-      : "";
-  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
-  const alternateTexts = alternates.map((entry) => entry.text);
-  const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
-  const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
-  // Equivalents go back where the line offered them: inside brackets beside the
-  // amount, after a slash, or in the bracket the line closes on.
-  const altLabel = alternateLabel(
-    alternates.length,
-    parsed.alternateStyle,
-    alternateTexts,
-    bracketed,
+  const { named, unitLabel, capacityLabel, altLabel, trailingLabel, itemLabel } = renderScaledLine(
+    parsed,
+    alternates,
+    unit,
+    shown,
+    language,
   );
-  const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
-  // What a container holds is the page's figure and not the factor's, so it
-  // goes back between the count and the container, exactly as published.
-  const capacityLabel = parsed.capacity ? ` ${parsed.capacity}` : "";
-  // A measure needs the partitive that French puts between it and what it
-  // measures. A counted item stands straight after its number in both
-  // languages, and agrees with it: "1 egg yolk", "3 brioches".
-  const counted = parsed.capacity
-    ? agreeCountedContainer(parsed.item, shown, language)
-    : agreeWithAmount(parsed.item, shown, language);
-  const itemLabel = itemLabelFor(named, parsed.item, counted, language);
-
   const result: ScaledIngredient = {
     text: `${parsed.decoration ? `${parsed.decoration} ` : ""}${parsed.approximation ?? ""}${amountText}${unitLabel}${capacityLabel}${altLabel}${itemLabel}${trailingLabel}`.trim(),
     original: parsed.original,

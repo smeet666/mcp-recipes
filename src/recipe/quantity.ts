@@ -919,6 +919,97 @@ function takeEquivalents(
 }
 
 /**
+ * Whether the figures on the line give the size of something rather than how
+ * many of it the recipe wants, and of what.
+ *
+ * Three ways a line says it. Without a measure, the words behind the count
+ * carry the mass. With a partitive, "une dinde de 3 kg" writes the noun where a
+ * measure stands and the partitive takes it for one — a noun the vocabulary
+ * lists as a measure keeps counting, since a pot is a thing to buy more of,
+ * while a noun read as a measure only for standing there names the food itself.
+ * And "12 oz can tomatoes" qualifies the tin, leaving how many tins unwritten.
+ */
+function whatTheFiguresSize(
+  leading: { unit: UnitInfo | null; partitive: boolean },
+  item: string,
+  language: Language,
+): HeldBack | null {
+  if (language === "fr" && !leading.unit && statesItemSize(item)) {
+    return "itemSize";
+  }
+
+  // "une dinde de 3 kg" writes the noun where a measure stands, and the
+  // partitive takes it for one. A noun the vocabulary lists as a measure keeps
+  // counting, since a pot or a boîte is a thing to buy more of; a noun read as
+  // a measure only for standing there names the food itself, and a mass behind
+  // it is the size of one of them.
+  if (language === "fr" && leading.partitive && isStatedSize(item)) {
+    return "itemSize";
+  }
+
+  // "12 oz can tomatoes": the measure qualifies the tin, and how many tins the
+  // recipe wants is not written anywhere on the line.
+  if (leading.unit?.kind === "measured" && CONTAINER_NOUN.test(normalizeUnitKey(item))) {
+    return "containerSize";
+  }
+
+  return null;
+}
+
+/**
+ * What the words behind the figure say the figure counts.
+ *
+ * "two thirds of a cup" names a share of one cup, and the measure stands behind
+ * the preposition and the article that introduce it. "2 dozen mushrooms" counts
+ * mushrooms, twelve to the dozen, so the multiplier is folded into the amount
+ * and the line goes on to be read as the count of a thing it now is.
+ */
+function whatTheCountIsOf(
+  behindFigure: string,
+  language: Language,
+): { rest: string; multiplier: ReturnType<typeof readCountMultiplier> } {
+  let rest = behindFigure.trimStart();
+  // "two thirds of a cup" names a share of one cup, and the measure stands
+  // behind the preposition and the article that introduce it.
+  if (language === "en") {
+    rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
+  }
+
+  // "2 dozen mushrooms" counts mushrooms, twelve to the dozen, so the multiplier
+  // is folded into the amount and the line goes on to be read as the count of a
+  // thing it now is.
+  const multiplier = readCountMultiplier(rest);
+  if (multiplier) {
+    rest = multiplier.rest;
+  }
+
+  return { rest, multiplier };
+}
+
+/**
+ * What a container holds, when the bracket beside it states a capacity rather
+ * than an equivalent.
+ *
+ * "2 boîtes (400 g)" names two tins of that size, and the figure is the page's
+ * own rather than the factor's, so it goes back between the count and the
+ * container exactly as published. A bracket that restates the quantity in
+ * another unit is a different thing and stays an equivalent.
+ */
+function capacityOfTheContainer(
+  group: { measures: ReadonlyArray<{ unit: UnitInfo | null }>; published: string } | null,
+  measureName: string | undefined,
+  item: string,
+): string | null {
+  if (!group?.measures.every((measure) => measure.unit?.kind === "measured")) {
+    return null;
+  }
+  if (!namesContainer(measureName) && !namesContainer(item)) {
+    return null;
+  }
+  return group.published;
+}
+
+/**
  * Split an ingredient line into amount, measure, bracketed equivalents and
  * item.
  *
@@ -979,20 +1070,9 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     return empty(notAnAmount);
   }
 
-  let rest = stated.slice(quantity.length).trimStart();
-  // "two thirds of a cup" names a share of one cup, and the measure stands
-  // behind the preposition and the article that introduce it.
-  if (language === "en") {
-    rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
-  }
-
-  // "2 dozen mushrooms" counts mushrooms, twelve to the dozen, so the multiplier
-  // is folded into the amount and the line goes on to be read as the count of a
-  // thing it now is.
-  const multiplier = readCountMultiplier(rest);
-  if (multiplier) {
-    rest = multiplier.rest;
-  }
+  const counted = whatTheCountIsOf(stated.slice(quantity.length), language);
+  let rest = counted.rest;
+  const multiplier = counted.multiplier;
   const times = multiplier?.times ?? 1;
 
   const fromArticle = quantity === article;
@@ -1015,31 +1095,13 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   const { slashed, trailing, group } = equivalents;
   rest = equivalents.rest;
   const item = equivalents.item;
-  const capacity =
-    group?.measures.every((measure) => measure.unit?.kind === "measured") &&
-    (namesContainer(leading.unit?.canonical) || namesContainer(item))
-      ? group.published
-      : null;
+  const capacity = capacityOfTheContainer(group, leading.unit?.canonical, item);
 
   // A counted thing whose size the line states: the number the line opens with
   // is one bird, and the measure behind it is what that bird weighs.
-  if (language === "fr" && !leading.unit && statesItemSize(item)) {
-    return empty("itemSize");
-  }
-
-  // "une dinde de 3 kg" writes the noun where a measure stands, and the
-  // partitive takes it for one. A noun the vocabulary lists as a measure keeps
-  // counting, since a pot or a boîte is a thing to buy more of; a noun read as
-  // a measure only for standing there names the food itself, and a mass behind
-  // it is the size of one of them.
-  if (language === "fr" && leading.partitive && isStatedSize(item)) {
-    return empty("itemSize");
-  }
-
-  // "12 oz can tomatoes": the measure qualifies the tin, and how many tins the
-  // recipe wants is not written anywhere on the line.
-  if (leading.unit?.kind === "measured" && CONTAINER_NOUN.test(normalizeUnitKey(item))) {
-    return empty("containerSize");
+  const sizedRatherThanCounted = whatTheFiguresSize(leading, item, language);
+  if (sizedRatherThanCounted !== null) {
+    return empty(sizedRatherThanCounted);
   }
 
   const alternates = capacity === null ? (slashed?.measures ?? group?.measures ?? []) : [];
