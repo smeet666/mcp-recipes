@@ -424,7 +424,9 @@ function buildTrailer(options: OkOptions): string {
   const held = new Set<string>();
   for (const note of options.notes ?? []) {
     const text = noteText(note);
-    if (held.has(text)) continue;
+    if (held.has(text)) {
+      continue;
+    }
     held.add(text);
     kept.push(note);
   }
@@ -442,7 +444,9 @@ function buildTrailer(options: OkOptions): string {
     // Room runs out with nothing but the sentences the answer misleads without.
     // Dropping one of those buys space by removing the warning the answer most
     // needed, so the body gives up its own room instead.
-    if (victim === -1) break;
+    if (victim === -1) {
+      break;
+    }
     kept.splice(victim, 1);
   }
 
@@ -489,7 +493,9 @@ export function toToolError(error: unknown): ToolResult {
       : new RecipesError("network_error", error instanceof Error ? error.message : String(error));
 
   const lines = [`[${known.code}] ${quoteForeign(known.message)}`];
-  if (known.details.hint) lines.push(`Hint: ${quoteForeign(known.details.hint)}`);
+  if (known.details.hint) {
+    lines.push(`Hint: ${quoteForeign(known.details.hint)}`);
+  }
   return { content: [{ type: "text", text: lines.join("\n") }], isError: true };
 }
 
@@ -526,7 +532,9 @@ export function fitLines(lines: readonly string[], room: number): FittedLines {
   let used = 0;
 
   for (const line of lines) {
-    if (kept.length >= ALWAYS_SHOWN && used + line.length > room) break;
+    if (kept.length >= ALWAYS_SHOWN && used + line.length > room) {
+      break;
+    }
     kept.push(line);
     used += line.length + 1;
   }
@@ -540,12 +548,14 @@ export function omittedLinesLine(shown: number, total: number, what: string): st
 }
 
 export function truncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
+  if (text.length <= maxChars) {
+    return text;
+  }
   return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
 
 /** A compact listing, carrying what it takes to pick one recipe out of many. */
-export function renderRows(rows: Array<z.infer<typeof rowSchema>>): string {
+export function renderRows(rows: z.infer<typeof rowSchema>[]): string {
   return rows
     .map((row, index) => {
       const head = `${index + 1}. ${quoteForeign(row.title)} · ${quoteForeign(row.source_name)} · id: ${row.id}`;
@@ -564,7 +574,9 @@ export function renderRows(rows: Array<z.infer<typeof rowSchema>>): string {
  * crediting it would say it had.
  */
 export function creditLine(contributors: Array<{ attribution: string; url?: string }>): string {
-  if (contributors.length === 0) return "No source contributed to this answer.";
+  if (contributors.length === 0) {
+    return "No source contributed to this answer.";
+  }
   const names = contributors.map((entry) =>
     entry.url ? `${entry.attribution} — ${quoteForeign(entry.url)}` : entry.attribution,
   );

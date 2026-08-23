@@ -27,6 +27,8 @@ const HEADINGS: Record<PagePart, RegExp> = {
  * a page's headings at all.
  */
 export function headingFor(part: PagePart, headings: readonly string[] | null): string | null {
-  if (headings === null) return null;
+  if (headings === null) {
+    return null;
+  }
   return headings.find((heading) => HEADINGS[part].test(heading)) ?? null;
 }

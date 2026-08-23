@@ -67,24 +67,22 @@ function compareBiscuitsAndGravy() {
 }
 
 describe("a version whose title names part of the dish is not that dish", () => {
-  it("names the version that carries only part of the wording", () => {
-    return compareBiscuitsAndGravy().then((result) => {
+  it("names the version that carries only part of the wording", () =>
+    compareBiscuitsAndGravy().then((result) => {
       const text = textOf(result);
       expect(text).toMatch(/Petits biscuits de No/);
       expect(text).toMatch(/gravy/i);
       expect(text).toMatch(/candidate/i);
-    });
-  });
+    }));
 
-  it("states no difference between a dish and a row that merely shares a word", () => {
-    return compareBiscuitsAndGravy().then((result) => {
+  it("states no difference between a dish and a row that merely shares a word", () =>
+    compareBiscuitsAndGravy().then((result) => {
       const payload = payloadOf<{ differences: string[] }>(result);
       expect(payload.differences).toEqual([]);
-    });
-  });
+    }));
 
-  it("still confronts two versions that both name the whole dish", () => {
-    return runCompareRecipes(
+  it("still confronts two versions that both name the whole dish", () =>
+    runCompareRecipes(
       fakeClient({
         marmiton: {
           rows: [{ ...christmasBiscuitRows[0]!, title: "Biscuits and gravy à ma façon" }],
@@ -96,6 +94,5 @@ describe("a version whose title names part of the dish is not that dish", () => 
     ).then((result) => {
       const payload = payloadOf<{ differences: string[] }>(result);
       expect(payload.differences.length).toBeGreaterThan(0);
-    });
-  });
+    }));
 });

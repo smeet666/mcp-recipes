@@ -28,7 +28,9 @@ const PASSES = 5;
 
 async function fiveTimes(run: () => Promise<string> | string): Promise<string[]> {
   const answers: string[] = [];
-  for (let pass = 0; pass < PASSES; pass += 1) answers.push(await run());
+  for (let pass = 0; pass < PASSES; pass += 1) {
+    answers.push(await run());
+  }
   return answers;
 }
 

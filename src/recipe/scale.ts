@@ -89,10 +89,18 @@ function roundTo(value: number, step: number): number {
  * report 2470 for a product that needed no rounding at all.
  */
 function roundMeasured(value: number): number {
-  if (Number.isInteger(value)) return value;
-  if (value >= 100) return roundTo(value, 5);
-  if (value >= 10) return roundTo(value, 1);
-  if (value >= 1) return roundTo(value, 0.1);
+  if (Number.isInteger(value)) {
+    return value;
+  }
+  if (value >= 100) {
+    return roundTo(value, 5);
+  }
+  if (value >= 10) {
+    return roundTo(value, 1);
+  }
+  if (value >= 1) {
+    return roundTo(value, 0.1);
+  }
   return Math.round(value * 100) / 100;
 }
 
@@ -141,7 +149,9 @@ function roundCountable(
   divisibility: Divisibility,
   ceiling: number,
 ): CountableResult {
-  if (value <= 0) return { value: 0, clamped: false };
+  if (value <= 0) {
+    return { value: 0, clamped: false };
+  }
 
   const floor = SMALLEST_USABLE[divisibility];
 
@@ -153,11 +163,15 @@ function roundCountable(
     // Below the halfway mark the nearest whole is none, and dropping the
     // ingredient is worse than overstating it, so the line keeps one and says
     // it no longer holds its share.
-    if (value < 0.5) return { value: floor, clamped: true };
+    if (value < 0.5) {
+      return { value: floor, clamped: true };
+    }
     return { value: Math.round(value), clamped: false };
   }
 
-  if (value < floor) return { value: floor, clamped: true };
+  if (value < floor) {
+    return { value: floor, clamped: true };
+  }
 
   if (value < 1) {
     // A knife takes a vegetable to quarters and thirds; anything else offers
@@ -168,7 +182,9 @@ function roundCountable(
     );
     let closest = candidates[0] ?? floor;
     for (const candidate of candidates) {
-      if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
+      if (Math.abs(value - candidate) < Math.abs(value - closest)) {
+        closest = candidate;
+      }
     }
     return { value: trim(closest), clamped: false };
   }
@@ -181,7 +197,9 @@ function roundCountable(
  * fractions printed on a measuring set.
  */
 function roundSpoon(value: number, ceiling: number): CountableResult {
-  if (value <= 0) return { value: 0, clamped: false };
+  if (value <= 0) {
+    return { value: 0, clamped: false };
+  }
 
   if (value < 1) {
     const candidates = [SMALLEST_USABLE_FRACTION, 1 / 3, 0.5, 2 / 3, 0.75, 1].filter(
@@ -189,7 +207,9 @@ function roundSpoon(value: number, ceiling: number): CountableResult {
     );
     let closest = candidates[0] ?? SMALLEST_USABLE_FRACTION;
     for (const candidate of candidates) {
-      if (Math.abs(value - candidate) < Math.abs(value - closest)) closest = candidate;
+      if (Math.abs(value - candidate) < Math.abs(value - closest)) {
+        closest = candidate;
+      }
     }
     return { value: trim(closest), clamped: value < SMALLEST_USABLE_FRACTION };
   }
@@ -211,7 +231,9 @@ function stepDownSpoon(unit: UnitInfo, reference: number): { unit: UnitInfo; rat
 
   while (reference * ratio < 1 && !isHalfStep(reference * ratio)) {
     const step = demoteUnit(current);
-    if (!step) break;
+    if (!step) {
+      break;
+    }
     ratio *= step.per;
     current = step.unit;
   }
@@ -234,7 +256,9 @@ const EXACT_SHARE = 0.005;
 
 function landedExactly(exact: number, amount: number): boolean {
   const gap = Math.abs(exact - amount);
-  if (gap > EXACT_WITHIN) return false;
+  if (gap > EXACT_WITHIN) {
+    return false;
+  }
   return exact === 0 || gap / Math.abs(exact) <= EXACT_SHARE;
 }
 
@@ -248,7 +272,7 @@ function landedExactly(exact: number, amount: number): boolean {
  * the answer is that the value moved.
  */
 function boundLandedExactly(bound: ScaledBound): boolean {
-  const fine = bound.ratio >= 1 ? bound.ratio : 1;
+  const fine = Math.max(bound.ratio, 1);
   return landedExactly(bound.raw * fine, bound.amount * (fine / bound.ratio));
 }
 
@@ -372,7 +396,9 @@ function scaleMeasure(
     // A share stated in the smaller spoon is a measurement, and keeps the
     // precision of one rather than being snapped to the fractions of a spoon
     // it no longer fills.
-    if (stepped.ratio !== 1) return inUnit(stepped.unit, stepped.ratio);
+    if (stepped.ratio !== 1) {
+      return inUnit(stepped.unit, stepped.ratio);
+    }
 
     const bounds = eachEnd(({ published, raw }) => {
       const ceiling = factor < 1 ? published : Number.POSITIVE_INFINITY;
@@ -510,7 +536,9 @@ const HALVED_CUT =
  */
 function cloveDivisibility(unit: UnitInfo | null, item: string): Divisibility | null {
   const counted = unit ? unit.canonical === "clove" : /\bcloves?\b/i.test(item);
-  if (!counted) return null;
+  if (!counted) {
+    return null;
+  }
   return /\bgarlic\b/i.test(item) ? "half" : "whole";
 }
 
@@ -534,7 +562,9 @@ const BLANC_OF_EGG = /\bblancs?\s+d(?:e\s|['’])\s*(?:oeufs?|œufs?)\b/iu;
 function blancDivisibility(item: string): Divisibility | null {
   // The noun is the one followed by what it is the blanc of. "vin blanc" and
   // "oignon blanc" use the same letters as a colour and count as neither.
-  if (!BLANC_OF.test(item)) return null;
+  if (!BLANC_OF.test(item)) {
+    return null;
+  }
   return BLANC_OF_EGG.test(item) ? "whole" : "half";
 }
 
@@ -558,15 +588,31 @@ function foldItem(item: string): string {
 function divisibilityOf(unit: UnitInfo | null, item: string): Divisibility {
   const key = foldItem(item);
   const clove = cloveDivisibility(unit, key);
-  if (clove) return clove;
-  if (unit && !countsBarePieces(unit)) return unitDivisibility(unit);
+  if (clove) {
+    return clove;
+  }
+  if (unit && !countsBarePieces(unit)) {
+    return unitDivisibility(unit);
+  }
   const blanc = blancDivisibility(key);
-  if (blanc) return blanc;
-  if (WHOLE_ITEM.test(key)) return "whole";
-  if (PORTION_SIZED_ITEM.test(key)) return "whole";
-  if (HALVED_ITEM.test(key)) return "half";
-  if (HALVED_CUT.test(key)) return "half";
-  if (QUARTERED_MEASURE.test(key)) return "quarter";
+  if (blanc) {
+    return blanc;
+  }
+  if (WHOLE_ITEM.test(key)) {
+    return "whole";
+  }
+  if (PORTION_SIZED_ITEM.test(key)) {
+    return "whole";
+  }
+  if (HALVED_ITEM.test(key)) {
+    return "half";
+  }
+  if (HALVED_CUT.test(key)) {
+    return "half";
+  }
+  if (QUARTERED_MEASURE.test(key)) {
+    return "quarter";
+  }
   return QUARTERED_ITEM.test(key) ? "quarter" : "half";
 }
 
@@ -681,8 +727,15 @@ const IRREGULAR_SINGULAR: Record<string, string> = Object.fromEntries(
  */
 function matchCase(source: string, replacement: string): string {
   const hasLetter = /\p{L}/u.test(source);
-  if (hasLetter && source === source.toUpperCase()) return replacement.toUpperCase();
-  if (source[0] === source[0]?.toUpperCase() && source.slice(1) === source.slice(1).toLowerCase()) {
+  if (hasLetter && source === source.toUpperCase()) {
+    return replacement.toUpperCase();
+  }
+  const first = source.slice(0, 1);
+  if (
+    first !== "" &&
+    first === first.toUpperCase() &&
+    source.slice(1) === source.slice(1).toLowerCase()
+  ) {
     return (replacement[0] ?? "").toUpperCase() + replacement.slice(1);
   }
   return replacement;
@@ -690,30 +743,52 @@ function matchCase(source: string, replacement: string): string {
 
 function toEnglishPlural(word: string): string {
   const key = word.toLowerCase();
-  if (INVARIABLE_ITEM.has(key)) return word;
+  if (INVARIABLE_ITEM.has(key)) {
+    return word;
+  }
   const irregular = IRREGULAR_PLURAL[key];
-  if (irregular) return matchCase(word, irregular);
-  if (/(?:ch|sh|s|x|z)$/i.test(word)) return `${word}es`;
-  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
-  if (/(?:[^f]f|fe)$/i.test(word)) return `${word.replace(/fe?$/i, "")}ves`;
+  if (irregular) {
+    return matchCase(word, irregular);
+  }
+  if (/(?:ch|sh|s|x|z)$/i.test(word)) {
+    return `${word}es`;
+  }
+  if (/[^aeiou]y$/i.test(word)) {
+    return `${word.slice(0, -1)}ies`;
+  }
+  if (/(?:[^f]f|fe)$/i.test(word)) {
+    return `${word.replace(/fe?$/i, "")}ves`;
+  }
   return `${word}s`;
 }
 
 function toEnglishSingular(word: string): string {
   const key = word.toLowerCase();
-  if (INVARIABLE_ITEM.has(key)) return word;
+  if (INVARIABLE_ITEM.has(key)) {
+    return word;
+  }
   const irregular = IRREGULAR_SINGULAR[key];
-  if (irregular) return matchCase(word, irregular);
-  if (/ies$/i.test(word) && word.length > 4) return `${word.slice(0, -3)}y`;
+  if (irregular) {
+    return matchCase(word, irregular);
+  }
+  if (/ies$/i.test(word) && word.length > 4) {
+    return `${word.slice(0, -3)}y`;
+  }
   // A -ves plural belongs to a noun ending in -f or -fe, and those are named
   // one by one in `IRREGULAR_PLURAL`: turning every -ves back into -f makes a
   // "clof" out of "cloves" and an "olif" out of "olives".
-  if (/(?:ch|sh|s|x|z)es$/i.test(word)) return word.slice(0, -2);
+  if (/(?:ch|sh|s|x|z)es$/i.test(word)) {
+    return word.slice(0, -2);
+  }
   // "glass", "molasses": the -s belongs to the singular. Beyond the doubled -s
   // the ending settles nothing, "couscous" and "kiwis" both closing on -us, so
   // the names that carry their -s are named in `INVARIABLE_ITEM`.
-  if (/ss$/i.test(word)) return word;
-  if (/s$/i.test(word)) return word.slice(0, -1);
+  if (/ss$/i.test(word)) {
+    return word;
+  }
+  if (/s$/i.test(word)) {
+    return word.slice(0, -1);
+  }
   return word;
 }
 
@@ -730,7 +805,9 @@ function toEnglishSingular(word: string): string {
  * water.
  */
 function agreeInEnglish(item: string, amount: number): string {
-  if (!item) return item;
+  if (!item) {
+    return item;
+  }
 
   const comma = item.indexOf(",");
   const head = comma < 0 ? item : item.slice(0, comma);
@@ -743,17 +820,23 @@ function agreeInEnglish(item: string, amount: number): string {
   }
 
   const words = head.trimEnd().split(" ");
-  const last = words[words.length - 1] ?? "";
-  if (!/^[A-Za-z]+$/.test(last) || last.length <= 2) return item;
+  const last = words.at(-1) ?? "";
+  if (!/^[A-Za-z]+$/.test(last) || last.length <= 2) {
+    return item;
+  }
 
   const wantsPlural = amount > 1;
   const plural = toEnglishPlural(last);
   const singular = toEnglishSingular(last);
   const isPlural = last.toLowerCase() !== singular.toLowerCase();
 
-  if (wantsPlural && !isPlural) words[words.length - 1] = plural;
-  else if (!wantsPlural && isPlural) words[words.length - 1] = singular;
-  else return item;
+  if (wantsPlural && !isPlural) {
+    words[words.length - 1] = plural;
+  } else if (!wantsPlural && isPlural) {
+    words[words.length - 1] = singular;
+  } else {
+    return item;
+  }
 
   return `${words.join(" ")}${tail}`;
 }
@@ -863,10 +946,63 @@ function agreeTrailingAdjective(word: string, wantsPlural: boolean): string | nu
   const isPlural = folded.endsWith("s");
   const singular = isPlural ? word.slice(0, -1) : word;
 
-  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) return null;
-  if (wantsPlural === isPlural) return null;
+  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) {
+    return null;
+  }
+  if (wantsPlural === isPlural) {
+    return null;
+  }
 
   return wantsPlural ? `${word}s` : singular;
+}
+
+/**
+ * The head of a French noun phrase, put in the number its count asks for.
+ *
+ * The marks are not uniform: "morceau" and "chou" take -x where an ordinary
+ * noun takes -s, "bocal" takes -aux, a word ending in -s, -x or -z takes no
+ * mark at all, and "ananas" or "couscous" carry their -s in the singular. A
+ * head already in the number wanted is left as written.
+ */
+function agreeFrenchHead(
+  head: string,
+  number: { wantsPlural: boolean; isPlural: boolean; ouPlural: boolean },
+): string {
+  const { wantsPlural, isPlural, ouPlural } = number;
+
+  if (wantsPlural && !isPlural) {
+    if (/[sxz]$/i.test(head)) {
+      return head;
+    }
+    if (/eau$/i.test(head)) {
+      return `${head}x`;
+    }
+    if (FRENCH_OU_PLURAL_IN_X.has(foldWord(head))) {
+      return `${head}x`;
+    }
+    if (/al$/i.test(head)) {
+      return `${head.slice(0, -2)}aux`;
+    }
+    return `${head}s`;
+  }
+
+  if (!wantsPlural && isPlural) {
+    if (/eaux$/i.test(head)) {
+      return head.slice(0, -1);
+    }
+    if (/aux$/i.test(head)) {
+      return `${head.slice(0, -3)}al`;
+    }
+    if (ouPlural) {
+      return head.slice(0, -1);
+    }
+    if (INVARIABLE_FRENCH_NOUN.has(foldWord(head))) {
+      return head;
+    }
+    return head.slice(0, -1);
+  }
+
+  return head;
 }
 
 /**
@@ -883,11 +1019,15 @@ function agreeTrailingAdjective(word: string, wantsPlural: boolean): string | nu
  * singular where the second is a plural of "clou".
  */
 function agreeInFrench(item: string, amount: number): string {
-  if (!item) return item;
+  if (!item) {
+    return item;
+  }
 
   const words = item.split(" ");
   const head = words[0] ?? "";
-  if (head.length <= 3) return item;
+  if (head.length <= 3) {
+    return item;
+  }
 
   const wantsPlural = amount >= 2;
   // A final -x marks the plural of the few nouns in -ou that take one, and it
@@ -895,32 +1035,15 @@ function agreeInFrench(item: string, amount: number): string {
   const ouPlural = /x$/i.test(head) && FRENCH_OU_PLURAL_IN_X.has(foldWord(head.slice(0, -1)));
   const isPlural = /s$|eaux$|aux$/i.test(head) || ouPlural;
 
-  if (wantsPlural && !isPlural) {
-    // Words ending in -s, -x or -z do not take a plural mark.
-    if (/[sxz]$/i.test(head)) {
-      // The head stays as written.
-    }
-    // "morceau", "chou" and "bocal" take -x and -aux where the ordinary noun
-    // takes -s.
-    else if (/eau$/i.test(head)) words[0] = `${head}x`;
-    else if (FRENCH_OU_PLURAL_IN_X.has(foldWord(head))) words[0] = `${head}x`;
-    else if (/al$/i.test(head)) words[0] = `${head.slice(0, -2)}aux`;
-    else words[0] = `${head}s`;
-  } else if (!wantsPlural && isPlural) {
-    if (/eaux$/i.test(head)) words[0] = head.slice(0, -1);
-    else if (/aux$/i.test(head)) words[0] = `${head.slice(0, -3)}al`;
-    else if (ouPlural) words[0] = head.slice(0, -1);
-    // "ananas", "anis", "couscous": the -s belongs to the singular.
-    else if (INVARIABLE_FRENCH_NOUN.has(foldWord(head))) {
-      // The head stays as written.
-    } else words[0] = head.slice(0, -1);
-  }
+  words[0] = agreeFrenchHead(head, { wantsPlural, isPlural, ouPlural });
 
   const last = words.length - 1;
   const trailing = last > 0 ? words[last] : undefined;
   if (trailing !== undefined) {
     const adjective = agreeTrailingAdjective(trailing, wantsPlural);
-    if (adjective) words[last] = adjective;
+    if (adjective) {
+      words[last] = adjective;
+    }
   }
 
   return words.join(" ");
@@ -936,15 +1059,21 @@ function agreeInFrench(item: string, amount: number): string {
  * reason it does after the noun.
  */
 function agreeLeadingAdjective(word: string, amount: number, language: Language): string {
-  if (language === "en") return word;
+  if (language === "en") {
+    return word;
+  }
 
   const wantsPlural = amount >= 2;
   const folded = foldWord(word);
   const isPlural = folded.endsWith("s") && !AGREEABLE_ADJECTIVES.has(folded);
   const singular = isPlural ? word.slice(0, -1) : word;
 
-  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) return word;
-  if (wantsPlural === isPlural) return word;
+  if (!AGREEABLE_ADJECTIVES.has(foldWord(singular))) {
+    return word;
+  }
+  if (wantsPlural === isPlural) {
+    return word;
+  }
   return wantsPlural ? `${singular}s` : singular;
 }
 
@@ -961,9 +1090,13 @@ function agreeWithAmount(item: string, amount: number, language: Language): stri
  * reading as one.
  */
 function agreeCountedContainer(item: string, amount: number, language: Language): string {
-  if (language === "fr") return agreeInFrench(item, amount);
+  if (language === "fr") {
+    return agreeInFrench(item, amount);
+  }
   const space = item.indexOf(" ");
-  if (space < 0) return agreeInEnglish(item, amount);
+  if (space < 0) {
+    return agreeInEnglish(item, amount);
+  }
   return `${agreeInEnglish(item.slice(0, space), amount)}${item.slice(space)}`;
 }
 
@@ -984,8 +1117,12 @@ const MUTE_H_WORDS = /^(?:huile|huiles|huitre|huitres|huître|huîtres|herbe|her
  * the two side by side: "6 tablespoons butter".
  */
 function joinItem(item: string, language: Language): string {
-  if (!item) return "";
-  if (language === "en") return ` ${item}`;
+  if (!item) {
+    return "";
+  }
+  if (language === "en") {
+    return ` ${item}`;
+  }
   const elides = /^[aeiouàâäéèêëîïôöûü]/i.test(item) || MUTE_H_WORDS.test(item);
   return elides ? ` d'${item}` : ` de ${item}`;
 }
@@ -1018,14 +1155,20 @@ interface Branch {
  */
 function splitBranch(text: string, parsed: ParsedIngredient): Branch | null {
   const itemStart = parsed.item ? text.indexOf(parsed.item) : text.length;
-  if (itemStart < 0) return null;
+  if (itemStart < 0) {
+    return null;
+  }
 
   const separator = BRANCH_SEPARATORS[parsed.language];
   separator.lastIndex = 0;
   for (let match = separator.exec(text); match; match = separator.exec(text)) {
-    if (match.index < itemStart) continue;
+    if (match.index < itemStart) {
+      continue;
+    }
     const tail = text.slice(match.index + match[0].length);
-    if (parseIngredient(tail, parsed.language).amount === null) continue;
+    if (parseIngredient(tail, parsed.language).amount === null) {
+      continue;
+    }
     return { head: text.slice(0, match.index), separator: match[0], tail };
   }
   return null;
@@ -1043,12 +1186,16 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
   const { factor } = options;
   // A factor of one changes nothing, and rewriting the line anyway would round
   // "178 ml" to "180 ml" and report a difference the caller never asked for.
-  if (factor === 1) return passthroughIngredient(line, options.language);
+  if (factor === 1) {
+    return passthroughIngredient(line, options.language);
+  }
 
   const text = line.trim();
   const parsed = parseIngredient(text, options.language ?? "auto");
   const branch = splitBranch(text, parsed);
-  if (branch) return scaleBranchedLine(line, branch, { ...options, language: parsed.language });
+  if (branch) {
+    return scaleBranchedLine(line, branch, { ...options, language: parsed.language });
+  }
 
   return scaleSingleLine(line, options);
 }
@@ -1064,7 +1211,9 @@ export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngr
  */
 function scaleBranchedLine(line: string, branch: Branch, options: ScaleOptions): ScaledIngredient {
   const head = scaleSingleLine(branch.head, options);
-  if (head.scaling === "unscaled") return { ...head, text: line.trim(), original: line };
+  if (head.scaling === "unscaled") {
+    return { ...head, text: line.trim(), original: line };
+  }
 
   const tail = scaleAlternative(branch.tail, options);
   const result: ScaledIngredient = {
@@ -1098,140 +1247,99 @@ function scaleAlternative(
 ): { text: string; rewritten: boolean } {
   const parsed = parseIngredient(tail, options.language ?? "auto");
   const published = tail.trim();
-  if (parsed.amount === null) return { text: published, rewritten: false };
+  if (parsed.amount === null) {
+    return { text: published, rewritten: false };
+  }
 
   const largest = (parsed.amountMax ?? parsed.amount) * options.factor;
-  if (largest < 1) return { text: published, rewritten: false };
+  if (largest < 1) {
+    return { text: published, rewritten: false };
+  }
 
   return { text: scaleIngredient(tail, options).text, rewritten: true };
 }
 
-/** Why a line showing a figure came back as the page published it. */
-const HELD_BACK_NOTE: Record<HeldBack, string> = {
-  sizeQualifier:
-    "The figures here give the size of one item rather than how many, so the line is " +
-    "left as published.",
-  itemSize:
-    "The measure standing behind the item gives the size of one of them rather than how many, " +
-    "so the line is left as published. Serving more people is a matter of taking a bigger one, " +
-    "and serving fewer a smaller one.",
-  containerSize:
-    "The measure here gives what one container holds rather than how many of them the recipe " +
-    "uses, and the line states no count, so it is left as published. Scaling it is a matter of " +
-    "opening that many containers of the size named.",
-  perPerson:
-    "This line already states an amount for one person, and the factor is what changes " +
-    "how many people the recipe serves, so the line is left as published.",
-  duration:
-    "This line states a length of time rather than an amount of an ingredient, so it is left as " +
-    "published. A rest, a proof or a bake takes as long for a large batch as for a small one, " +
-    "and the factor has nothing to say about it.",
-  ambiguousDecimal:
-    "The comma in this number marks thousands in one convention and the decimal point in " +
-    "another, and the line gives no sign which was meant, so it is left as published.",
-};
-
-function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient {
-  const { factor } = options;
-  const parsed = parseIngredient(line, options.language ?? "auto");
-  const language = parsed.language;
-
-  if (parsed.amount === null || parsed.heldBack) {
-    return {
-      text: parsed.original,
-      original: parsed.original,
-      scaling: "unscaled",
-      amount: null,
-      amountMax: null,
-      unit: null,
-      language,
-      note: parsed.heldBack
-        ? HELD_BACK_NOTE[parsed.heldBack]
-        : "No quantity given; adjust to taste.",
-    };
+/**
+ * The equivalents beside a measure, written the way the line wrote them.
+ *
+ * A trailing restatement is printed after the item rather than beside the
+ * amount, so it carries no label here.
+ */
+function alternateLabel(
+  count: number,
+  style: string | null,
+  texts: readonly string[],
+  bracketed: string,
+): string {
+  if (count === 0) {
+    return "";
   }
+  if (style === "slash") {
+    return ` / ${texts.join(" / ")}`;
+  }
+  if (style === "trailing") {
+    return "";
+  }
+  return bracketed;
+}
 
-  const divisibility = divisibilityOf(parsed.unit, parsed.item);
-  const primary = scaleMeasure(parsed.amount, parsed.amountMax, parsed.unit, factor, divisibility);
-  const alternates = parsed.alternates.map((measure) => renderMeasure(measure, factor, language));
+/**
+ * What follows the amount: the partitive French puts between a measure and what
+ * it measures, or the counted item itself, which stands straight after its
+ * number in both languages and agrees with it.
+ */
+function itemLabelFor(
+  named: UnitInfo | null,
+  item: string,
+  counted: string,
+  language: Language,
+): string {
+  if (named) {
+    return joinItem(item, language);
+  }
+  if (counted) {
+    return ` ${counted}`;
+  }
+  return "";
+}
 
-  const primaryBounds = primary.bounds;
-  const alternateBounds = alternates.flatMap((entry) => entry.bounds);
-  const movedPrimary = primaryBounds.some((bound) => !boundLandedExactly(bound));
-  const movedAlternate = alternateBounds.some((bound) => !boundLandedExactly(bound));
-  const clamped = [...primaryBounds, ...alternateBounds].find((bound) => bound.clamped) ?? null;
-  // Two figures beside each other agree only as closely as the page wrote
-  // them, and multiplying both keeps that gap rather than closing it.
-  const restated = parsed.alternateStyle === "slash";
-  const carriesMore = hasEmbeddedMeasure(parsed.item, language);
-  // A further quantity beside a mass or a volume restates or qualifies it, and
-  // it did not move, so the line as a whole is not the exact product of what
-  // the page published. Beside a counted container the same figure gives the
-  // size of one of them, which is a thing the factor must leave alone: "2
-  // boîtes de 400 g" is exactly twice "1 boîte de 400 g".
-  const leftover = carriesMore && parsed.unit?.kind === "measured";
+/** What the answer says about a line beyond the figure it came to. */
+interface LineOutcome {
+  parsed: ParsedIngredient;
+  bounds: readonly ScaledBound[];
+  unit: UnitInfo | null;
+  low: ScaledBound;
+  clamped: ScaledBound | null;
+  movedPrimary: boolean;
+  movedAlternate: boolean;
+  restated: boolean;
+  collapsed: boolean;
+  language: Language;
+  carriesMore: boolean;
+}
 
-  const low = primaryBounds[0];
-  const high = primaryBounds[1] ?? null;
-  const unit = primary.unit;
-  const shown = high?.amount ?? low.amount;
-  const asText = (value: number) =>
-    formatAmount(value, language, { fractions: unit?.kind !== "measured" });
-
-  // A range whose two ends land on the same amount stopped being a range. "1 to
-  // 1 clove" is not something a cook reads, so the line states the one amount
-  // both ends came to.
-  const collapsed = high !== null && high.amount === low.amount;
-  const amountText = renderRange(
-    asText(low.amount),
-    high === null || collapsed ? null : asText(high.amount),
-    parsed.rangeSeparator,
-  );
-  // "ea" announces that the figure counts pieces, and names no measure of them,
-  // so the line reads as the count of the thing itself and the marker has
-  // nothing to say in it.
-  const named = unit && !countsBarePieces(unit) ? unit : null;
-  // The size word the page put in front of its measure goes back in front of
-  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
-  const adjective =
-    named && parsed.measureAdjective
-      ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
-      : "";
-  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
-  const alternateTexts = alternates.map((entry) => entry.text);
-  const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
-  const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
-  // Equivalents go back where the line offered them: inside brackets beside the
-  // amount, after a slash, or in the bracket the line closes on.
-  const altLabel =
-    alternates.length === 0
-      ? ""
-      : parsed.alternateStyle === "slash"
-        ? ` / ${alternateTexts.join(" / ")}`
-        : parsed.alternateStyle === "trailing"
-          ? ""
-          : bracketed;
-  const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
-  // What a container holds is the page's figure and not the factor's, so it
-  // goes back between the count and the container, exactly as published.
-  const capacityLabel = parsed.capacity ? ` ${parsed.capacity}` : "";
-  // A measure needs the partitive that French puts between it and what it
-  // measures. A counted item stands straight after its number in both
-  // languages, and agrees with it: "1 egg yolk", "3 brioches".
-  const counted = parsed.capacity
-    ? agreeCountedContainer(parsed.item, shown, language)
-    : agreeWithAmount(parsed.item, shown, language);
-  const itemLabel = named ? joinItem(parsed.item, language) : counted ? ` ${counted}` : "";
-
-  const result: ScaledIngredient = {
-    text: `${parsed.decoration ? `${parsed.decoration} ` : ""}${parsed.approximation ?? ""}${amountText}${unitLabel}${capacityLabel}${altLabel}${itemLabel}${trailingLabel}`.trim(),
-    original: parsed.original,
-    scaling: movedPrimary || movedAlternate || restated || leftover ? "rounded" : "scaled",
-    amount: low.amount,
-    amountMax: collapsed ? null : (high?.amount ?? null),
-    unit: named?.canonical ?? null,
+/**
+ * Everything the answer owes a caller about one scaled line, in one string.
+ *
+ * The reasons stack: a line can be clamped, carry a second quantity, collapse
+ * its range and state an approximation, and each has to be said without
+ * cancelling the others.
+ */
+function noteForScaledLine(outcome: LineOutcome): string | undefined {
+  const {
+    parsed,
+    bounds: primaryBounds,
+    unit,
+    low,
+    clamped,
+    movedPrimary,
+    movedAlternate,
+    restated,
+    collapsed,
     language,
-  };
+    carriesMore,
+  } = outcome;
+  let note: string | undefined;
 
   /**
    * The exact product, written for a note.
@@ -1324,10 +1432,12 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     );
   }
 
-  if (sentences.length > 0) result.note = sentences.join(" ");
+  if (sentences.length > 0) {
+    note = sentences.join(" ");
+  }
 
   if (parsed.unit && parsed.unit.kind === "approximate") {
-    result.note = withApproximateNote(parsed.unit, result.note);
+    note = withApproximateNote(parsed.unit, note);
   }
 
   // A line that wrote its amount as a word says which word it was, so a caller
@@ -1338,9 +1448,185 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     // gave.
     const stood = (parsed.amount ?? 0) / (parsed.countMultiplier ?? 1);
     const read = `"${parsed.articleWord}" read as ${formatAmount(stood, language)}.`;
-    result.note = result.note ? `${read} ${result.note}` : read;
+    note = note ? `${read} ${note}` : read;
   }
 
+  return note;
+}
+
+/**
+ * The line as it reads once scaled: the amount, its measure, what the container
+ * holds, the equivalents beside it, and the item they belong to.
+ *
+ * The size word the page put in front of its measure goes back in front of it,
+ * and the equivalents go back the way the line offered them, since a slash and
+ * a bracket are two different ways of restating one quantity.
+ */
+function renderScaledLine(
+  parsed: ParsedIngredient,
+  alternates: ReadonlyArray<{ text: string }>,
+  unit: UnitInfo | null,
+  shown: number,
+  language: Language,
+): {
+  named: UnitInfo | null;
+  unitLabel: string;
+  capacityLabel: string;
+  altLabel: string;
+  trailingLabel: string;
+  itemLabel: string;
+} {
+  const named = unit && !countsBarePieces(unit) ? unit : null;
+  // The size word the page put in front of its measure goes back in front of
+  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
+  const adjective =
+    named && parsed.measureAdjective
+      ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
+      : "";
+  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
+  const alternateTexts = alternates.map((entry) => entry.text);
+  const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
+  const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
+  // Equivalents go back where the line offered them: inside brackets beside the
+  // amount, after a slash, or in the bracket the line closes on.
+  const altLabel = alternateLabel(
+    alternates.length,
+    parsed.alternateStyle,
+    alternateTexts,
+    bracketed,
+  );
+  const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
+  // What a container holds is the page's figure and not the factor's, so it
+  // goes back between the count and the container, exactly as published.
+  const capacityLabel = parsed.capacity ? ` ${parsed.capacity}` : "";
+  // A measure needs the partitive that French puts between it and what it
+  // measures. A counted item stands straight after its number in both
+  // languages, and agrees with it: "1 egg yolk", "3 brioches".
+  const counted = parsed.capacity
+    ? agreeCountedContainer(parsed.item, shown, language)
+    : agreeWithAmount(parsed.item, shown, language);
+  const itemLabel = itemLabelFor(named, parsed.item, counted, language);
+
+  return { named, unitLabel, capacityLabel, altLabel, trailingLabel, itemLabel };
+}
+
+/** Why a line showing a figure came back as the page published it. */
+const HELD_BACK_NOTE: Record<HeldBack, string> = {
+  sizeQualifier:
+    "The figures here give the size of one item rather than how many, so the line is " +
+    "left as published.",
+  itemSize:
+    "The measure standing behind the item gives the size of one of them rather than how many, " +
+    "so the line is left as published. Serving more people is a matter of taking a bigger one, " +
+    "and serving fewer a smaller one.",
+  containerSize:
+    "The measure here gives what one container holds rather than how many of them the recipe " +
+    "uses, and the line states no count, so it is left as published. Scaling it is a matter of " +
+    "opening that many containers of the size named.",
+  perPerson:
+    "This line already states an amount for one person, and the factor is what changes " +
+    "how many people the recipe serves, so the line is left as published.",
+  duration:
+    "This line states a length of time rather than an amount of an ingredient, so it is left as " +
+    "published. A rest, a proof or a bake takes as long for a large batch as for a small one, " +
+    "and the factor has nothing to say about it.",
+  ambiguousDecimal:
+    "The comma in this number marks thousands in one convention and the decimal point in " +
+    "another, and the line gives no sign which was meant, so it is left as published.",
+};
+
+function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient {
+  const { factor } = options;
+  const parsed = parseIngredient(line, options.language ?? "auto");
+  const language = parsed.language;
+
+  if (parsed.amount === null || parsed.heldBack) {
+    return {
+      text: parsed.original,
+      original: parsed.original,
+      scaling: "unscaled",
+      amount: null,
+      amountMax: null,
+      unit: null,
+      language,
+      note: parsed.heldBack
+        ? HELD_BACK_NOTE[parsed.heldBack]
+        : "No quantity given; adjust to taste.",
+    };
+  }
+
+  const divisibility = divisibilityOf(parsed.unit, parsed.item);
+  const primary = scaleMeasure(parsed.amount, parsed.amountMax, parsed.unit, factor, divisibility);
+  const alternates = parsed.alternates.map((measure) => renderMeasure(measure, factor, language));
+
+  const primaryBounds = primary.bounds;
+  const alternateBounds = alternates.flatMap((entry) => entry.bounds);
+  const movedPrimary = primaryBounds.some((bound) => !boundLandedExactly(bound));
+  const movedAlternate = alternateBounds.some((bound) => !boundLandedExactly(bound));
+  const clamped = [...primaryBounds, ...alternateBounds].find((bound) => bound.clamped) ?? null;
+  // Two figures beside each other agree only as closely as the page wrote
+  // them, and multiplying both keeps that gap rather than closing it.
+  const restated = parsed.alternateStyle === "slash";
+  const carriesMore = hasEmbeddedMeasure(parsed.item, language);
+  // A further quantity beside a mass or a volume restates or qualifies it, and
+  // it did not move, so the line as a whole is not the exact product of what
+  // the page published. Beside a counted container the same figure gives the
+  // size of one of them, which is a thing the factor must leave alone: "2
+  // boîtes de 400 g" is exactly twice "1 boîte de 400 g".
+  const leftover = carriesMore && parsed.unit?.kind === "measured";
+
+  const low = primaryBounds[0];
+  const high = primaryBounds[1] ?? null;
+  const unit = primary.unit;
+  const shown = high?.amount ?? low.amount;
+  const asText = (value: number) =>
+    formatAmount(value, language, { fractions: unit?.kind !== "measured" });
+
+  // A range whose two ends land on the same amount stopped being a range. "1 to
+  // 1 clove" is not something a cook reads, so the line states the one amount
+  // both ends came to.
+  const collapsed = high !== null && high.amount === low.amount;
+  const amountText = renderRange(
+    asText(low.amount),
+    high === null || collapsed ? null : asText(high.amount),
+    parsed.rangeSeparator,
+  );
+  // "ea" announces that the figure counts pieces, and names no measure of them,
+  // so the line reads as the count of the thing itself and the marker has
+  // nothing to say in it.
+  const { named, unitLabel, capacityLabel, altLabel, trailingLabel, itemLabel } = renderScaledLine(
+    parsed,
+    alternates,
+    unit,
+    shown,
+    language,
+  );
+  const result: ScaledIngredient = {
+    text: `${parsed.decoration ? `${parsed.decoration} ` : ""}${parsed.approximation ?? ""}${amountText}${unitLabel}${capacityLabel}${altLabel}${itemLabel}${trailingLabel}`.trim(),
+    original: parsed.original,
+    scaling: movedPrimary || movedAlternate || restated || leftover ? "rounded" : "scaled",
+    amount: low.amount,
+    amountMax: collapsed ? null : (high?.amount ?? null),
+    unit: named?.canonical ?? null,
+    language,
+  };
+
+  const note = noteForScaledLine({
+    parsed,
+    bounds: primaryBounds,
+    unit,
+    low,
+    clamped,
+    movedPrimary,
+    movedAlternate,
+    restated,
+    collapsed,
+    language,
+    carriesMore,
+  });
+  if (note !== undefined) {
+    result.note = note;
+  }
   return result;
 }
 
@@ -1397,7 +1683,9 @@ function renderMeasure(
 
 /** Keep a range in the shape the recipe wrote it: "3–4", "2 to 3" or "2 à 3". */
 function renderRange(low: string, high: string | null, separator: string | null): string {
-  if (high === null || separator === null) return low;
+  if (high === null || separator === null) {
+    return low;
+  }
   return /^[-–—]$/.test(separator) ? `${low}${separator}${high}` : `${low} ${separator} ${high}`;
 }
 
@@ -1428,9 +1716,11 @@ export function passthroughIngredient(
     unit: held ? null : (parsed.unit?.canonical ?? null),
     language: parsed.language,
   };
-  if (parsed.heldBack) result.note = HELD_BACK_NOTE[parsed.heldBack];
-  else if (parsed.amount === null) result.note = "No quantity given; adjust to taste.";
-  else if (parsed.unit?.kind === "approximate") {
+  if (parsed.heldBack) {
+    result.note = HELD_BACK_NOTE[parsed.heldBack];
+  } else if (parsed.amount === null) {
+    result.note = "No quantity given; adjust to taste.";
+  } else if (parsed.unit?.kind === "approximate") {
     result.note = withApproximateNote(parsed.unit, undefined);
   }
   return result;

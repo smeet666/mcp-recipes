@@ -86,7 +86,9 @@ export const timeout = (message: string, details?: ErrorDetails) =>
  * network failure, which is the reading that claims least.
  */
 export function toRecipesError(error: unknown): RecipesError {
-  if (error instanceof RecipesError) return error;
+  if (error instanceof RecipesError) {
+    return error;
+  }
 
   const message = error instanceof Error ? error.message : String(error);
   const raw = error as { code?: unknown; details?: unknown } | null;
@@ -115,7 +117,9 @@ export function toRecipesError(error: unknown): RecipesError {
  * server cannot answer for.
  */
 export function fromSource(error: unknown, sourceName: string): RecipesError {
-  if (error instanceof RecipesError) return error;
+  if (error instanceof RecipesError) {
+    return error;
+  }
 
   const known = toRecipesError(error);
   const reported = known.message.replace(/\s+/g, " ").trim();
@@ -125,8 +129,12 @@ export function fromSource(error: unknown, sourceName: string): RecipesError {
       : `${sourceName} could not be read.`;
   const message = reported === "" ? opening : `${opening} It reports: "${reported}"`;
   const details: ErrorDetails = {};
-  if (known.details.url !== undefined) details.url = known.details.url;
-  if (known.details.status !== undefined) details.status = known.details.status;
+  if (known.details.url !== undefined) {
+    details.url = known.details.url;
+  }
+  if (known.details.status !== undefined) {
+    details.status = known.details.status;
+  }
 
   switch (known.code) {
     case "not_found":

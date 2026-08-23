@@ -119,10 +119,14 @@ export function namespacedId(source: SourceId, reference: string): string {
  * differently and a figure is repeated as the page wrote it either way.
  */
 export function publishedFigures(panel: unknown): Record<string, string> | null {
-  if (typeof panel !== "object" || panel === null) return null;
+  if (typeof panel !== "object" || panel === null) {
+    return null;
+  }
   const kept: Record<string, string> = {};
   for (const [key, value] of Object.entries(panel)) {
-    if (typeof value === "string" && value.trim() !== "") kept[key] = value.trim();
+    if (typeof value === "string" && value.trim() !== "") {
+      kept[key] = value.trim();
+    }
   }
   return Object.keys(kept).length > 0 ? kept : null;
 }
@@ -140,7 +144,9 @@ export function readYieldSpan(published: string | null): {
   max: number | null;
   unit: string | null;
 } {
-  if (published === null) return { count: null, max: null, unit: null };
+  if (published === null) {
+    return { count: null, max: null, unit: null };
+  }
 
   const span = /^\s*(\d+(?:[.,]\d+)?)\s*(?:à|a|to|-|–|—|ou|or)\s*(\d+(?:[.,]\d+)?)\s*(.*)$/i.exec(
     published,
@@ -158,7 +164,9 @@ export function readYieldSpan(published: string | null): {
   if (single) {
     const [figure = ""] = single.slice(1);
     const value = Number(figure.replace(",", "."));
-    if (Number.isFinite(value)) return { count: value, max: null, unit: text(single[2]) };
+    if (Number.isFinite(value)) {
+      return { count: value, max: null, unit: text(single[2]) };
+    }
   }
 
   return { count: null, max: null, unit: null };

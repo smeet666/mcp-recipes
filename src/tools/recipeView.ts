@@ -23,6 +23,27 @@ import {
 } from "./shared.js";
 import type { Note } from "./shared.js";
 
+/**
+ * What the other half of the recipe holds, when this half is being read alone.
+ *
+ * A page whose ingredients were read and whose method was not is a page that
+ * has one, and saying so is what stops a caller concluding the recipe is a list
+ * with no procedure.
+ */
+function whatTheOtherPartHolds(
+  part: PagePart,
+  recipe: { steps: readonly unknown[]; ingredients: readonly unknown[] },
+): string | null {
+  if (part === "ingredients") {
+    return recipe.steps.length > 0
+      ? `${recipe.steps.length} step(s) of method were read from it`
+      : null;
+  }
+  return recipe.ingredients.length > 0
+    ? `${recipe.ingredients.length} ingredient line(s) were read from it`
+    : null;
+}
+
 export const yieldSchema = z.object({
   original_count: z
     .number()
@@ -135,7 +156,9 @@ function resolveFactor(
   recipe: RecipeDetail,
   servings: number | null,
 ): { factor: number | null; notes: Note[] } {
-  if (servings === null) return { factor: null, notes: [] };
+  if (servings === null) {
+    return { factor: null, notes: [] };
+  }
 
   if (recipe.yieldCount === null || recipe.yieldCount <= 0) {
     return {
@@ -229,14 +252,7 @@ const METHOD_PART: PartWords = {
  */
 function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
   const heading = headingFor(words.part, recipe.publishedSections);
-  const counterpart =
-    words.part === "ingredients"
-      ? recipe.steps.length > 0
-        ? `${recipe.steps.length} step(s) of method were read from it`
-        : null
-      : recipe.ingredients.length > 0
-        ? `${recipe.ingredients.length} ingredient line(s) were read from it`
-        : null;
+  const counterpart = whatTheOtherPartHolds(words.part, recipe);
 
   const shown = [
     heading === null ? null : `the page heads a section "${quoteForeign(heading)}"`,
@@ -255,7 +271,7 @@ function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
   const looked = recipe.publishedSections === null ? "" : ", which heads no section announcing one";
   return mustKeep(
     `No ${words.entry} was read from this page${looked}. A page publishing no ${words.whole} and ` +
-      `one written in a layout this server cannot follow look the same from here, so read the url ` +
+      "one written in a layout this server cannot follow look the same from here, so read the url " +
       `before settling which this is. ${words.caution}`,
   );
 }
@@ -388,6 +404,8 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
 /** The yield as a reader would say it, with what was asked for beside it. */
 export function renderYield(payload: RecipePayload): string {
   const published = payload.yield.original_text ?? "an amount the page does not state";
-  if (payload.yield.factor === null) return `Yields ${quoteForeign(published)} (as published).`;
+  if (payload.yield.factor === null) {
+    return `Yields ${quoteForeign(published)} (as published).`;
+  }
   return `Yields ${quoteForeign(published)} as published, scaled by ${payload.yield.factor} for ${payload.yield.requested}.`;
 }

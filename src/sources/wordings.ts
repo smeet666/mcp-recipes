@@ -494,6 +494,29 @@ function foldWord(word: string): string {
 }
 
 /**
+ * Whether a word left over from a question names the dish.
+ *
+ * The framing of a question is not the dish it asks for, a number counts eaters
+ * or minutes rather than naming anything, and what an apostrophe leaves behind
+ * once it has split an elision is not a word at all.
+ */
+function namesTheDish(word: string, key: string): boolean {
+  if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key)) {
+    return false;
+  }
+  if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) {
+    return false;
+  }
+  if (/^\d+$/.test(word)) {
+    return false;
+  }
+  if (word.length < 2) {
+    return false;
+  }
+  return !CONDITION_UNITS.has(word);
+}
+
+/**
  * Read a question once, deciding for every word whether it names the dish or
  * states a condition on it.
  *
@@ -509,8 +532,12 @@ function readQuestion(question: string): ReadQuestion {
 
   const state = (named: string | null, kind: ConditionKind): void => {
     const trimmed = named === null ? null : named.trim();
-    if (trimmed === "") return;
-    if (conditions.some((held) => held.named === trimmed && held.kind === kind)) return;
+    if (trimmed === "") {
+      return;
+    }
+    if (conditions.some((held) => held.named === trimmed && held.kind === kind)) {
+      return;
+    }
     conditions.push({ named: trimmed, kind });
   };
 
@@ -567,15 +594,9 @@ function readQuestion(question: string): ReadQuestion {
       continue;
     }
 
-    if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key)) continue;
-    if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) continue;
-    // A number counts eaters, minutes or calories. None of them names a dish.
-    if (/^\d+$/.test(word)) continue;
-    // What is left of an elision once the apostrophe has split it.
-    if (word.length < 2) continue;
-    if (CONDITION_UNITS.has(word)) continue;
-
-    if (!dish.includes(word)) dish.push(word);
+    if (namesTheDish(word, key) && !dish.includes(word)) {
+      dish.push(word);
+    }
   }
 
   return { dish, conditions };
@@ -633,12 +654,16 @@ function takeFood(words: string[], from: number): { named: string; next: number 
   let index = from;
   // An article or a quantifier can stand between the marker and the food:
   // "pas de beurre", "without any butter".
-  while (index < words.length && isFiller(words[index] ?? "")) index += 1;
+  while (index < words.length && isFiller(words[index] ?? "")) {
+    index += 1;
+  }
 
   const named: string[] = [];
   while (index < words.length && named.length < CONDITION_WORDS) {
     const word = words[index] ?? "";
-    if (!namesFood(word)) break;
+    if (!namesFood(word)) {
+      break;
+    }
     named.push(word);
     index += 1;
 
@@ -668,12 +693,24 @@ function isFiller(word: string): boolean {
 /** Whether a word can be part of the name of something a recipe holds. */
 function namesFood(word: string): boolean {
   const key = foldWord(word);
-  if (key.length < 2) return false;
-  if (/^\d+$/.test(key)) return false;
-  if (key === "free") return false;
-  if (CONDITION_ENDS.has(key)) return false;
-  if (NEGATORS.has(key) || HEALTH_MARKERS.has(key)) return false;
-  if (CONDITION_UNITS.has(key)) return false;
+  if (key.length < 2) {
+    return false;
+  }
+  if (/^\d+$/.test(key)) {
+    return false;
+  }
+  if (key === "free") {
+    return false;
+  }
+  if (CONDITION_ENDS.has(key)) {
+    return false;
+  }
+  if (NEGATORS.has(key) || HEALTH_MARKERS.has(key)) {
+    return false;
+  }
+  if (CONDITION_UNITS.has(key)) {
+    return false;
+  }
   return !(FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key));
 }
 
@@ -714,11 +751,15 @@ export function deriveWordings(question: string): Wording[] {
 
   const offer = (candidate: string, derivation: string): void => {
     const clean = tidy(candidate);
-    if (clean === "") return;
+    if (clean === "") {
+      return;
+    }
     // Two wordings differing only in case or spacing are one wording to these
     // indexes, and sending both spends an interval to learn nothing.
     const key = clean.toLowerCase();
-    if (seen.has(key)) return;
+    if (seen.has(key)) {
+      return;
+    }
     seen.add(key);
     wordings.push({ query: clean, derivation });
   };
@@ -756,7 +797,9 @@ export function deriveWordings(question: string): Wording[] {
  */
 export function namesDish(title: string, question: string): boolean {
   const words = namingWords(question);
-  if (words.length === 0) return true;
+  if (words.length === 0) {
+    return true;
+  }
   return dishWordsMissing(title, question).length < words.length;
 }
 

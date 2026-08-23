@@ -84,7 +84,9 @@ async function readSearch(
     return await reader.search(query);
   } catch (error) {
     const code = (error as { code?: string } | null)?.code;
-    if (code === "not_found") return { data: [], cached: false };
+    if (code === "not_found") {
+      return { data: [], cached: false };
+    }
     throw error;
   }
 }

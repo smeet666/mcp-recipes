@@ -16,6 +16,7 @@ import { dishWordsMissing } from "../sources/wordings.js";
 import type { RecipeDetail, SourceId, SourceReport } from "../types.js";
 import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
 import type { RecipePayload, Section } from "./recipeView.js";
+import type { RecipeView } from "./recipeView.js";
 import {
   creditLine,
   fitLines,
@@ -34,6 +35,19 @@ import {
 import type { Note } from "./shared.js";
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
+
+/**
+ * Why nothing was compared.
+ *
+ * A version that was offered and could not be read is a different statement
+ * from no source offering one at all: the first says the dish is out there.
+ */
+function nothingWasCompared(someWereUnread: boolean, dish: string): string {
+  if (someWereUnread) {
+    return `Every version of "${quoteForeign(dish)}" that was offered could not be read, so nothing was compared.`;
+  }
+  return `No source offered a recipe for "${quoteForeign(dish)}".`;
+}
 
 export const compareRecipesDescription = [
   "Take a dish and show how each source writes it, side by side.",
@@ -90,8 +104,65 @@ const TEXT_DIFFERENCE_LINES = 4;
 
 /** Sources named the way a sentence names them. */
 function listNames(names: string[]): string {
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  if (names.length <= 1) {
+    return names.join("");
+  }
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * Which versions actually answer to the dish that was asked for.
+ *
+ * A title sharing one word with the question is not the dish: "biscuits and
+ * gravy" and a tin of Christmas biscuits share the biscuit, and setting them
+ * side by side would present a search that missed as a difference between two
+ * traditions.
+ */
+function weighTitlesAgainstTheDish(
+  payloads: readonly RecipeView["payload"][],
+  dish: string,
+  notes: RecipeView["notes"][number][],
+): Array<{ payload: RecipeView["payload"]; missing: readonly string[] }> {
+  const weighed = payloads.map((payload) => ({
+    payload,
+    missing: dishWordsMissing(payload.title, dish),
+  }));
+  const carriesDish = weighed.some((one) => one.missing.length === 0);
+
+  weighed.forEach(({ payload, missing }) => {
+    if (missing.length === 0) {
+      return;
+    }
+    notes.push(
+      mustKeep(
+        `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
+          `carries no ${missing.map((word) => `"${quoteForeign(word)}"`).join(" and no ")}. ` +
+          "Read it as a candidate to check rather than as that dish.",
+      ),
+    );
+  });
+
+  if (payloads.length > 0 && !carriesDish) {
+    notes.push(
+      `No version here carries the whole of "${quoteForeign(dish)}" in its title. These are ` +
+        "the closest rows each source returned for that spelling, so read them as candidates to " +
+        "check rather than as that dish.",
+    );
+  }
+
+  if (payloads.length === 1 && carriesDish) {
+    notes.push(
+      mustKeep(
+        "This is one version rather than a comparison. Read it as what that one source publishes.",
+      ),
+    );
+  }
+
+  // A difference is a statement about one dish written two ways. Setting a
+  // row that answers to another name beside it turns a search that missed
+  // into a claim about two traditions.
+
+  return weighed;
 }
 
 /**
@@ -113,7 +184,9 @@ function describeDifferences(
   payloads: RecipePayload[],
   sections: readonly Section[],
 ): string[] {
-  if (recipes.length < 2) return [];
+  if (recipes.length < 2) {
+    return [];
+  }
   const differences: string[] = [];
   const nameOf = (recipe: RecipeDetail) => recipe.sourceName;
 
@@ -170,7 +243,9 @@ function describeDifferences(
 
   for (const recipe of recipes) {
     const license = recipe.license;
-    if (license === null) continue;
+    if (license === null) {
+      continue;
+    }
     differences.push(
       `${nameOf(recipe)} publishes under ${quoteForeign(license.title)}, which asks for attribution.`,
     );
@@ -196,7 +271,9 @@ export async function runCompareRecipes(
 
     const best = new Map<SourceId, string>();
     for (const row of merged.rows) {
-      if (!best.has(row.source)) best.set(row.source, row.id);
+      if (!best.has(row.source)) {
+        best.set(row.source, row.id);
+      }
     }
 
     const offered = [...best.entries()];
@@ -210,7 +287,9 @@ export async function runCompareRecipes(
 
     reads.forEach((read, index) => {
       const source = offered[index]?.[0];
-      if (source === undefined) return;
+      if (source === undefined) {
+        return;
+      }
       opened.add(source);
       if (read.status === "fulfilled") {
         recipes.push(read.value.recipe);
@@ -238,7 +317,9 @@ export async function runCompareRecipes(
     const payloads = views.map((view) => view.payload);
 
     const notes: Note[] = reportNotes(merged.reports);
-    for (const view of views) notes.push(...view.notes);
+    for (const view of views) {
+      notes.push(...view.notes);
+    }
 
     const omitted = SECTIONS.filter((section) => !args.sections.includes(section));
     if (omitted.length > 0) {
@@ -252,7 +333,9 @@ export async function runCompareRecipes(
     // "that source offered nothing" is the one that turns a bad minute into a
     // claim about what a corpus holds.
     for (const report of merged.reports) {
-      if (recipes.some((recipe) => recipe.source === report.source)) continue;
+      if (recipes.some((recipe) => recipe.source === report.source)) {
+        continue;
+      }
       const failedRead = unread.get(report.source);
       if (report.status === "failed") {
         notes.push(
@@ -284,42 +367,7 @@ export async function runCompareRecipes(
     // as a source's version of the dish states as fact the one thing the search
     // did not establish, and sharing one word of a name is not carrying it:
     // "biscuits and gravy" and a tin of Christmas biscuits share the biscuit.
-    const weighed = payloads.map((payload) => ({
-      payload,
-      missing: dishWordsMissing(payload.title, args.dish),
-    }));
-    const carriesDish = weighed.some((one) => one.missing.length === 0);
-
-    weighed.forEach(({ payload, missing }) => {
-      if (missing.length === 0) return;
-      notes.push(
-        mustKeep(
-          `${payload.source_name}'s closest row is ${quoteForeign(payload.title)}, whose title ` +
-            `carries no ${missing.map((word) => `"${quoteForeign(word)}"`).join(" and no ")}. ` +
-            "Read it as a candidate to check rather than as that dish.",
-        ),
-      );
-    });
-
-    if (payloads.length > 0 && !carriesDish) {
-      notes.push(
-        `No version here carries the whole of "${quoteForeign(args.dish)}" in its title. These are ` +
-          "the closest rows each source returned for that spelling, so read them as candidates to " +
-          "check rather than as that dish.",
-      );
-    }
-
-    if (payloads.length === 1 && carriesDish) {
-      notes.push(
-        mustKeep(
-          "This is one version rather than a comparison. Read it as what that one source publishes.",
-        ),
-      );
-    }
-
-    // A difference is a statement about one dish written two ways. Setting a
-    // row that answers to another name beside it turns a search that missed
-    // into a claim about two traditions.
+    const weighed = weighTitlesAgainstTheDish(payloads, args.dish, notes);
     const comparable = recipes.filter((recipe) =>
       weighed.some(
         ({ payload, missing }) =>
@@ -397,9 +445,7 @@ export async function runCompareRecipes(
 
     const body =
       payloads.length === 0
-        ? unread.size > 0
-          ? `Every version of "${quoteForeign(args.dish)}" that was offered could not be read, so nothing was compared.`
-          : `No source offered a recipe for "${quoteForeign(args.dish)}".`
+        ? nothingWasCompared(unread.size > 0, args.dish)
         : versionBlocks.join("\n\n");
 
     // What differs comes first. It is the answer to the question that was
@@ -416,7 +462,9 @@ export async function runCompareRecipes(
         // what became of the row it offered.
         per_source: merged.reports.map((report) => {
           const payload = toReportPayload(report);
-          if (!opened.has(report.source)) return payload;
+          if (!opened.has(report.source)) {
+            return payload;
+          }
           const failedRead = unread.get(report.source);
           return withRead(
             payload,
