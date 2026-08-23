@@ -817,6 +817,108 @@ function readEvidence(line: string): LanguageEvidence {
 }
 
 /**
+ * The measure standing after the amount, and the size word in front of it.
+ *
+ * The adjective is only an adjective when a measure stands behind it. In
+ * "1 cleaned leek green" the words that follow name the food itself, and taking
+ * one off would hand back a line the page never wrote.
+ */
+function readMeasure(
+  rest: string,
+  language: Language,
+  fromArticle: boolean,
+): {
+  leading: ReturnType<typeof takeLeadingUnit>;
+  described: { adjective: string | null; rest: string };
+  behind: ReturnType<typeof takeLeadingUnit> | null;
+} {
+  const direct = takeLeadingUnit(rest, language, fromArticle);
+  const described = direct.unit ? { adjective: null, rest } : takeMeasureAdjective(rest, language);
+  const behind = described.adjective
+    ? takeLeadingUnit(described.rest, language, fromArticle)
+    : null;
+
+  return { leading: leadingMeasure(direct, behind), described, behind };
+}
+
+/**
+ * Whether the figure the line opens with counts anything, and what it is
+ * instead when it does not.
+ *
+ * Three ways a figure is not a quantity: it is joined to a word by a hyphen and
+ * describes one thing, it names a rank in an order, or it measures a length of
+ * time, which belongs to the method rather than to the proportions. `false`
+ * means the figure counts.
+ */
+function whatTheFigureIsNot(
+  behindFigure: string,
+  couldBeARank: boolean,
+  language: Language,
+): HeldBack | null | false {
+  if (/^-\p{L}/u.test(behindFigure)) {
+    return "sizeQualifier";
+  }
+  if (couldBeARank && ORDINAL_SUFFIX.test(behindFigure)) {
+    return null;
+  }
+  if (TIME_UNIT[language].test(behindFigure.trimStart())) {
+    return "duration";
+  }
+  return false;
+}
+
+/**
+ * The equivalents a line writes beside its measure, in whichever of the three
+ * shapes it wrote them.
+ *
+ * A bracketed group, a slash beside the amount, or a restatement trailing the
+ * item: only one of them is read, because a line offering two would be stating
+ * the same quantity three times.
+ */
+function takeEquivalents(
+  text: string,
+  language: Language,
+): {
+  rest: string;
+  bracketed: ReturnType<typeof takeAlternates>;
+  slashed: ReturnType<typeof takeSlashAlternates>;
+  item: string;
+  trailing: ReturnType<typeof takeTrailingAlternates>;
+  group:
+    | ReturnType<typeof takeTrailingAlternates>
+    | Omit<ReturnType<typeof takeAlternates>, "rest">
+    | null;
+} {
+  const introducedBracket = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i.exec(text);
+  const bracketed = takeAlternates(
+    introducedBracket ? text.slice(introducedBracket[0].length) : text,
+    language,
+  );
+  let rest = bracketed.measures.length > 0 ? bracketed.rest : text;
+
+  const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest, language);
+  if (slashed) {
+    rest = slashed.rest;
+  }
+
+  let item = stripItemLead(rest, language);
+
+  const trailing =
+    bracketed.measures.length === 0 && !slashed ? takeTrailingAlternates(item, language) : null;
+  if (trailing) {
+    item = trailing.item;
+  }
+
+  const group = trailing ?? (bracketed.measures.length > 0 ? bracketed : null);
+  // A measure inside a bracket beside a container gives what one of them holds,
+  // as in "1 (14 oz) can". The recipe's proportion lives in how many tins are
+  // opened, and a tin of twice the size is a tin no shop sells, so the figure
+  // goes back exactly as the page wrote it.
+
+  return { rest, item, bracketed, slashed, trailing, group };
+}
+
+/**
  * Split an ingredient line into amount, measure, bracketed equivalents and
  * item.
  *
@@ -868,19 +970,13 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "4 to 5-pound roast" is one roast that weighs that much.
-  const behindFigure = stated.slice(quantity.length);
-  if (/^-\p{L}/u.test(behindFigure)) {
-    return empty("sizeQualifier");
-  }
-
-  // A rank names a position in an order, and there is no amount in it.
-  if (quantity !== article && ORDINAL_SUFFIX.test(behindFigure)) {
-    return empty(null);
-  }
-
-  // A length of time belongs to the method rather than to the proportions.
-  if (TIME_UNIT[language].test(behindFigure.trimStart())) {
-    return empty("duration");
+  const notAnAmount = whatTheFigureIsNot(
+    stated.slice(quantity.length),
+    quantity !== article,
+    language,
+  );
+  if (notAnAmount !== false) {
+    return empty(notAnAmount);
   }
 
   let rest = stated.slice(quantity.length).trimStart();
@@ -900,15 +996,8 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   const times = multiplier?.times ?? 1;
 
   const fromArticle = quantity === article;
-  const direct = takeLeadingUnit(rest, language, fromArticle);
-  const described = direct.unit ? { adjective: null, rest } : takeMeasureAdjective(rest, language);
-  // The adjective is only an adjective when a measure stands behind it. In
-  // "1 cleaned leek green" the words that follow name the food itself, and
-  // taking one off would hand back a line the page never wrote.
-  const behind = described.adjective
-    ? takeLeadingUnit(described.rest, language, fromArticle)
-    : null;
-  const leading = leadingMeasure(direct, behind);
+  const measure = readMeasure(rest, language, fromArticle);
+  const { leading, described, behind } = measure;
   rest = leading.rest;
 
   // A range gives two amounts, and a second member behind it would belong to
@@ -922,31 +1011,10 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   // The partitive can stand between the measure and the bracket restating it,
   // as in "150 g de (3/4 de tasse) de sucre". It introduces the equivalent
   // rather than the food, so it is stepped over and the bracket read behind it.
-  const introducedBracket = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i.exec(rest);
-  const bracketed = takeAlternates(
-    introducedBracket ? rest.slice(introducedBracket[0].length) : rest,
-    language,
-  );
-  rest = bracketed.measures.length > 0 ? bracketed.rest : rest;
-
-  const slashed = bracketed.measures.length > 0 ? null : takeSlashAlternates(rest, language);
-  if (slashed) {
-    rest = slashed.rest;
-  }
-
-  let item = stripItemLead(rest, language);
-
-  const trailing =
-    bracketed.measures.length === 0 && !slashed ? takeTrailingAlternates(item, language) : null;
-  if (trailing) {
-    item = trailing.item;
-  }
-
-  const group = trailing ?? (bracketed.measures.length > 0 ? bracketed : null);
-  // A measure inside a bracket beside a container gives what one of them holds,
-  // as in "1 (14 oz) can". The recipe's proportion lives in how many tins are
-  // opened, and a tin of twice the size is a tin no shop sells, so the figure
-  // goes back exactly as the page wrote it.
+  const equivalents = takeEquivalents(rest, language);
+  const { slashed, trailing, group } = equivalents;
+  rest = equivalents.rest;
+  const item = equivalents.item;
   const capacity =
     group?.measures.every((measure) => measure.unit?.kind === "measured") &&
     (namesContainer(leading.unit?.canonical) || namesContainer(item))
