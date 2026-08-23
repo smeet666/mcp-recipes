@@ -1240,6 +1240,201 @@ function scaleAlternative(
   return { text: scaleIngredient(tail, options).text, rewritten: true };
 }
 
+/**
+ * The equivalents beside a measure, written the way the line wrote them.
+ *
+ * A trailing restatement is printed after the item rather than beside the
+ * amount, so it carries no label here.
+ */
+function alternateLabel(
+  count: number,
+  style: string | null,
+  texts: readonly string[],
+  bracketed: string,
+): string {
+  if (count === 0) {
+    return "";
+  }
+  if (style === "slash") {
+    return ` / ${texts.join(" / ")}`;
+  }
+  if (style === "trailing") {
+    return "";
+  }
+  return bracketed;
+}
+
+/**
+ * What follows the amount: the partitive French puts between a measure and what
+ * it measures, or the counted item itself, which stands straight after its
+ * number in both languages and agrees with it.
+ */
+function itemLabelFor(
+  named: UnitInfo | null,
+  item: string,
+  counted: string,
+  language: Language,
+): string {
+  if (named) {
+    return joinItem(item, language);
+  }
+  if (counted) {
+    return ` ${counted}`;
+  }
+  return "";
+}
+
+/** What the answer says about a line beyond the figure it came to. */
+interface LineOutcome {
+  parsed: ParsedIngredient;
+  bounds: readonly ScaledBound[];
+  unit: UnitInfo | null;
+  low: ScaledBound;
+  clamped: ScaledBound | null;
+  movedPrimary: boolean;
+  movedAlternate: boolean;
+  restated: boolean;
+  collapsed: boolean;
+  language: Language;
+  carriesMore: boolean;
+}
+
+/**
+ * Everything the answer owes a caller about one scaled line, in one string.
+ *
+ * The reasons stack: a line can be clamped, carry a second quantity, collapse
+ * its range and state an approximation, and each has to be said without
+ * cancelling the others.
+ */
+function noteForScaledLine(outcome: LineOutcome): string | undefined {
+  const {
+    parsed,
+    bounds: primaryBounds,
+    unit,
+    low,
+    clamped,
+    movedPrimary,
+    movedAlternate,
+    restated,
+    collapsed,
+    language,
+    carriesMore,
+  } = outcome;
+  let note: string | undefined;
+
+  /**
+   * The exact product, written for a note.
+   *
+   * Decimals rather than kitchen fractions: this number exists to be compared
+   * against the one on the line, and a fraction snapped from 0.32 to "1/3"
+   * reads as the exact product while being a different number.
+   */
+  const asPublished = (value: number, source: UnitInfo | null) =>
+    `${formatAmount(value, language, { fractions: false })}${
+      source ? ` ${formatUnit(source, value, language)}` : ""
+    }`;
+
+  const sentences: string[] = [];
+
+  if (clamped) {
+    sentences.push(
+      `Clamped up to ${formatAmount(clamped.amount, language)} from ` +
+        `${formatAmount(Math.round(clamped.raw * 1000) / 1000, language)}, the smallest amount ` +
+        "worth measuring. This line no longer holds its share of the recipe.",
+    );
+  } else if (movedPrimary) {
+    // Every bound that moved is named, with the direction it moved in. On a
+    // range the two ends can move opposite ways, and reporting one of them as
+    // though it spoke for both states the wrong direction for half the
+    // quantity.
+    const moved = primaryBounds.filter((bound) => !boundLandedExactly(bound));
+    sentences.push(
+      moved
+        .map(
+          (bound) =>
+            `Rounded ${bound.amount > bound.exact ? "up" : "down"} from ` +
+            `${asPublished(bound.raw, parsed.unit)}.`,
+        )
+        .join(" "),
+    );
+  } else if (movedAlternate) {
+    // The amount itself came out exact, and only the equivalent beside it had
+    // to move. Saying "rounded from 300 g" when 300 g is exact would send a
+    // cook looking for an error that is not there.
+    sentences.push(
+      `The amount is exact; the equivalent ${
+        restated ? "beside it" : "in brackets"
+      } was rounded to stay readable.`,
+    );
+  } else if (restated) {
+    sentences.push(
+      "This line states one quantity twice, and both readings were scaled. " +
+        "They agree as closely as the page wrote them, and no closer.",
+    );
+  }
+
+  // A line can offer a substitute with its own amount, as in "1 Tbsp vanilla
+  // sugar OR 1 tsp vanilla extract". Only the amount the line opens with is
+  // scaled, and a substitute left at its published size contradicts it. This is
+  // said whatever else happened to the line: a line that was also rounded is the
+  // one where a stale second quantity is hardest to spot.
+  if (carriesMore) {
+    sentences.push(
+      "This line carries a further quantity after the first one, and only the first was scaled. " +
+        "Read the rest as published.",
+    );
+  }
+
+  if (parsed.capacity) {
+    sentences.push(
+      `${parsed.capacity} is what one container holds, so it stays as published and the count is ` +
+        "what the factor moved. Scaling this line is a matter of opening that many containers of " +
+        "the size named.",
+    );
+  }
+
+  if (collapsed) {
+    sentences.push("The page gave a range, and at this size both ends come to the same amount.");
+  }
+
+  // Below what any scale shows, the arithmetic is right and the kitchen cannot
+  // follow it. Saying so is the difference between an answer and a number.
+  if (unit?.kind === "measured" && low.amount > 0 && low.amount < 0.05) {
+    sentences.push(
+      "This is smaller than a kitchen scale resolves. Make a larger batch, or measure it by eye.",
+    );
+  }
+
+  // The page put the amount forward as loose, and multiplying it keeps it that
+  // way: the answer is as approximate as the figure it came from.
+  if (parsed.approximation) {
+    sentences.push(
+      "The page gave this amount as an approximation, and the scaled figure is no firmer.",
+    );
+  }
+
+  if (sentences.length > 0) {
+    note = sentences.join(" ");
+  }
+
+  if (parsed.unit && parsed.unit.kind === "approximate") {
+    note = withApproximateNote(parsed.unit, note);
+  }
+
+  // A line that wrote its amount as a word says which word it was, so a caller
+  // can see the figure came from the grammar rather than from a digit.
+  if (parsed.articleWord) {
+    // `amount` carries the product once a word such as "dozen" has multiplied
+    // it, and quoting that back would credit the article with a figure it never
+    // gave.
+    const stood = (parsed.amount ?? 0) / (parsed.countMultiplier ?? 1);
+    const read = `"${parsed.articleWord}" read as ${formatAmount(stood, language)}.`;
+    note = note ? `${read} ${note}` : read;
+  }
+
+  return note;
+}
+
 /** Why a line showing a figure came back as the page published it. */
 const HELD_BACK_NOTE: Record<HeldBack, string> = {
   sizeQualifier:
@@ -1337,14 +1532,12 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
   // Equivalents go back where the line offered them: inside brackets beside the
   // amount, after a slash, or in the bracket the line closes on.
-  const altLabel =
-    alternates.length === 0
-      ? ""
-      : parsed.alternateStyle === "slash"
-        ? ` / ${alternateTexts.join(" / ")}`
-        : parsed.alternateStyle === "trailing"
-          ? ""
-          : bracketed;
+  const altLabel = alternateLabel(
+    alternates.length,
+    parsed.alternateStyle,
+    alternateTexts,
+    bracketed,
+  );
   const trailingLabel = parsed.alternateStyle === "trailing" ? bracketed : "";
   // What a container holds is the page's figure and not the factor's, so it
   // goes back between the count and the container, exactly as published.
@@ -1355,7 +1548,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
   const counted = parsed.capacity
     ? agreeCountedContainer(parsed.item, shown, language)
     : agreeWithAmount(parsed.item, shown, language);
-  const itemLabel = named ? joinItem(parsed.item, language) : counted ? ` ${counted}` : "";
+  const itemLabel = itemLabelFor(named, parsed.item, counted, language);
 
   const result: ScaledIngredient = {
     text: `${parsed.decoration ? `${parsed.decoration} ` : ""}${parsed.approximation ?? ""}${amountText}${unitLabel}${capacityLabel}${altLabel}${itemLabel}${trailingLabel}`.trim(),
@@ -1367,116 +1560,22 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     language,
   };
 
-  /**
-   * The exact product, written for a note.
-   *
-   * Decimals rather than kitchen fractions: this number exists to be compared
-   * against the one on the line, and a fraction snapped from 0.32 to "1/3"
-   * reads as the exact product while being a different number.
-   */
-  const asPublished = (value: number, source: UnitInfo | null) =>
-    `${formatAmount(value, language, { fractions: false })}${
-      source ? ` ${formatUnit(source, value, language)}` : ""
-    }`;
-
-  const sentences: string[] = [];
-
-  if (clamped) {
-    sentences.push(
-      `Clamped up to ${formatAmount(clamped.amount, language)} from ` +
-        `${formatAmount(Math.round(clamped.raw * 1000) / 1000, language)}, the smallest amount ` +
-        "worth measuring. This line no longer holds its share of the recipe.",
-    );
-  } else if (movedPrimary) {
-    // Every bound that moved is named, with the direction it moved in. On a
-    // range the two ends can move opposite ways, and reporting one of them as
-    // though it spoke for both states the wrong direction for half the
-    // quantity.
-    const moved = primaryBounds.filter((bound) => !boundLandedExactly(bound));
-    sentences.push(
-      moved
-        .map(
-          (bound) =>
-            `Rounded ${bound.amount > bound.exact ? "up" : "down"} from ` +
-            `${asPublished(bound.raw, parsed.unit)}.`,
-        )
-        .join(" "),
-    );
-  } else if (movedAlternate) {
-    // The amount itself came out exact, and only the equivalent beside it had
-    // to move. Saying "rounded from 300 g" when 300 g is exact would send a
-    // cook looking for an error that is not there.
-    sentences.push(
-      `The amount is exact; the equivalent ${
-        restated ? "beside it" : "in brackets"
-      } was rounded to stay readable.`,
-    );
-  } else if (restated) {
-    sentences.push(
-      "This line states one quantity twice, and both readings were scaled. " +
-        "They agree as closely as the page wrote them, and no closer.",
-    );
+  const note = noteForScaledLine({
+    parsed,
+    bounds: primaryBounds,
+    unit,
+    low,
+    clamped,
+    movedPrimary,
+    movedAlternate,
+    restated,
+    collapsed,
+    language,
+    carriesMore,
+  });
+  if (note !== undefined) {
+    result.note = note;
   }
-
-  // A line can offer a substitute with its own amount, as in "1 Tbsp vanilla
-  // sugar OR 1 tsp vanilla extract". Only the amount the line opens with is
-  // scaled, and a substitute left at its published size contradicts it. This is
-  // said whatever else happened to the line: a line that was also rounded is the
-  // one where a stale second quantity is hardest to spot.
-  if (carriesMore) {
-    sentences.push(
-      "This line carries a further quantity after the first one, and only the first was scaled. " +
-        "Read the rest as published.",
-    );
-  }
-
-  if (parsed.capacity) {
-    sentences.push(
-      `${parsed.capacity} is what one container holds, so it stays as published and the count is ` +
-        "what the factor moved. Scaling this line is a matter of opening that many containers of " +
-        "the size named.",
-    );
-  }
-
-  if (collapsed) {
-    sentences.push("The page gave a range, and at this size both ends come to the same amount.");
-  }
-
-  // Below what any scale shows, the arithmetic is right and the kitchen cannot
-  // follow it. Saying so is the difference between an answer and a number.
-  if (unit?.kind === "measured" && low.amount > 0 && low.amount < 0.05) {
-    sentences.push(
-      "This is smaller than a kitchen scale resolves. Make a larger batch, or measure it by eye.",
-    );
-  }
-
-  // The page put the amount forward as loose, and multiplying it keeps it that
-  // way: the answer is as approximate as the figure it came from.
-  if (parsed.approximation) {
-    sentences.push(
-      "The page gave this amount as an approximation, and the scaled figure is no firmer.",
-    );
-  }
-
-  if (sentences.length > 0) {
-    result.note = sentences.join(" ");
-  }
-
-  if (parsed.unit && parsed.unit.kind === "approximate") {
-    result.note = withApproximateNote(parsed.unit, result.note);
-  }
-
-  // A line that wrote its amount as a word says which word it was, so a caller
-  // can see the figure came from the grammar rather than from a digit.
-  if (parsed.articleWord) {
-    // `amount` carries the product once a word such as "dozen" has multiplied
-    // it, and quoting that back would credit the article with a figure it never
-    // gave.
-    const stood = (parsed.amount ?? 0) / (parsed.countMultiplier ?? 1);
-    const read = `"${parsed.articleWord}" read as ${formatAmount(stood, language)}.`;
-    result.note = result.note ? `${read} ${result.note}` : read;
-  }
-
   return result;
 }
 

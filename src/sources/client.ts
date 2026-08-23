@@ -196,6 +196,37 @@ function heldBack(wording: Wording, because: string): WordingAttempt {
 }
 
 /**
+ * Keep the rows a wording brought back that no earlier wording already did, and
+ * count how many of them name the dish that was asked for.
+ *
+ * The identifier names its source, so two sources minting the same reference
+ * stay two rows while one recipe reached twice stays one.
+ */
+function keepNewRows<T extends { id: string; title: string }>(
+  read: { rows: readonly T[] },
+  seen: Set<string>,
+  rows: T[],
+  question: string,
+): { added: number; onTopic: number } {
+  let added = 0;
+  let onTopic = 0;
+
+  for (const row of read.rows) {
+    if (seen.has(row.id)) {
+      continue;
+    }
+    seen.add(row.id);
+    rows.push(row);
+    added += 1;
+    if (namesDish(row.title, question)) {
+      onTopic += 1;
+    }
+  }
+
+  return { added, onTopic };
+}
+
+/**
  * Interleave rows so no source opens the list twice before another has opened
  * it once.
  *
@@ -400,20 +431,9 @@ export class RecipesClient {
           );
         }
 
-        let added = 0;
-        for (const row of read.rows) {
-          // The identifier names its source, so two sources minting the same
-          // reference stay two rows while one recipe reached twice stays one.
-          if (seen.has(row.id)) {
-            continue;
-          }
-          seen.add(row.id);
-          rows.push(row);
-          added += 1;
-          if (namesDish(row.title, question)) {
-            onTopic += 1;
-          }
-        }
+        const kept = keepNewRows(read, seen, rows, question);
+        const added = kept.added;
+        onTopic += kept.onTopic;
 
         wordings.push({
           query: wording.query,
