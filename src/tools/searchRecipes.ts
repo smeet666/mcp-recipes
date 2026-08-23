@@ -29,6 +29,35 @@ import {
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
 
+/**
+ * The order the rows are in, and what no order could be.
+ *
+ * No score orders the sources against each other, so the only order this server
+ * can describe is the one it imposed.
+ */
+function howTheRowsAreOrdered(contributed: ReadonlyArray<{ name: string }>): string {
+  if (contributed.length > 1) {
+    return "One row from each source in turn, in the order each source returned them. No score orders them against each other.";
+  }
+  if (contributed.length === 1) {
+    return `Every row came from ${contributed[0]?.name}, in the order it returned them.`;
+  }
+  return "No source contributed a row.";
+}
+
+/**
+ * What an empty answer amounts to.
+ *
+ * No source answering and every source holding nothing are different statements
+ * about the world, and a caller cannot tell them apart from an empty list.
+ */
+function nothingCameBack(answeredCount: number, query: string, alsoSent: string): string {
+  if (answeredCount === 0) {
+    return `No source answered for "${query}", so nothing here says whether such a recipe exists.`;
+  }
+  return `Nothing came back for "${query}".${alsoSent}`;
+}
+
 export const searchRecipesDescription = [
   "Search every recipe source this server reads, at the same time, for a dish or an ingredient, and get one merged list.",
   "Each row carries the id get_recipe takes, and that id names the source it came from, so nothing has to be guessed afterwards.",
@@ -106,12 +135,7 @@ export async function runSearchRecipes(
     // How the order was built depends on how many sources are in it. Describing
     // a merge that did not happen tells a caller the list means something it
     // does not.
-    const order =
-      contributed.length > 1
-        ? "One row from each source in turn, in the order each source returned them. No score orders them against each other."
-        : contributed.length === 1
-          ? `Every row came from ${contributed[0]?.name}, in the order it returned them.`
-          : "No source contributed a row.";
+    const order = howTheRowsAreOrdered(contributed);
 
     // What a question asks the dish to avoid is the part of it no source can
     // answer, and the part a reader is most harmed by getting wrong. A recipe
@@ -251,9 +275,7 @@ export async function runSearchRecipes(
     const body =
       results.length > 0
         ? `${results.length} recipes for "${args.query}":\n${renderRows(results)}${alsoSent}`
-        : answered.length === 0
-          ? `No source answered for "${args.query}", so nothing here says whether such a recipe exists.`
-          : `Nothing came back for "${args.query}".${alsoSent}`;
+        : nothingCameBack(answered.length, args.query, alsoSent);
 
     return ok(
       {

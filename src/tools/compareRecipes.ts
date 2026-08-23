@@ -35,6 +35,19 @@ import type { Note } from "./shared.js";
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
 
+/**
+ * Why nothing was compared.
+ *
+ * A version that was offered and could not be read is a different statement
+ * from no source offering one at all: the first says the dish is out there.
+ */
+function nothingWasCompared(someWereUnread: boolean, dish: string): string {
+  if (someWereUnread) {
+    return `Every version of "${quoteForeign(dish)}" that was offered could not be read, so nothing was compared.`;
+  }
+  return `No source offered a recipe for "${quoteForeign(dish)}".`;
+}
+
 export const compareRecipesDescription = [
   "Take a dish and show how each source writes it, side by side.",
   "Each source's closest match is read in full, and all of them can be rescaled to the same number of servings so the ingredient lists stand comparison.",
@@ -413,9 +426,7 @@ export async function runCompareRecipes(
 
     const body =
       payloads.length === 0
-        ? unread.size > 0
-          ? `Every version of "${quoteForeign(args.dish)}" that was offered could not be read, so nothing was compared.`
-          : `No source offered a recipe for "${quoteForeign(args.dish)}".`
+        ? nothingWasCompared(unread.size > 0, args.dish)
         : versionBlocks.join("\n\n");
 
     // What differs comes first. It is the answer to the question that was

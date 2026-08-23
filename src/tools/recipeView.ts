@@ -23,6 +23,27 @@ import {
 } from "./shared.js";
 import type { Note } from "./shared.js";
 
+/**
+ * What the other half of the recipe holds, when this half is being read alone.
+ *
+ * A page whose ingredients were read and whose method was not is a page that
+ * has one, and saying so is what stops a caller concluding the recipe is a list
+ * with no procedure.
+ */
+function whatTheOtherPartHolds(
+  part: PagePart,
+  recipe: { steps: readonly unknown[]; ingredients: readonly unknown[] },
+): string | null {
+  if (part === "ingredients") {
+    return recipe.steps.length > 0
+      ? `${recipe.steps.length} step(s) of method were read from it`
+      : null;
+  }
+  return recipe.ingredients.length > 0
+    ? `${recipe.ingredients.length} ingredient line(s) were read from it`
+    : null;
+}
+
 export const yieldSchema = z.object({
   original_count: z
     .number()
@@ -231,14 +252,7 @@ const METHOD_PART: PartWords = {
  */
 function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
   const heading = headingFor(words.part, recipe.publishedSections);
-  const counterpart =
-    words.part === "ingredients"
-      ? recipe.steps.length > 0
-        ? `${recipe.steps.length} step(s) of method were read from it`
-        : null
-      : recipe.ingredients.length > 0
-        ? `${recipe.ingredients.length} ingredient line(s) were read from it`
-        : null;
+  const counterpart = whatTheOtherPartHolds(words.part, recipe);
 
   const shown = [
     heading === null ? null : `the page heads a section "${quoteForeign(heading)}"`,

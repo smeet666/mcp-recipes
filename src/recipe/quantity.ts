@@ -20,6 +20,41 @@ import {
   unitKeys,
 } from "./units.js";
 
+/**
+ * The measure the line leads with: the one standing straight after the amount,
+ * or the one a size word stands in front of.
+ */
+function leadingMeasure<T extends { unit: unknown }>(direct: T, behind: T | null): T {
+  if (direct.unit) {
+    return direct;
+  }
+  return behind?.unit ? behind : direct;
+}
+
+/**
+ * How a line writes the equivalents beside its measure, when it writes any.
+ *
+ * Three shapes and three renderings: a slash beside the amount, a trailing
+ * restatement, or a bracketed group. The reading is kept rather than the
+ * rendering being guessed back from the measures later.
+ */
+function alternateStyleOf(
+  count: number,
+  slashed: boolean,
+  trailing: boolean,
+): "slash" | "trailing" | "bracket" | null {
+  if (count === 0) {
+    return null;
+  }
+  if (slashed) {
+    return "slash";
+  }
+  if (trailing) {
+    return "trailing";
+  }
+  return "bracket";
+}
+
 export interface ParsedQuantity {
   amount: number;
   /** Characters consumed from the start of the line. */
@@ -219,16 +254,14 @@ function takeCompoundMember(
   }
 
   const joiner = ADDS_UP.exec(text);
-  if (joiner) {
-    text = text.slice(joiner[0].length);
-  }
+  const behindTheJoiner = joiner ? text.slice(joiner[0].length) : text;
 
-  const second = parseLeadingQuantity(text, language);
+  const second = parseLeadingQuantity(behindTheJoiner, language);
   if (!second || second.amount <= 0 || second.amount >= step.per) {
     return null;
   }
 
-  const after = text.slice(second.length);
+  const after = behindTheJoiner.slice(second.length);
   const measure = takeUnit(after.trimStart(), language);
   if (measure.unit) {
     if (measure.unit.canonical !== step.unit.canonical) {
@@ -875,7 +908,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   const behind = described.adjective
     ? takeLeadingUnit(described.rest, language, fromArticle)
     : null;
-  const leading = direct.unit ? direct : behind?.unit ? behind : direct;
+  const leading = leadingMeasure(direct, behind);
   rest = leading.rest;
 
   // A range gives two amounts, and a second member behind it would belong to
@@ -955,8 +988,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     rangeSeparator: range?.separator ?? null,
     unit: leading.unit,
     alternates,
-    alternateStyle:
-      alternates.length === 0 ? null : slashed ? "slash" : trailing ? "trailing" : "bracket",
+    alternateStyle: alternateStyleOf(alternates.length, slashed !== null, trailing !== null),
     alternateIntro: capacity === null ? (group?.intro ?? null) : null,
     capacity,
     item,

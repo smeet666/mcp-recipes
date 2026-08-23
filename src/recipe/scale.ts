@@ -730,7 +730,12 @@ function matchCase(source: string, replacement: string): string {
   if (hasLetter && source === source.toUpperCase()) {
     return replacement.toUpperCase();
   }
-  if (source[0] === source[0]?.toUpperCase() && source.slice(1) === source.slice(1).toLowerCase()) {
+  const first = source.slice(0, 1);
+  if (
+    first !== "" &&
+    first === first.toUpperCase() &&
+    source.slice(1) === source.slice(1).toLowerCase()
+  ) {
     return (replacement[0] ?? "").toUpperCase() + replacement.slice(1);
   }
   return replacement;
