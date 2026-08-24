@@ -235,7 +235,12 @@ export function noteTexts(notes: readonly Note[]): string[] {
 
 /** Name the recipe a note is about, keeping what the note is worth. */
 export function labelNote(label: string, note: Note): Note {
-  return typeof note === "string" ? `${label}: ${note}` : mustKeep(`${label}: ${note.text}`);
+  if (typeof note === "string") {
+    const plain: string = note;
+    return `${label}: ${plain}`;
+  }
+  const said: string = note.text;
+  return mustKeep(`${label}: ${said}`);
 }
 
 /**

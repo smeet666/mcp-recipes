@@ -7,7 +7,7 @@
  */
 
 import { invalidInput } from "../errors.js";
-import type { RecipeDetail } from "../types.js";
+import type { RecipeDetail, RecipeRow } from "../types.js";
 import type { Claim, ReadRecipe, ReadRows, SourceAdapter } from "./adapter.js";
 import {
   count,
@@ -53,11 +53,11 @@ export interface CookbookRecipe {
 
 /** The part of the Cookbook's client this server uses. */
 export interface CookbookReader {
-  search(
+  search: (
     query: string,
     limit: number,
-  ): Promise<{ data: { results: CookbookSummary[] }; cached: boolean }>;
-  getRecipe(reference: string): Promise<{ data: CookbookRecipe; cached: boolean }>;
+  ) => Promise<{ data: { results: CookbookSummary[] }; cached: boolean }>;
+  getRecipe: (reference: string) => Promise<{ data: CookbookRecipe; cached: boolean }>;
 }
 
 export const COOKBOOK_PROFILE = {
@@ -94,12 +94,13 @@ export function cookbookAdapter(reader: CookbookReader): SourceAdapter {
         let key: string;
         try {
           key = decodeURIComponent(raw.replace(SITE_URL, "")).replace(/_/g, " ");
-        } catch {
+        } catch (cause) {
           // A percent sign that opens no escape is common in a wiki title, and
           // it is the caller's string rather than a site that failed.
           throw invalidInput(
             `"${raw}" carries a percent sign that is not a valid escape, so the page name cannot be read.`,
             "Pass the id search_recipes returned instead of the address.",
+            cause,
           );
         }
         return {
@@ -126,7 +127,7 @@ export function cookbookAdapter(reader: CookbookReader): SourceAdapter {
         (outcome.data as { results?: unknown })?.results,
         COOKBOOK_PROFILE,
       );
-      const rows = [];
+      const rows: RecipeRow[] = [];
       let skipped = 0;
 
       for (const summary of list) {

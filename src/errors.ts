@@ -38,6 +38,8 @@ export interface ErrorDetails {
   /** The address that produced the failure, for a bug report. */
   url?: string;
   status?: number;
+  /** What was raised underneath, kept for the bug report the hint asks for. */
+  cause?: unknown;
 }
 
 export class RecipesError extends Error {
@@ -45,7 +47,7 @@ export class RecipesError extends Error {
   readonly details: ErrorDetails;
 
   constructor(code: ErrorCode, message: string, details: ErrorDetails = {}) {
-    super(message);
+    super(message, details.cause === undefined ? undefined : { cause: details.cause });
     this.name = "RecipesError";
     this.code = code;
     this.details = details;
@@ -55,8 +57,8 @@ export class RecipesError extends Error {
 export const notFound = (message: string, details?: ErrorDetails) =>
   new RecipesError("not_found", message, details ?? {});
 
-export const invalidInput = (message: string, hint?: string) =>
-  new RecipesError("invalid_input", message, hint ? { hint } : {});
+export const invalidInput = (message: string, hint?: string, cause?: unknown) =>
+  new RecipesError("invalid_input", message, { ...(hint ? { hint } : {}), cause });
 
 export const rateLimited = (message: string, details?: ErrorDetails) =>
   new RecipesError("rate_limited", message, {

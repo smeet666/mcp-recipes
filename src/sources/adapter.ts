@@ -53,9 +53,9 @@ export interface SourceAdapter extends SourceProfile {
    * no source claims is refused, instead of being sent somewhere that would
    * answer it with a confident absence.
    */
-  claims(raw: string): Claim | null;
-  search(query: string, limit: number): Promise<ReadRows>;
-  getRecipe(reference: string): Promise<ReadRecipe>;
+  claims: (raw: string) => Claim | null;
+  search: (query: string, limit: number) => Promise<ReadRows>;
+  getRecipe: (reference: string) => Promise<ReadRecipe>;
 }
 
 /* -------------------------------------------------------------------------- */

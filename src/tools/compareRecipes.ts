@@ -13,7 +13,7 @@
 import { z } from "zod";
 import type { RecipesClient } from "../sources/client.js";
 import { dishWordsMissing } from "../sources/wordings.js";
-import type { RecipeDetail, SourceId, SourceReport } from "../types.js";
+import type { RecipeDetail, SourceId } from "../types.js";
 import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
 import type { RecipePayload, Section } from "./recipeView.js";
 import type { RecipeView } from "./recipeView.js";
@@ -129,9 +129,9 @@ function weighTitlesAgainstTheDish(
   }));
   const carriesDish = weighed.some((one) => one.missing.length === 0);
 
-  weighed.forEach(({ payload, missing }) => {
+  for (const { payload, missing } of weighed) {
     if (missing.length === 0) {
-      return;
+      continue;
     }
     notes.push(
       mustKeep(
@@ -140,7 +140,7 @@ function weighTitlesAgainstTheDish(
           "Read it as a candidate to check rather than as that dish.",
       ),
     );
-  });
+  }
 
   if (payloads.length > 0 && !carriesDish) {
     notes.push(
@@ -428,10 +428,10 @@ export async function runCompareRecipes(
         // for that many people.
         `  ${renderYield(payload)}`,
       ];
-      const offered = payload.ingredients
+      const listed = payload.ingredients
         .slice(0, TEXT_INGREDIENT_LINES)
         .map((entry) => `  - ${quoteForeign(entry.text)}`);
-      const fitted = fitLines(offered, share - head.join("\n").length);
+      const fitted = fitLines(listed, share - head.join("\n").length);
 
       const lines = [...head, ...fitted.lines];
       const hidden = payload.ingredients.length - fitted.lines.length;
@@ -483,4 +483,4 @@ export async function runCompareRecipes(
   }
 }
 
-export type { SourceReport };
+export type { SourceReport } from "../types.js";
