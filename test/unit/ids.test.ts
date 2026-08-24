@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 import { RecipesError } from "../../src/errors.js";
-import { namespacedId, resolveId } from "../../src/sources/ids.js";
+import { namespacedId } from "../../src/sources/adapter.js";
+import { resolveId } from "../../src/sources/ids.js";
 import { fakeSources } from "./support.js";
 
 const sources = fakeSources();

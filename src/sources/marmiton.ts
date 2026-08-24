@@ -5,7 +5,7 @@
  * whose search serves a single page it disallows paging past.
  */
 
-import type { RecipeDetail } from "../types.js";
+import type { RecipeDetail, RecipeRow } from "../types.js";
 import type { Claim, ReadRecipe, ReadRows, SourceAdapter } from "./adapter.js";
 import {
   count,
@@ -47,8 +47,11 @@ export interface MarmitonRecipe {
 
 /** The part of Marmiton's client this server uses. */
 export interface MarmitonReader {
-  search(query: string): Promise<{ data: MarmitonSummary[]; cached: boolean }>;
-  getRecipe(ref: { id?: string; url?: string }): Promise<{ data: MarmitonRecipe; cached: boolean }>;
+  search: (query: string) => Promise<{ data: MarmitonSummary[]; cached: boolean }>;
+  getRecipe: (ref: {
+    id?: string;
+    url?: string;
+  }) => Promise<{ data: MarmitonRecipe; cached: boolean }>;
 }
 
 export const MARMITON_PROFILE = {
@@ -112,7 +115,7 @@ export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
     async search(query: string): Promise<ReadRows> {
       const outcome = await readSearch(reader, query);
       const list = rowsOf<Partial<MarmitonSummary>>(outcome.data, MARMITON_PROFILE);
-      const rows = [];
+      const rows: RecipeRow[] = [];
       let skipped = 0;
 
       for (const summary of list) {

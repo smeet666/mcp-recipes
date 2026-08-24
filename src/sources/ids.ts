@@ -11,8 +11,6 @@ import { invalidInput } from "../errors.js";
 import type { SourceId } from "../types.js";
 import type { SourceAdapter } from "./adapter.js";
 
-export { namespacedId } from "./adapter.js";
-
 const SEPARATOR = ":";
 
 export interface ResolvedId {
