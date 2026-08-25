@@ -124,7 +124,7 @@ line says what it was rounded from and in which direction.
 
 ## Install
 
-Node 20 or later.
+Node 24 or later.
 
 ```bash
 npx -y mcp-recipes
@@ -575,7 +575,7 @@ arrondie dit depuis quelle valeur et dans quel sens.
 
 ## Installation
 
-Node 20 ou plus récent.
+Node 24 ou plus récent.
 
 ```bash
 npx -y mcp-recipes
