@@ -134,7 +134,7 @@ export function cookbookAdapter(reader: CookbookReader): SourceAdapter {
         const key = text(summary?.key);
         const title = text(summary?.title) ?? key;
         const url = text(summary?.sourceUrl);
-        if (!key || !title || !url) {
+        if (!(key && title && url)) {
           skipped += 1;
           continue;
         }

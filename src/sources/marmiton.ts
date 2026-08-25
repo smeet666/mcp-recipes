@@ -125,7 +125,7 @@ export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
         const id = text(summary?.id);
         const title = text(summary?.title);
         const url = text(summary?.url);
-        if (!id || !title || !url) {
+        if (!(id && title && url)) {
           skipped += 1;
           continue;
         }
