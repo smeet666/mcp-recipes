@@ -15,6 +15,10 @@ import { parseFailure } from "../errors.js";
 import type { Language } from "../recipe/language.js";
 import type { RecipeDetail, RecipeRow, SourceId, SourceProfile } from "../types.js";
 
+const NUMBER_AND_REST = /^\s*(\d+(?:[.,]\d+)?)\s*(.*)$/;
+const RANGE_AND_REST =
+  /^\s*(\d+(?:[.,]\d+)?)\s*(?:à|a|to|-|–|—|ou|or)\s*(\d+(?:[.,]\d+)?)\s*(.*)$/i;
+
 /** Rows that could be read, and how many could not. */
 export interface ReadRows {
   rows: RecipeRow[];
@@ -148,9 +152,7 @@ export function readYieldSpan(published: string | null): {
     return { count: null, max: null, unit: null };
   }
 
-  const span = /^\s*(\d+(?:[.,]\d+)?)\s*(?:à|a|to|-|–|—|ou|or)\s*(\d+(?:[.,]\d+)?)\s*(.*)$/i.exec(
-    published,
-  );
+  const span = RANGE_AND_REST.exec(published);
   if (span) {
     const [lowText = "", highText = ""] = span.slice(1);
     const low = Number(lowText.replace(",", "."));
@@ -160,7 +162,7 @@ export function readYieldSpan(published: string | null): {
     }
   }
 
-  const single = /^\s*(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(published);
+  const single = NUMBER_AND_REST.exec(published);
   if (single) {
     const [figure = ""] = single.slice(1);
     const value = Number(figure.replace(",", "."));

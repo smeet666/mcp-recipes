@@ -10,6 +10,18 @@
 
 import type { Language } from "./language.js";
 
+const AL_ENDING = /al$/i;
+const AUX_ENDING = /aux$/i;
+const EAUX_ENDING = /eaux$/i;
+const EAU_ENDING = /eau$/i;
+const FUL_MEASURE = /^[a-z]{3,}fuls?$/;
+const HEAD_BEFORE_DE = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u;
+const HOUSEHOLD_MEASURE =
+  /^(cup|tablespoon|Tbsp|teaspoon|tsp|cuillère à soupe|cuillère à café|tasse)$/;
+const SIBILANT_LETTER = /[sxz]$/i;
+const TRAILING_S_ANY_CASE = /s$/i;
+const VOWEL_THEN_S = /[aiou]s$/i;
+
 export type UnitKind =
   /** Mass or volume: scales continuously and cleanly. */
   | "measured"
@@ -477,7 +489,7 @@ const NOT_A_MEASURE = new Set([
  * number where the recipe wrote none.
  */
 export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
-  const match = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u.exec(text);
+  const match = HEAD_BEFORE_DE.exec(text);
   if (!match) {
     return null;
   }
@@ -522,7 +534,7 @@ export function readContainerLoad(word: string): UnitInfo | null {
   const key = normalizeUnitKey(word);
   // At least three letters name the container, which keeps "awful" out of the
   // kitchen.
-  if (!/^[a-z]{3,}fuls?$/.test(key)) {
+  if (!FUL_MEASURE.test(key)) {
     return null;
   }
 
@@ -539,16 +551,16 @@ export function readContainerLoad(word: string): UnitInfo | null {
  * alone.
  */
 function frenchSingular(word: string): string {
-  if (/eaux$/i.test(word)) {
+  if (EAUX_ENDING.test(word)) {
     return word.slice(0, -1);
   }
-  if (/aux$/i.test(word)) {
+  if (AUX_ENDING.test(word)) {
     return `${word.slice(0, -3)}al`;
   }
-  if (/[aiou]s$/i.test(word)) {
+  if (VOWEL_THEN_S.test(word)) {
     return word;
   }
-  if (/s$/i.test(word) && word.length > 3) {
+  if (TRAILING_S_ANY_CASE.test(word) && word.length > 3) {
     return word.slice(0, -1);
   }
   return word;
@@ -556,13 +568,13 @@ function frenchSingular(word: string): string {
 
 /** The plural French writes for a noun, or the noun itself when it takes no mark. */
 function frenchPlural(word: string): string {
-  if (/[sxz]$/i.test(word)) {
+  if (SIBILANT_LETTER.test(word)) {
     return word;
   }
-  if (/eau$/i.test(word)) {
+  if (EAU_ENDING.test(word)) {
     return `${word}x`;
   }
-  if (/al$/i.test(word)) {
+  if (AL_ENDING.test(word)) {
     return `${word.slice(0, -2)}aux`;
   }
   return `${word}s`;
@@ -673,9 +685,7 @@ export function demoteUnit(unit: UnitInfo): { unit: UnitInfo; per: number } | nu
  * is what lets a share of one be restated in a smaller spoon.
  */
 export function isSpoonMeasure(unit: UnitInfo): boolean {
-  return /^(cup|tablespoon|Tbsp|teaspoon|tsp|cuillère à soupe|cuillère à café|tasse)$/.test(
-    unit.canonical,
-  );
+  return HOUSEHOLD_MEASURE.test(unit.canonical);
 }
 
 /** How finely a kitchen can divide one of a counted thing. */

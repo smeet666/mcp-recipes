@@ -19,6 +19,8 @@ import {
   textList,
 } from "./adapter.js";
 
+const ABSOLUTE_URL = /^https?:\/\//i;
+
 /** A search row, as Marmiton's own reader publishes one. */
 export interface MarmitonSummary {
   id: string;
@@ -157,7 +159,7 @@ export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
 
     async getRecipe(reference: string): Promise<ReadRecipe> {
       // The reader takes an identifier or an address and tells them apart.
-      const ref = /^https?:\/\//i.test(reference) ? { url: reference } : { id: reference };
+      const ref = ABSOLUTE_URL.test(reference) ? { url: reference } : { id: reference };
       const outcome = await reader.getRecipe(ref);
       return { recipe: marmitonDetail(outcome.data), cached: outcome.cached };
     },

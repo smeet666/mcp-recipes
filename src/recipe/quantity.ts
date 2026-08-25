@@ -20,6 +20,38 @@ import {
   unitKeys,
 } from "./units.js";
 
+const BRACKETED_TAIL = /\s*(\([^()]*\))\s*$/;
+const LEADING_ARTICLE = /^(?:of\s+)?an?\s+/i;
+const LEADING_ARTICLE_FRENCH = /^(?:une|un)\s+/i;
+const LEADING_INDEFINITE_WITH_SPACE = /^an?\s+/i;
+const LEADING_PARTITIVE = /^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i;
+const OF_OPENING = /^of\s+/i;
+const OPENING_ARTICLE_FRENCH = /^\s*(un|une)\b\s*/i;
+const REPEATED_COMMA_GROUPS = /^\s*\d+,\d+,\d/;
+const SLASH_OUTSIDE_A_FRACTION = /(?<!\d)\/|\/(?!\d)/;
+
+const ATTACHED_DE = /\s+de\s+(?=\d)/i;
+const DECIMAL = /^(\d+(?:[.,]\d+)?)/;
+const DIGIT = /\d/;
+const ENGLISH_RANGE_JOINER = /^\s+(to|or)\s+/i;
+const FRACTION_WORD =
+  /^(?:(a|an|one|two|three)[\s-]+)?(halves|half|thirds|third|quarters|quarter|fourths|fourth)\b/i;
+const FRENCH_RANGE_JOINER = /^\s+(à|a|ou)\s+/i;
+const GROUPED_DECIMAL = /^(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/;
+const HYPHENATED_TAIL = /^-\p{L}/u;
+const LEADING_DASH = /^\s*(–|—|-)\s*/;
+const LEADING_INDEFINITE = /^an?\s/i;
+const LEADING_OF = /^\s*of\s+/i;
+const LEADING_QUANTITY = /^[\s\d.,/½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞\-–—]+/u;
+const LEADING_WORD = /^\s*(\p{L}+)\s+/u;
+const MIXED_FRACTION = /^(\d+)\s+(\d+)\s*\/\s*(\d+)/;
+const PARTITIVE_BEFORE_BRACKET = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i;
+const PARTITIVE_OPENING = /^(?:de\s|d'|du\s|des\s|,)/i;
+const SIMPLE_FRACTION = /^(\d+)\s*\/\s*(\d+)/;
+const TRAILING_S = /s$/;
+const VAGUE_ARTICLE = /^(?:un|une|quelques|of\s+an?|an?)\s+/iu;
+const WHITESPACE = /\s+/;
+
 /**
  * The measure the line leads with: the one standing straight after the amount,
  * or the one a size word stands in front of.
@@ -191,13 +223,13 @@ const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
  * that line counts grams, and its bracket restates the same quantity.
  */
 function statesItemSize(item: string): boolean {
-  const attached = /\s+de\s+(?=\d)/i.exec(item);
+  const attached = ATTACHED_DE.exec(item);
   if (!attached) {
     return false;
   }
 
   const named = item.slice(0, attached.index).trim();
-  if (!named || /\d/.test(named)) {
+  if (!named || DIGIT.test(named)) {
     return false;
   }
 
@@ -280,7 +312,7 @@ function takeCompoundMember(
     return null;
   }
   const trailing = after.trimStart();
-  if (trailing !== "" && !/^(?:de\s|d'|du\s|des\s|,)/i.test(trailing)) {
+  if (trailing !== "" && !PARTITIVE_OPENING.test(trailing)) {
     return null;
   }
 
@@ -389,7 +421,7 @@ function takeMeasureAdjective(
   text: string,
   language: Language,
 ): { adjective: string | null; rest: string } {
-  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  const match = LEADING_WORD.exec(text);
   if (!match) {
     return { adjective: null, rest: text };
   }
@@ -400,7 +432,7 @@ function takeMeasureAdjective(
   // cuillères", and the list carries the singular.
   const listed =
     MEASURE_ADJECTIVES[language].has(folded) ||
-    MEASURE_ADJECTIVES[language].has(folded.replace(/s$/, ""));
+    MEASURE_ADJECTIVES[language].has(folded.replace(TRAILING_S, ""));
   if (!listed) {
     return { adjective: null, rest: text };
   }
@@ -447,7 +479,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
     return { amount: whole + fraction, length: offset + mixedGlyph[0].length };
   }
 
-  const mixed = /^(\d+)\s+(\d+)\s*\/\s*(\d+)/.exec(trimmed);
+  const mixed = MIXED_FRACTION.exec(trimmed);
   if (mixed) {
     const denominator = Number(mixed[3]);
     if (denominator !== 0) {
@@ -458,7 +490,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
     }
   }
 
-  const fraction = /^(\d+)\s*\/\s*(\d+)/.exec(trimmed);
+  const fraction = SIMPLE_FRACTION.exec(trimmed);
   if (fraction) {
     const denominator = Number(fraction[2]);
     // A denominator of zero is not a quantity. Reading the numerator alone
@@ -478,9 +510,7 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
   // "1,500 g" is fifteen hundred grams. Reading the digits up to the comma and
   // stopping there answers 1 for a line that said 1500, and leaves ",500 g"
   // behind in the item name.
-  const decimal = (
-    language === "fr" ? /^(\d+(?:[.,]\d+)?)/ : /^(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/
-  ).exec(trimmed);
+  const decimal = (language === "fr" ? DECIMAL : GROUPED_DECIMAL).exec(trimmed);
   if (decimal) {
     const [written = ""] = decimal.slice(1);
     const amount = Number(
@@ -531,10 +561,7 @@ const WRITTEN_DENOMINATORS: Record<string, number> = {
  * to another line.
  */
 function parseWrittenFraction(text: string): ParsedQuantity | null {
-  const match =
-    /^(?:(a|an|one|two|three)[\s-]+)?(halves|half|thirds|third|quarters|quarter|fourths|fourth)\b/i.exec(
-      text,
-    );
+  const match = FRACTION_WORD.exec(text);
   if (!match) {
     return null;
   }
@@ -545,11 +572,8 @@ function parseWrittenFraction(text: string): ParsedQuantity | null {
     return null;
   }
 
-  const rest = text
-    .slice(match[0].length)
-    .replace(/^\s*of\s+/i, "")
-    .trimStart();
-  if (!(/^an?\s/i.test(rest) || takeUnit(rest, "en").unit)) {
+  const rest = text.slice(match[0].length).replace(LEADING_OF, "").trimStart();
+  if (!(LEADING_INDEFINITE.test(rest) || takeUnit(rest, "en").unit)) {
     return null;
   }
 
@@ -584,8 +608,8 @@ export function parseLeadingRange(text: string, language: Language): ParsedRange
   const after = text.slice(low.length);
   // A written separator needs whitespace around it, so "5 tomatoes" is not read
   // as "5 to" followed by an unreadable second bound.
-  const written = language === "fr" ? /^\s+(à|a|ou)\s+/i : /^\s+(to|or)\s+/i;
-  const separator = written.exec(after) ?? /^\s*(–|—|-)\s*/.exec(after);
+  const written = language === "fr" ? FRENCH_RANGE_JOINER : ENGLISH_RANGE_JOINER;
+  const separator = written.exec(after) ?? LEADING_DASH.exec(after);
   if (!separator) {
     return null;
   }
@@ -746,7 +770,7 @@ export function takeUnit(
   }
 
   if (language === "en") {
-    const words = text.trimStart().split(/\s+/);
+    const words = text.trimStart().split(WHITESPACE);
     const load = words[0] ? readContainerLoad(words[0]) : null;
     if (load) {
       return { unit: load, rest: words.slice(1).join(" ") };
@@ -767,7 +791,7 @@ export function takeUnit(
  * wrote are consumed one at a time until they normalise to the key.
  */
 function afterKey(text: string, key: string): string | null {
-  const words = text.trim().split(/\s+/);
+  const words = text.trim().split(WHITESPACE);
   for (let count = 1; count <= words.length; count += 1) {
     if (normalizeUnitKey(words.slice(0, count).join(" ")) !== key) {
       continue;
@@ -807,8 +831,8 @@ function readEvidence(line: string): LanguageEvidence {
   const text = line.trim();
   // Whatever a leading figure, fraction or article occupies, so the probe looks
   // at the position a measure would stand in.
-  const afterFigures = text.replace(/^[\s\d.,/½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞\-–—]+/u, "").trimStart();
-  const afterArticle = afterFigures.replace(/^(?:un|une|quelques|of\s+an?|an?)\s+/iu, "");
+  const afterFigures = text.replace(LEADING_QUANTITY, "").trimStart();
+  const afterArticle = afterFigures.replace(VAGUE_ARTICLE, "");
 
   const frenchUnit = takeUnit(afterArticle, "fr").unit !== null;
   const englishUnit = takeUnit(afterArticle, "en").unit !== null;
@@ -855,7 +879,7 @@ function whatTheFigureIsNot(
   couldBeARank: boolean,
   language: Language,
 ): HeldBack | null | false {
-  if (/^-\p{L}/u.test(behindFigure)) {
+  if (HYPHENATED_TAIL.test(behindFigure)) {
     return "sizeQualifier";
   }
   if (couldBeARank && ORDINAL_SUFFIX.test(behindFigure)) {
@@ -889,7 +913,7 @@ function takeEquivalents(
     | Omit<ReturnType<typeof takeAlternates>, "rest">
     | null;
 } {
-  const introducedBracket = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i.exec(text);
+  const introducedBracket = PARTITIVE_BEFORE_BRACKET.exec(text);
   const bracketed = takeAlternates(
     introducedBracket ? text.slice(introducedBracket[0].length) : text,
     language,
@@ -972,7 +996,7 @@ function whatTheCountIsOf(
   // "two thirds of a cup" names a share of one cup, and the measure stands
   // behind the preposition and the article that introduce it.
   if (language === "en") {
-    rest = rest.replace(/^(?:of\s+)?an?\s+/i, "");
+    rest = rest.replace(LEADING_ARTICLE, "");
   }
 
   // "2 dozen mushrooms" counts mushrooms, twelve to the dozen, so the multiplier
@@ -1144,7 +1168,7 @@ function unreadableComma(text: string, language: Language, evidence: LanguageEvi
   if (language === "en") {
     return COMMA_DECIMAL.test(text);
   }
-  return /^\s*\d+,\d+,\d/.test(text);
+  return REPEATED_COMMA_GROUPS.test(text);
 }
 
 interface ParsedArticle extends ParsedQuantity {
@@ -1168,7 +1192,7 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
     takeLeadingUnit(rest, language, true).unit !== null || readCountMultiplier(rest) !== null;
 
   if (language === "fr") {
-    const match = /^\s*(un|une)\b\s*/i.exec(text);
+    const match = OPENING_ARTICLE_FRENCH.exec(text);
     if (!match) {
       return null;
     }
@@ -1183,7 +1207,7 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
     return { amount, length: match[0].length, word };
   }
 
-  const article = /^an?\s+/i.exec(text);
+  const article = LEADING_INDEFINITE_WITH_SPACE.exec(text);
   if (!article) {
     return null;
   }
@@ -1212,7 +1236,7 @@ const COUNT_MULTIPLIERS: Record<string, number> = {
 
 /** The multiplier a line opens with, and what stands after it. */
 function readCountMultiplier(text: string): { times: number; rest: string } | null {
-  const match = /^\s*(\p{L}+)\s+/u.exec(text);
+  const match = LEADING_WORD.exec(text);
   if (!match) {
     return null;
   }
@@ -1271,15 +1295,9 @@ function takeLeadingUnit(
  */
 function stripItemLead(text: string, language: Language): string {
   if (language === "fr") {
-    return text
-      .replace(/^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i, "")
-      .replace(/^(?:une|un)\s+/i, "")
-      .trim();
+    return text.replace(LEADING_PARTITIVE, "").replace(LEADING_ARTICLE_FRENCH, "").trim();
   }
-  return text
-    .replace(/^of\s+/i, "")
-    .replace(/^an?\s+/i, "")
-    .trim();
+  return text.replace(OF_OPENING, "").replace(LEADING_INDEFINITE_WITH_SPACE, "").trim();
 }
 
 /**
@@ -1363,7 +1381,7 @@ function readBracket(bracket: string, language: Language): Omit<BracketedMeasure
   // A slash separates two ways of stating the quantity, and it also writes a
   // fraction. One sitting between two digits belongs to the number, so
   // "(3/4 de tasse)" is one measure rather than a three and a four.
-  const parts = body.split(/(?<!\d)\/|\/(?!\d)/).map((part) => part.trim());
+  const parts = body.split(SLASH_OUTSIDE_A_FRACTION).map((part) => part.trim());
   const measures: Measure[] = [];
 
   for (const part of parts) {
@@ -1407,7 +1425,7 @@ function takeTrailingAlternates(
   item: string,
   language: Language,
 ): (Omit<BracketedMeasures, "rest"> & { item: string }) | null {
-  const closing = /\s*(\([^()]*\))\s*$/.exec(item);
+  const closing = BRACKETED_TAIL.exec(item);
   if (!closing) {
     return null;
   }

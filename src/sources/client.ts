@@ -50,6 +50,8 @@ export type {
   WordingAttempt,
 } from "../types.js";
 
+const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+
 export interface RecipesClientOptions {
   config?: Partial<Config>;
   logger?: Logger;
@@ -314,7 +316,7 @@ export class RecipesClient {
     // shows by default, and those rows would come back as this question's
     // recipes. One character is a word in the scripts that write one that way,
     // so what is asked for is a letter or a digit rather than a length.
-    if (!/[\p{L}\p{N}]/u.test(trimmed)) {
+    if (!LETTER_OR_DIGIT.test(trimmed)) {
       throw invalidInput(
         `"${trimmed}" carries no letter and no digit, so there is no word to search for.`,
         "Name a dish or an ingredient.",
