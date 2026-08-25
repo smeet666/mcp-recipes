@@ -30,6 +30,9 @@
  * for, and there is no phrasing whose absence from such a list is safe.
  */
 
+const DIGITS_ONLY = /^\d+$/;
+const WORD_SEPARATORS = /[^\p{L}\p{N}-]+/u;
+
 /** One wording, and how it was arrived at. */
 export interface Wording {
   query: string;
@@ -507,7 +510,7 @@ function namesTheDish(word: string, key: string): boolean {
   if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) {
     return false;
   }
-  if (/^\d+$/.test(word)) {
+  if (DIGITS_ONLY.test(word)) {
     return false;
   }
   if (word.length < 2) {
@@ -696,7 +699,7 @@ function namesFood(word: string): boolean {
   if (key.length < 2) {
     return false;
   }
-  if (/^\d+$/.test(key)) {
+  if (DIGITS_ONLY.test(key)) {
     return false;
   }
   if (key === "free") {
@@ -860,7 +863,7 @@ function tokenise(value: string): string[] {
   return value
     .toLowerCase()
     .replace(/['’]/gu, " ")
-    .split(/[^\p{L}\p{N}-]+/u)
+    .split(WORD_SEPARATORS)
     .map((word) => word.replace(/^-+|-+$/g, ""))
     .filter((word) => word !== "");
 }

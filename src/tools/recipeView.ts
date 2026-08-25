@@ -23,6 +23,8 @@ import {
 } from "./shared.js";
 import type { Note } from "./shared.js";
 
+const SERVING_WORD = /personne|people|serving|portion|part\b/i;
+
 /**
  * What the other half of the recipe holds, when this half is being read alone.
  *
@@ -195,7 +197,7 @@ function resolveFactor(
   }
 
   const unit = recipe.yieldUnit;
-  if (unit && !/personne|people|serving|portion|part\b/i.test(unit)) {
+  if (unit && !SERVING_WORD.test(unit)) {
     notes.push(
       `This page states its yield in ${quoteForeign(unit)} rather than in servings, so asking for ` +
         `${servings} multiplied the quantities by ${round(factor)} to give ${servings} ${quoteForeign(unit)}.`,

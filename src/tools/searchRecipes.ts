@@ -29,6 +29,8 @@ import {
 import { strictInput } from "./arguments.js";
 import type { ToolResult } from "./shared.js";
 
+const WHITESPACE = /\s+/;
+
 /**
  * The order the rows are in, and what no order could be.
  *
@@ -228,7 +230,7 @@ export async function runSearchRecipes(
     // This is said even where a condition was read by name, because the ones
     // read by name are the ones this server can recognise and a question can
     // carry others.
-    if (args.query.trim().split(/\s+/).length > WORDS_BEFORE_SAYING_SO) {
+    if (args.query.trim().split(WHITESPACE).length > WORDS_BEFORE_SAYING_SO) {
       notes.push(
         mustKeep(
           "This query went to each source as free text and no filter was applied to it. Anything the " +
