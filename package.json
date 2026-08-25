@@ -36,7 +36,10 @@
     "mcp-recipes": "dist/index.js"
   },
   "exports": {
-    ".": "./dist/index.js",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./client": {
       "types": "./dist/sources/client.d.ts",
       "import": "./dist/sources/client.js"
@@ -50,7 +53,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "server.json"
   ],
   "engines": {
     "node": ">=24.0.0"
