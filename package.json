@@ -27,7 +27,10 @@
     "url": "git+https://github.com/smeet666/mcp-recipes.git"
   },
   "license": "MIT",
-  "author": "Damien Bouissou",
+  "author": {
+    "name": "Damien Bouissou",
+    "url": "https://github.com/smeet666"
+  },
   "type": "module",
   "bin": {
     "mcp-recipes": "dist/index.js"
