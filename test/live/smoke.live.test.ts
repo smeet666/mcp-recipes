@@ -10,6 +10,7 @@
  * every push has no business adding load to them.
  */
 
+import process from "node:process";
 import { describe, expect, it } from "vitest";
 import { RecipesClient } from "../../src/sources/client.js";
 

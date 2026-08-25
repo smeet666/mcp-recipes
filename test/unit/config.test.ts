@@ -6,6 +6,7 @@
  * start over a typo is very hard to diagnose from inside a host application.
  */
 
+import process from "node:process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_INTERVAL_MS,
