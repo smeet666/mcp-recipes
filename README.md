@@ -143,6 +143,23 @@ npx -y mcp-recipes
 }
 ```
 
+### With Docker
+
+```json
+{
+  "mcpServers": {
+    "recipes": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:2.0.0"]
+    }
+  }
+}
+```
+
+`-i` keeps stdin open, which is where the protocol travels, and no `-t` is
+passed: a TTY rewrites the stream and breaks it. The container needs outbound
+HTTPS to `www.marmiton.org`, `en.wikibooks.org` and `api.wikimedia.org`, and nothing else: no volume, no port, no environment variable, no credential.
+
 ### From a clone
 
 ```bash
@@ -593,6 +610,24 @@ npx -y mcp-recipes
   }
 }
 ```
+
+### Avec Docker
+
+```json
+{
+  "mcpServers": {
+    "recipes": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:2.0.0"]
+    }
+  }
+}
+```
+
+`-i` garde l'entrée standard ouverte, qui est le canal du protocole, et aucun
+`-t` n'est passé : un terminal réécrit le flux et le casse. Le conteneur a besoin
+d'un accès HTTPS sortant vers `www.marmiton.org`, `en.wikibooks.org` et `api.wikimedia.org`, et de rien d'autre :
+aucun volume, aucun port, aucune variable d'environnement, aucun identifiant.
 
 ---
 
