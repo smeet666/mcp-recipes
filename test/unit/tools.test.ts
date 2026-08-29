@@ -14,6 +14,7 @@ import type { SearchRecipesArgs } from "../../src/tools/searchRecipes.js";
 import {
   FakeSourceError,
   fakeClient,
+  onlyFrom,
   payloadOf,
   textOf,
   yieldlessRecipe,
@@ -33,7 +34,7 @@ describe("search_recipes", () => {
 
     expect(payload.result_count).toBe(payload.results.length);
     expect(new Set(payload.results.map((row) => row.source))).toEqual(
-      new Set(["marmiton", "cookbook"]),
+      new Set(["marmiton", "cookbook", "ptitchef", "goodfood", "supertoinette"]),
     );
     expect(payload.results.every((row) => row.id.startsWith(row.source))).toBe(true);
   });
@@ -69,16 +70,17 @@ describe("search_recipes", () => {
   });
 
   it("distinguishes every source answering nothing from every source failing", async () => {
-    const empty = await runSearchRecipes(
-      fakeClient({ marmiton: { rows: [] }, cookbook: { rows: [] } }),
-      { ...searchArgs },
-    );
+    const empty = await runSearchRecipes(fakeClient(onlyFrom()), { ...searchArgs });
     expect(textOf(empty)).toMatch(/Every source answered and none holds anything/);
 
+    const unreachable = new FakeSourceError("network_error", "unreachable");
     const broken = await runSearchRecipes(
       fakeClient({
-        marmiton: { fail: new FakeSourceError("network_error", "unreachable") },
-        cookbook: { fail: new FakeSourceError("network_error", "unreachable") },
+        marmiton: { fail: unreachable },
+        cookbook: { fail: unreachable },
+        ptitchef: { fail: unreachable },
+        goodfood: { fail: unreachable },
+        supertoinette: { fail: unreachable },
       }),
       { ...searchArgs },
     );
@@ -124,8 +126,11 @@ describe("get_recipe", () => {
   });
 
   it("says how a raw identifier was routed", async () => {
-    const result = await runGetRecipe(fakeClient(), recipeArgs({ id: "1001" }));
-    expect(payloadOf<{ id_read_as: string | null }>(result).id_read_as).toMatch(/bare number/);
+    const result = await runGetRecipe(
+      fakeClient(),
+      recipeArgs({ id: "recettes/dessert/crepes-de-la-chandeleur-fid-20001" }),
+    );
+    expect(payloadOf<{ id_read_as: string | null }>(result).id_read_as).toMatch(/Ptitchef/);
     expect(textOf(result)).toMatch(/Spell an id with its source/);
   });
 
@@ -275,15 +280,22 @@ describe("compare_recipes", () => {
     const payload = payloadOf<{ versions: Array<{ source: string }> }>(
       await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes" })),
     );
-    expect(payload.versions.map((version) => version.source)).toEqual(["marmiton", "cookbook"]);
+    expect(payload.versions.map((version) => version.source)).toEqual([
+      "marmiton",
+      "cookbook",
+      "ptitchef",
+      "goodfood",
+      "supertoinette",
+    ]);
   });
 
-  it("rescales both versions to the same number of servings", async () => {
+  it("rescales every version to the same number of servings", async () => {
     const payload = payloadOf<{
       versions: Array<{ yield: { requested: number; factor: number } }>;
     }>(await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes", servings: 8 })));
 
-    expect(payload.versions.map((version) => version.yield.factor)).toEqual([2, 1]);
+    // A factor per source, each read off what that source says it yields.
+    expect(payload.versions.map((version) => version.yield.factor)).toEqual([2, 1, 2, 2, 2]);
     expect(payload.versions.every((version) => version.yield.requested === 8)).toBe(true);
   });
 
@@ -304,8 +316,11 @@ describe("compare_recipes", () => {
 
   it("shows one version, and says so, when a source fails", async () => {
     const result = await runCompareRecipes(
-      fakeClient({ marmiton: { fail: new FakeSourceError("timeout", "Marmiton took too long.") } }),
-      compareArgs({ dish: "crepes" }),
+      fakeClient({
+        ...onlyFrom("marmiton", "cookbook"),
+        marmiton: { fail: new FakeSourceError("timeout", "Marmiton took too long.") },
+      }),
+      compareArgs({ dish: "crepes", sources: ["marmiton", "cookbook"] }),
     );
     const payload = payloadOf<{ versions: unknown[] }>(result);
 
@@ -344,9 +359,11 @@ describe("compare_recipes", () => {
   });
 
   it("says a yield was rescaled where it stands above a rescaled list", async () => {
+    // Narrowed to two sources, since the text block states what differs first
+    // and shortens the versions themselves once there are several.
     const result = await runCompareRecipes(
-      fakeClient(),
-      compareArgs({ dish: "crepes", servings: 8 }),
+      fakeClient(onlyFrom("marmiton", "cookbook")),
+      compareArgs({ dish: "crepes", servings: 8, sources: ["marmiton", "cookbook"] }),
     );
     expect(textOf(result)).toContain("Yields 4 personnes as published, scaled by 2 for 8.");
   });

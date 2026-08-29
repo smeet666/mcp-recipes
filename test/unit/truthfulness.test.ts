@@ -18,6 +18,7 @@ import {
   FakeSourceError,
   compareArgs,
   fakeClient,
+  onlyFrom,
   marmitonRecipe,
   payloadOf,
   recipeArgs,
@@ -205,7 +206,7 @@ describe("a count means what its name says", () => {
 
 describe("a comparison is about the dish that was asked for", () => {
   /** A source that answers anything with its closest row, and one that holds nothing. */
-  const oneRowOnly = () => fakeClient({ cookbook: { rows: [] } });
+  const oneRowOnly = () => fakeClient(onlyFrom("marmiton"));
   const ABSENT_DISH = "zzzqxwv nonexistent dish 12345";
 
   it("says when no version's title carries the dish that was asked for", async () => {

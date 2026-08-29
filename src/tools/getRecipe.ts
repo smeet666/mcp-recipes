@@ -38,7 +38,9 @@ export const getRecipeInput = strictInput({
     .string()
     .min(1)
     .max(500)
-    .describe("From search_recipes, such as 'marmiton:44078' or 'cookbook:Cookbook:Carbonara'."),
+    .describe(
+      "From search_recipes, such as 'marmiton:44078', 'goodfood:recipes/carbonara' or 'cookbook:Cookbook:Carbonara'. Two sources address a recipe by a bare number, so spell an id with its source.",
+    ),
   servings: z
     .number()
     .int()

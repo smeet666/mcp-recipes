@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.0.0
+
+- **`compare_recipes` now answers with up to five versions where it answered
+  with two.** A caller rendering the whole of its answer sees more of it, and
+  its `differences` list grows with the number of sources. The new optional
+  `sources` argument narrows it back to whichever traditions a question is
+  actually about, and the tool asks every source when it is left out.
+- **A bare number is no longer read as a Marmiton identifier.** Two of the
+  sources address a recipe by digits alone, so `get_recipe` answers `44078`
+  with `invalid_input` naming both readings rather than confidently returning
+  one site's recipe. Every id `search_recipes` hands back already carries its
+  source, so this reaches only a caller who wrote a bare number by hand.
+- **Three sources are added:** Ptitchef and Supertoinette in French, BBC Good
+  Food in English, beside Marmiton and the Wikibooks Cookbook. Each is named by
+  an id of its own, `ptitchef`, `supertoinette` and `goodfood`, and every tool
+  that took a source id takes them.
+- **A recipe a source keeps for its subscribers is named as one.** BBC Good
+  Food publishes such a recipe's title, times, rating and nutrition and holds
+  back its ingredients and its method. The answer says which parts were held
+  back and why, and links the page, rather than reporting a list this server
+  failed to read. Asking to rescale one says there is nothing to rescale, in
+  place of the sentence about a page that states no servings, which would be
+  false: the page states what it serves.
+- **A method published as one block of prose is reported as one**, so a
+  paragraph is not read as the first step of several.
+- **A resting time published apart is carried under its own name.** It is in no
+  other time in the answer, and it is never added to another source's cooking
+  time.
+- **A search every source answered and none holds anything for keeps saying so**
+  however many sources report. That sentence separates a wording nothing matched
+  from a search that failed, and it used to be dropped once several sources each
+  reported holding nothing.
+- A difficulty and a cost are deliberately not carried. Every source writes a
+  difficulty in a word of its own and none publishes a scale for it, so it sits
+  on no axis two versions could be compared along. A cost is a price in euros on
+  one source and a rank inside its own list on another.
+- The privacy policy names the hosts this server actually contacts. A Cookbook
+  page is read through `api.wikimedia.org` and only linked as `en.wikibooks.org`,
+  which the host table stated the other way round.
+
 ## 2.0.0
 
 - **This server now needs node 24 or later.** Node 20 reached its end of

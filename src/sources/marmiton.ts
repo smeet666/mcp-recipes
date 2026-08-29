@@ -205,6 +205,11 @@ export function marmitonDetail(payload: unknown): RecipeDetail {
     nutrition: publishedFigures(recipe.nutrition),
     equipment: [],
     tips: [],
+    // Marmiton publishes no resting time, no word on how it lays its method
+    // out, and keeps nothing back.
+    restMinutes: null,
+    stepsAsOneBlock: null,
+    withheld: null,
     // Marmiton states no licence on a recipe page, and silence is not a grant.
     license: null,
   };

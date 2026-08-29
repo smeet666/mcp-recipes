@@ -1,8 +1,8 @@
-# Nightly canary against the two real sites.
+# Nightly canary against the real sites.
 #
-# The unit tests run against stand-in sites, so they cannot detect that Marmiton
-# changed the markup of a recipe page or that the Wikimedia gateway renamed a
-# field: the day either happens, they stay green while the published server is
+# The unit tests run against stand-in sites, so they cannot detect that one of
+# them changed the markup of a recipe page or that the Wikimedia gateway renamed
+# a field: the day that happens, they stay green while the published server is
 # broken for everyone. This job is the only thing that notices, and it opens an
 # issue when it fails.
 #
@@ -84,11 +84,11 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const title = "Live canary failing: one of the two sites may have changed";
+            const title = "Live canary failing: one of the sites may have changed";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
-              "The nightly live canary failed. Either Marmiton or the Wikibooks Cookbook changed",
-              "something this server reads, or one of them was unreachable from the runner.",
+              "The nightly live canary failed. One of the sites this server reads changed something",
+              "it reads, or was unreachable from the runner.",
               "",
               `Run: ${runUrl}`,
               "",
@@ -103,8 +103,8 @@ jobs:
               "breach rather than a missing field.",
               "",
               "A failure on one site alone is worth reading closely: the merged answer is supposed to",
-              "survive it and say which site was missing, so a canary that goes red on both assertions",
-              "at once is a different problem from one that goes red on one.",
+              "survive it and say which site was missing. A canary red on one site is a site that",
+              "moved; red on every one of them is this server, or the runner's network.",
             ].join("\n");
 
             // Reuse the open issue rather than filing one every night.

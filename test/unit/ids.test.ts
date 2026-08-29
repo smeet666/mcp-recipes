@@ -40,10 +40,16 @@ describe("an identifier this server minted", () => {
 });
 
 describe("a raw identifier is claimed by the source that mints its shape", () => {
-  it("reads a bare number as the source that mints bare numbers", () => {
-    const resolved = read("44078");
-    expect(resolved.source.id).toBe("marmiton");
-    expect(resolved.inferred).toMatch(/bare number/);
+  it("reads a path shape as the one source that mints it", () => {
+    const resolved = read("recettes/dessert/crepes-de-la-chandeleur-fid-20001");
+    expect(resolved.source.id).toBe("ptitchef");
+    expect(resolved.inferred).toMatch(/Ptitchef/);
+  });
+
+  it("reads an address as the source whose site it is", () => {
+    const resolved = read("https://www.bbcgoodfood.com/recipes/classic-crepes");
+    expect(resolved.source.id).toBe("goodfood");
+    expect(resolved.reference).toBe("recipes/classic-crepes");
   });
 
   it("reads a namespaced page name as the source whose pages carry that namespace", () => {
@@ -109,20 +115,27 @@ describe("what no source claims is refused rather than guessed", () => {
 });
 
 describe("a shape more than one source could claim", () => {
+  // Two of the sources address a recipe by a bare number, so a caller writing
+  // one has named no single recipe. Sending it to whichever source came first
+  // would answer confidently with another dish, which is the one failure
+  // routing exists to prevent.
   it("is refused as ambiguous rather than sent to whichever came first", () => {
-    // Two sources minting the same shape is a registry the caller has to
-    // disambiguate, so the refusal names both spellings that would work.
-    const rival = {
-      ...sources[0]!,
-      id: "rival",
-      name: "Rival",
-      claims: () => ({ reference: "44078", why: "a bare number", guess: false }),
-    };
-    expect(() => resolveId("44078", [...sources, rival])).toThrow(/could be an identifier on/);
+    expect(() => read("44078")).toThrow(/could be an identifier on/);
+  });
+
+  it("names every spelling that would resolve", () => {
     try {
-      resolveId("44078", [...sources, rival]);
+      read("44078");
+      throw new Error("a bare number should not have resolved");
     } catch (error) {
-      expect((error as RecipesError).details.hint).toContain("marmiton:44078");
+      const hint = (error as RecipesError).details.hint ?? "";
+      expect(hint).toContain("marmiton:44078");
+      expect(hint).toContain("supertoinette:44078");
     }
+  });
+
+  it("resolves that same number once a caller spells out which source", () => {
+    expect(read("supertoinette:44078").source.id).toBe("supertoinette");
+    expect(read("marmiton:44078").source.id).toBe("marmiton");
   });
 });

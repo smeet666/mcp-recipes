@@ -250,9 +250,15 @@ export async function runSearchRecipes(
       );
     }
 
+    // The one sentence that separates a wording every source answered from a
+    // search that failed. Each source also says for itself that it offered no
+    // row, and where there are several of those the per-source lines crowd the
+    // block; this is the line the answer cannot be read safely without.
     if (results.length === 0 && answered.length === merged.reports.length) {
       notes.push(
-        "Every source answered and none holds anything under this wording. Try the dish's name in another language, or name a main ingredient instead.",
+        mustKeep(
+          "Every source answered and none holds anything under this wording. Try the dish's name in another language, or name a main ingredient instead.",
+        ),
       );
     }
 

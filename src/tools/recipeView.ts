@@ -95,6 +95,28 @@ export const recipeSchema = z.object({
   prep_minutes: z.number().int().nullable(),
   cook_minutes: z.number().int().nullable(),
   total_minutes: z.number().int().nullable(),
+  rest_minutes: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Time the recipe stands, from a source that publishes it apart. It is in no other time here, and belongs to no other source's cooking time. Null where the source publishes none, which is not a dish that needs no rest.",
+    ),
+  steps_as_one_block: z
+    .boolean()
+    .nullable()
+    .describe(
+      "Whether the source publishes the method as one block of prose rather than as steps of its own. Null where the source says neither, so a single entry is not read as step one of several.",
+    ),
+  withheld: z
+    .object({
+      parts: z.array(z.string()).describe("Which parts, named as 'ingredients' or 'method'."),
+      why: z.string().describe("What the source says about keeping them back."),
+    })
+    .nullable()
+    .describe(
+      "A part the source published nothing of because it keeps it for its subscribers. Null from a source that withholds nothing, which is a different statement from an empty list.",
+    ),
   category: z.string().nullable(),
   author: z
     .string()
@@ -160,6 +182,23 @@ function resolveFactor(
 ): { factor: number | null; notes: Note[] } {
   if (servings === null) {
     return { factor: null, notes: [] };
+  }
+
+  // A page whose ingredient list is kept for subscribers states its servings
+  // perfectly well, so the sentence about a page that names none would be
+  // false. What is missing is the lines, and a factor over nothing is a factor
+  // nobody can use.
+  const held = withheldPart(recipe, "ingredients");
+  if (held !== null) {
+    return {
+      factor: null,
+      notes: [
+        mustKeep(
+          `${held}, so there is nothing here to put to ${servings}. ` +
+            `The page states what it serves; read the lines at ${quoteForeign(recipe.url)}.`,
+        ),
+      ],
+    };
   }
 
   if (recipe.yieldCount === null || recipe.yieldCount <= 0) {
@@ -252,7 +291,31 @@ const METHOD_PART: PartWords = {
  * says the two cannot be told apart from here rather than picking whichever
  * reads more fluently.
  */
+/**
+ * What the source says about keeping this part back, when it keeps it back.
+ *
+ * Null covers the ordinary case, a source that withholds nothing, and the case
+ * of a source that withholds a different part of the same recipe.
+ */
+function withheldPart(recipe: RecipeDetail, part: PagePart): string | null {
+  if (recipe.withheld === null || !recipe.withheld.parts.includes(part)) {
+    return null;
+  }
+  return recipe.withheld.why;
+}
+
 function emptyPartNote(recipe: RecipeDetail, words: PartWords): Note {
+  // The source has said which of the two readings below is the right one, so
+  // offering them is a question that has an answer.
+  const held = withheldPart(recipe, words.part);
+  if (held !== null) {
+    return mustKeep(
+      `${held}, so no ${words.entry} is in this answer. The page publishes one and this ` +
+        "server did not fail to read it; a reader who has the subscription reads the " +
+        `${words.whole} at ${quoteForeign(recipe.url)}. ${words.caution}`,
+    );
+  }
+
   const heading = headingFor(words.part, recipe.publishedSections);
   const counterpart = whatTheOtherPartHolds(words.part, recipe);
 
@@ -298,6 +361,35 @@ export interface BuildOptions {
   announceSections?: boolean;
 }
 
+/**
+ * What has to be said about the parts of the recipe themselves.
+ *
+ * An empty list returned in silence reads as a recipe that needs no ingredients,
+ * and an empty method as a dish that needs no cooking. A method published as one
+ * paragraph reads as the first step of several unless the answer says otherwise,
+ * and only the source knows which it is.
+ */
+function partNotes(recipe: RecipeDetail, wants: (section: Section) => boolean): Note[] {
+  const notes: Note[] = [];
+
+  if (wants("ingredients") && recipe.ingredients.length === 0) {
+    notes.push(emptyPartNote(recipe, INGREDIENTS_PART));
+  }
+  if (wants("steps") && recipe.steps.length === 0) {
+    notes.push(emptyPartNote(recipe, METHOD_PART));
+  }
+  if (wants("steps") && recipe.stepsAsOneBlock === true && recipe.steps.length > 0) {
+    notes.push(
+      mustKeep(
+        `${recipe.sourceName} publishes this method as one block of prose rather than as steps ` +
+          "of its own, so what is here is that block and not the first step of several.",
+      ),
+    );
+  }
+
+  return notes;
+}
+
 export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): RecipeView {
   const { factor, notes: yieldNotes } = resolveFactor(recipe, options.servings);
   const wants = (section: Section) => options.sections.includes(section);
@@ -307,16 +399,7 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
       ? passthroughIngredients(recipe.ingredients, recipe.language)
       : scaleIngredients(recipe.ingredients, { factor, language: recipe.language });
 
-  const notes: Note[] = [...yieldNotes];
-
-  // Returning an empty list in silence reads as a recipe that needs no
-  // ingredients, and an empty method as a dish that needs no cooking.
-  if (wants("ingredients") && recipe.ingredients.length === 0) {
-    notes.push(emptyPartNote(recipe, INGREDIENTS_PART));
-  }
-  if (wants("steps") && recipe.steps.length === 0) {
-    notes.push(emptyPartNote(recipe, METHOD_PART));
-  }
+  const notes: Note[] = [...yieldNotes, ...partNotes(recipe, wants)];
 
   const rounded = ingredients.filter((entry) => entry.scaling === "rounded");
   const unscaled = ingredients.filter((entry) => entry.scaling === "unscaled");
@@ -379,6 +462,9 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
     prep_minutes: wants("times") ? recipe.prepMinutes : null,
     cook_minutes: wants("times") ? recipe.cookMinutes : null,
     total_minutes: wants("times") ? recipe.totalMinutes : null,
+    rest_minutes: wants("times") ? recipe.restMinutes : null,
+    steps_as_one_block: recipe.stepsAsOneBlock,
+    withheld: recipe.withheld,
     category: recipe.category,
     author: recipe.author,
     rating: recipe.rating,

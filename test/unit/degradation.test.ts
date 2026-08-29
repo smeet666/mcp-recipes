@@ -23,6 +23,7 @@ import {
   fakeMarmiton,
   marmitonRecipe,
   marmitonRows,
+  onlyFrom,
   payloadOf,
   fakeSources,
   silentLogger,
@@ -163,15 +164,24 @@ describe("a configuration object handed to the published client", () => {
 });
 
 describe("search_recipes when nothing answered", () => {
-  const bothDown = () =>
-    fakeClient({
-      marmiton: { fail: new FakeSourceError("rate_limited", "Slow down.") },
-      cookbook: { fail: new FakeSourceError("rate_limited", "Slow down.") },
+  const everyOneDown = () => {
+    const waiting = new FakeSourceError("rate_limited", "Slow down.");
+    return fakeClient({
+      marmiton: { fail: waiting },
+      cookbook: { fail: waiting },
+      ptitchef: { fail: waiting },
+      goodfood: { fail: waiting },
+      supertoinette: { fail: waiting },
     });
+  };
 
   it("does not open with a sentence that reads as an absence", async () => {
     const text = textOf(
-      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5, fan_out: true }),
+      await runSearchRecipes(everyOneDown(), {
+        query: "crepes",
+        limit_per_source: 5,
+        fan_out: true,
+      }),
     );
     expect(text).not.toMatch(/^Nothing came back/);
     expect(text).toMatch(/No source answered/);
@@ -179,7 +189,11 @@ describe("search_recipes when nothing answered", () => {
 
   it("does not claim another source found something when none did", async () => {
     const text = textOf(
-      await runSearchRecipes(bothDown(), { query: "crepes", limit_per_source: 5, fan_out: true }),
+      await runSearchRecipes(everyOneDown(), {
+        query: "crepes",
+        limit_per_source: 5,
+        fan_out: true,
+      }),
     );
     expect(text).not.toMatch(/holds what the other sources found/);
   });
@@ -246,7 +260,10 @@ describe("compare_recipes stays readable", () => {
 
   it("reports only what actually differs", async () => {
     const payload = payloadOf<{ differences: string[] }>(
-      await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes" })),
+      await runCompareRecipes(
+        fakeClient(onlyFrom("marmiton", "cookbook")),
+        compareArgs({ dish: "crepes", sources: ["marmiton", "cookbook"] }),
+      ),
     );
     // Both stand-in recipes list six lines, so a line count is not a difference.
     expect(payload.differences.some((line) => /lists 6 ingredient lines/.test(line))).toBe(false);
@@ -257,7 +274,10 @@ describe("the credit names the sites that actually contributed", () => {
   it("drops a site that answered nothing from the credit line", async () => {
     const text = textOf(
       await runSearchRecipes(
-        fakeClient({ marmiton: { fail: new FakeSourceError("timeout", "too slow") } }),
+        fakeClient({
+          ...onlyFrom("marmiton", "cookbook"),
+          marmiton: { fail: new FakeSourceError("timeout", "too slow") },
+        }),
         { query: "crepes", limit_per_source: 5, fan_out: true },
       ),
     );

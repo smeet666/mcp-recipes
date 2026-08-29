@@ -61,6 +61,7 @@ describe("Amara asks vaguely and gets a page about an ingredient", () => {
       query: "something with chicken and rice",
       limit_per_source: 3,
       fan_out: true,
+      sources: ["cookbook"],
     });
     expect(textOf(result)).toMatch(/page about an ingredient rather than a recipe/);
   });
