@@ -1,6 +1,7 @@
 /** The shapes the source layer produces. Nothing here knows about MCP. */
 
 import type { Language } from "./recipe/language.js";
+import type { PagePart } from "./recipe/sections.js";
 
 /**
  * Which corpus a row, a recipe or a failure came from.
@@ -89,6 +90,28 @@ export interface RecipeDetail {
   prepMinutes: number | null;
   cookMinutes: number | null;
   totalMinutes: number | null;
+  /**
+   * Time the recipe stands, from a source that publishes it apart from
+   * preparation and cooking. It belongs to no other source's cooking time, and
+   * a source publishing none says null, which is not a dish that needs no rest.
+   */
+  restMinutes: number | null;
+  /**
+   * Whether the source publishes the method as one block of prose rather than
+   * as steps of its own. Null from a source that says neither, since a single
+   * entry can be one block or a method of one step and only the source knows.
+   */
+  stepsAsOneBlock: boolean | null;
+  /**
+   * A part the source published nothing of because it keeps it for its
+   * subscribers, and the words that say so.
+   *
+   * Null from a source that withholds nothing. That is a different statement
+   * from an empty list: a part withheld is a part the page has, and an answer
+   * that read it as a part this server failed to read would say something the
+   * page never said.
+   */
+  withheld: { parts: PagePart[]; why: string } | null;
   category: string | null;
   author: string | null;
   rating: Rating | null;

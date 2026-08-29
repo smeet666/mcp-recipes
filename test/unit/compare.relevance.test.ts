@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { runCompareRecipes } from "../../src/tools/compareRecipes.js";
-import { compareArgs, fakeClient, payloadOf, textOf } from "./support.js";
+import { compareArgs, fakeClient, onlyFrom, payloadOf, textOf } from "./support.js";
 import type { MarmitonRecipe, MarmitonSummary } from "../../src/sources/marmiton.js";
 import type { CookbookRecipe, CookbookSummary } from "../../src/sources/cookbook.js";
 import { marmitonRecipe, cookbookRecipe } from "./support.js";
@@ -84,13 +84,14 @@ describe("a version whose title names part of the dish is not that dish", () => 
   it("still confronts two versions that both name the whole dish", () =>
     runCompareRecipes(
       fakeClient({
+        ...onlyFrom("marmiton", "cookbook"),
         marmiton: {
           rows: [{ ...christmasBiscuitRows[0]!, title: "Biscuits and gravy à ma façon" }],
           recipe: { ...christmasBiscuits, title: "Biscuits and gravy à ma façon" },
         },
         cookbook: { rows: gravyRows, recipe: gravy },
       }),
-      compareArgs({ dish: "biscuits and gravy" }),
+      compareArgs({ dish: "biscuits and gravy", sources: ["marmiton", "cookbook"] }),
     ).then((result) => {
       const payload = payloadOf<{ differences: string[] }>(result);
       expect(payload.differences.length).toBeGreaterThan(0);

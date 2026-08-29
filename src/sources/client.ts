@@ -256,7 +256,7 @@ export class RecipesClient {
   constructor(options: RecipesClientOptions = {}) {
     this.config = withGuarantees({ ...loadConfig(), ...options.config });
     this.logger = options.logger ?? createLogger(this.config.logLevel);
-    this.sources = options.sources ?? buildSources(this.config, options.readers ?? {});
+    this.sources = options.sources ?? buildSources(this.config, options.readers ?? {}, this.logger);
   }
 
   /** What every source sees this client call itself. */

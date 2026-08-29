@@ -15,6 +15,7 @@ import {
   compareArgs,
   cookbookRecipe,
   fakeClient,
+  onlyFrom,
   marmitonRecipe,
   recipeArgs,
   textOf,
@@ -55,6 +56,7 @@ describe("a list too long for the block still opens", () => {
   it("gives every version of a comparison an opening", () =>
     runCompareRecipes(
       fakeClient({
+        ...onlyFrom("marmiton", "cookbook"),
         marmiton: { recipe: longMarmiton },
         cookbook: { recipe: longCookbook },
       }),
@@ -62,6 +64,7 @@ describe("a list too long for the block still opens", () => {
         dish: "crêpes",
         servings: 12,
         sections: ["ingredients", "steps", "times", "nutrition", "tips", "equipment"],
+        sources: ["marmiton", "cookbook"],
       }),
     ).then((result) => {
       const text = textOf(result);

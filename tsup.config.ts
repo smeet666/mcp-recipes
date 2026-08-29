@@ -10,7 +10,15 @@ export default defineConfig({
   clean: true,
   splitting: false,
   // Left external so a consumer resolves their own copies from node_modules.
-  external: ["@modelcontextprotocol/sdk", "zod", "mcp-marmiton", "mcp-wikibooks-cookbook"],
+  external: [
+    "@modelcontextprotocol/sdk",
+    "zod",
+    "mcp-marmiton",
+    "mcp-wikibooks-cookbook",
+    "mcp-ptitchef",
+    "mcp-bbc-goodfood",
+    "mcp-supertoinette",
+  ],
   // src/index.ts opens with the shebang and esbuild keeps it on the entry
   // point; a global banner would also stamp it onto the library entries.
 });

@@ -15,13 +15,17 @@ a serving is, and a wiki cookbook in English, with equipment lists and prose the
 first has no field for. Asking a question of one of them answers about one of
 them.
 
-This server reads two at once: [Marmiton](https://www.marmiton.org), where French
-home cooks publish, and the
+This server reads five at once. Three publish in French:
+[Marmiton](https://www.marmiton.org), where home cooks publish,
+[Ptitchef](https://www.ptitchef.com), which files its recipes under a tree of
+ingredients, and [Supertoinette](https://www.supertoinette.com), which prints a
+resting time of its own. Two publish in English: the
 [Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents),
-written and maintained in the open in English. You can search both with one
-question, read one recipe from either in one shape, put several versions of the
-same dish side by side, and rescale any ingredient list. It needs no API key and
-no account.
+written and maintained in the open, and
+[BBC Good Food](https://www.bbcgoodfood.com), which groups an ingredient list
+under headings. You can search them all with one question, read a recipe from any
+of them in one shape, put several versions of the same dish side by side, and
+rescale any ingredient list. It needs no API key and no account.
 
 _[Version française](#mcp-recipes-français)_
 
@@ -62,7 +66,7 @@ Node 24 or later is required, and no environment variable has to be set.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:2.0.0"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.0"]
     }
   }
 }
@@ -70,12 +74,13 @@ Node 24 or later is required, and no environment variable has to be set.
 
 `-i` keeps stdin open, which is where the protocol travels, and `-t` is left out
 because a TTY rewrites the stream. The container needs outbound HTTPS to
-`www.marmiton.org`, `en.wikibooks.org` and `api.wikimedia.org`, and nothing else:
+`www.marmiton.org`, `api.wikimedia.org`, `www.ptitchef.com`,
+`www.bbcgoodfood.com` and `www.supertoinette.com`, and nothing else:
 no volume, no port, no credential.
 
 ### Bundle, without npm
 
-Download `mcp-recipes-2.0.0.mcpb` from
+Download `mcp-recipes-3.0.0.mcpb` from
 [the latest release](https://github.com/smeet666/mcp-recipes/releases/latest) and
 open it. A client that supports MCP bundles installs it on its own, with no npm
 and no configuration file to edit. The bundle carries its dependencies, so
@@ -92,12 +97,15 @@ nothing is fetched at install time.
 The ordinary path runs from a search to a reading: a row carries an `id` naming
 its source, and `get_recipe` takes it.
 
-## The two sources
+## The sources
 
-| Source     | Site               | Language |
-| ---------- | ------------------ | -------- |
-| `marmiton` | `www.marmiton.org` | French   |
-| `cookbook` | Wikibooks Cookbook | English  |
+| Source          | Site                    | Language |
+| --------------- | ----------------------- | -------- |
+| `marmiton`      | `www.marmiton.org`      | French   |
+| `cookbook`      | Wikibooks Cookbook      | English  |
+| `ptitchef`      | `www.ptitchef.com`      | French   |
+| `goodfood`      | `www.bbcgoodfood.com`   | English  |
+| `supertoinette` | `www.supertoinette.com` | French   |
 
 A row's `id` names its source, so an identifier read from one answer goes back to
 the right site. **Counts are never added across sources**, and a source that
@@ -105,16 +113,16 @@ failed is reported as having failed rather than as having found nothing.
 
 ## Tools
 
-| Tool                | What it does                                                  |
-| ------------------- | ------------------------------------------------------------- |
-| `search_recipes`    | Searches both sources with one question.                      |
-| `get_recipe`        | Reads one recipe from either source, in one shape.            |
-| `compare_recipes`   | Puts several versions of the same dish side by side.          |
-| `scale_ingredients` | Rescales any ingredient list, with no request to either site. |
+| Tool                | What it does                                               |
+| ------------------- | ---------------------------------------------------------- |
+| `search_recipes`    | Searches every source with one question.                   |
+| `get_recipe`        | Reads one recipe from any source, in one shape.            |
+| `compare_recipes`   | Puts several versions of the same dish side by side.       |
+| `scale_ingredients` | Rescales any ingredient list, with no request to any site. |
 
 ### `search_recipes`
 
-Searches both sources with one question.
+Searches every source with one question.
 
 | Argument           | Type                          | Required | What it does                                                     |
 | ------------------ | ----------------------------- | -------- | ---------------------------------------------------------------- |
@@ -133,21 +141,25 @@ built.
 
 ### `get_recipe`
 
-Reads one recipe from either source, in one shape.
+Reads one recipe from any source, in one shape.
 
-| Argument         | Type                                                                                                           | Required | What it does                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------- |
-| `id`             | string, 1 to 500 characters                                                                                    | yes      | The identifier a row carries.                  |
-| `servings`       | integer, 1 to 500                                                                                              | no       | Rescale the ingredients to this many servings. |
-| `sections`       | array of `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, default `["ingredients", "steps"]` | no       | Which parts to return.                         |
-| `max_steps`      | integer, 1 to 100, default `20`                                                                                | no       | Steps to serve.                                |
-| `max_step_chars` | integer, 80 to 4000, default `600`                                                                             | no       | Characters kept per step.                      |
+| Argument         | Type                                                                                                           | Required | What it does                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string, 1 to 500 characters                                                                                    | yes      | The identifier a row carries, such as `marmiton:44078`. Two sources address a recipe by a bare number, so spell an id with its source. |
+| `servings`       | integer, 1 to 500                                                                                              | no       | Rescale the ingredients to this many servings.                                                                                         |
+| `sections`       | array of `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, default `["ingredients", "steps"]` | no       | Which parts to return.                                                                                                                 |
+| `max_steps`      | integer, 1 to 100, default `20`                                                                                | no       | Steps to serve.                                                                                                                        |
+| `max_step_chars` | integer, 80 to 4000, default `600`                                                                             | no       | Characters kept per step.                                                                                                              |
 
-**In return:** the recipe in the shape both sources are rendered into, whichever
+**In return:** the recipe in the shape every source is rendered into, whichever
 published it: its title, its address, its ingredients with each line's `scaling`,
-its steps, and the sections asked for. A field one source publishes and the other
-has no notion of comes back absent rather than invented. Raise `max_step_chars`
-when a step was cut mid-sentence.
+its steps, and the sections asked for. A field one source publishes and another
+has no notion of comes back absent rather than invented. `rest_minutes` carries a
+resting time from a source that prints one apart, and is in no other time here.
+`steps_as_one_block` says when a source published its method as one block of
+prose rather than as steps. `withheld` names a part a source keeps for its
+subscribers, which is a part the page has rather than a part that could not be
+read. Raise `max_step_chars` when a step was cut mid-sentence.
 
 ### `compare_recipes`
 
@@ -160,6 +172,7 @@ Puts several versions of the same dish side by side.
 | `sections`       | array of `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, default `["ingredients"]` | no       | Which parts to return per version.           |
 | `max_steps`      | integer, 1 to 100, default `10`                                                                       | no       | Steps to serve per version.                  |
 | `max_step_chars` | integer, 80 to 4000, default `600`                                                                    | no       | Characters kept per step.                    |
+| `sources`        | array of source ids                                                                                   | no       | Compare these sources alone.                 |
 
 **In return:** `versions`, one recipe per source that answered, all rescaled to
 the same number of servings so their quantities can be read against each other,
@@ -197,7 +210,7 @@ between the two is rounded, and the rescaled recipe then departs a little from
 the proportions of the original. The line carries `rounded`, and its note says
 what was done.
 
-The two sources write their quantities in their own languages, and a line is read
+The sources write their quantities in their own languages, and a line is read
 in the language it was written in. The figures are this server's arithmetic, so
 say they were recomputed when you show them.
 
@@ -263,23 +276,37 @@ codes. Each site keeps its own pace, and the floor holds here as well.
 
 Each site is paced on its own, one request at a time with at least a second
 between two, and the floor of half a second holds however the server is
-configured. Asking both sites at once therefore costs each of them one request,
+configured. Asking every site at once therefore costs each of them one request,
 never two. The `User-Agent` always ends with the project identity and an address
 where a person can be reached.
 
 Every row carries the address of the recipe's own page and the name of the site
-that published it. The Marmiton recipes belong to Marmiton and to the cooks who
-wrote them; the Cookbook pages are published under
+that published it. The Cookbook pages are published under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), which asks that
-what is built on them be shared under the same licence.
+what is built on them be shared under the same licence. Marmiton, Ptitchef, BBC
+Good Food and Supertoinette state no terms on a recipe page, and their recipes
+belong to those sites and to the cooks who wrote them. Silence is not a grant, so
+credit the site and link the page you took a recipe from.
 
-This MCP server is an unofficial project, with no affiliation to either site.
+A recipe BBC Good Food keeps for its subscribers comes back without its
+ingredients and its method, named as a recipe held back, with the address of its
+page. This server does not reconstruct what that site chose to sell.
+
+Two figures the sites publish are not repeated here. A difficulty is a word each
+site writes its own way, on no scale any of them publishes, so it sits on no axis
+along which two versions could be put. A cost is a price in euros on one site and
+a rank inside its own list on another, and one field holding both would invite
+them to be compared.
+
+This MCP server is an unofficial project, with no affiliation to any of the
+sites it reads.
 
 ## Privacy
 
 This server collects nothing about you and sends nothing to its author. It runs
-on your machine, contacts `www.marmiton.org`, `en.wikibooks.org` and
-`api.wikimedia.org` and nothing else, holds its answers in memory while it runs,
+on your machine, contacts `www.marmiton.org`, `api.wikimedia.org`,
+`www.ptitchef.com`, `www.bbcgoodfood.com` and `www.supertoinette.com` and nothing
+else, holds its answers in memory while it runs,
 and writes nothing to disk. [PRIVACY.md](PRIVACY.md) states what a request
 carries and which settings change any of it.
 
@@ -322,13 +349,18 @@ qu'est une part, et un wiki de cuisine en anglais, avec des listes de matériel 
 une prose pour lesquelles le premier n'a aucun champ. Poser une question à l'un
 d'eux répond au sujet de l'un d'eux.
 
-Ce serveur en lit deux à la fois : [Marmiton](https://www.marmiton.org), où des
-cuisiniers français publient, et le
+Ce serveur en lit cinq à la fois. Trois publient en français :
+[Marmiton](https://www.marmiton.org), où des cuisiniers publient,
+[Ptitchef](https://www.ptitchef.com), qui range ses recettes sous un arbre
+d'ingrédients, et [Supertoinette](https://www.supertoinette.com), qui imprime un
+temps de repos à part. Deux publient en anglais : le
 [Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents),
-écrit et entretenu à découvert en anglais. On peut chercher dans les deux avec
-une seule question, lire une recette de l'un ou l'autre sous une seule forme,
-mettre plusieurs versions d'un même plat côte à côte, et adapter n'importe quelle
-liste d'ingrédients. Aucune clé d'API, aucun compte.
+écrit et entretenu à découvert, et
+[BBC Good Food](https://www.bbcgoodfood.com), qui groupe une liste d'ingrédients
+sous des intertitres. On peut chercher dans les cinq avec une seule question,
+lire une recette de n'importe lequel sous une seule forme, mettre plusieurs
+versions d'un même plat côte à côte, et adapter n'importe quelle liste
+d'ingrédients. Aucune clé d'API, aucun compte.
 
 ## Installation
 
@@ -366,7 +398,7 @@ renseigner.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:2.0.0"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.0"]
     }
   }
 }
@@ -374,12 +406,13 @@ renseigner.
 
 `-i` garde l'entrée standard ouverte, qui est le canal du protocole, et `-t` est
 omis parce qu'un TTY réécrit le flux. Le conteneur a besoin d'un accès HTTPS
-sortant vers `www.marmiton.org`, `en.wikibooks.org` et `api.wikimedia.org`, et de
+sortant vers `www.marmiton.org`, `api.wikimedia.org`, `www.ptitchef.com`,
+`www.bbcgoodfood.com` et `www.supertoinette.com`, et de
 rien d'autre : aucun volume, aucun port, aucun identifiant.
 
 ### Bundle, sans npm
 
-Téléchargez `mcp-recipes-2.0.0.mcpb` depuis
+Téléchargez `mcp-recipes-3.0.0.mcpb` depuis
 [la dernière publication](https://github.com/smeet666/mcp-recipes/releases/latest)
 et ouvrez-le. Un client qui gère les bundles MCP l'installe seul, sans npm et
 sans fichier de configuration à modifier. Le bundle emporte ses dépendances, donc
@@ -396,12 +429,15 @@ rien n'est téléchargé à l'installation.
 Le chemin ordinaire va d'une recherche à une lecture : une ligne porte un `id`
 qui nomme sa source, et `get_recipe` le reprend.
 
-## Les deux sources
+## Les sources
 
-| Source     | Site               | Langue   |
-| ---------- | ------------------ | -------- |
-| `marmiton` | `www.marmiton.org` | français |
-| `cookbook` | Cookbook Wikibooks | anglais  |
+| Source          | Site                    | Langue   |
+| --------------- | ----------------------- | -------- |
+| `marmiton`      | `www.marmiton.org`      | français |
+| `cookbook`      | Cookbook Wikibooks      | anglais  |
+| `ptitchef`      | `www.ptitchef.com`      | français |
+| `goodfood`      | `www.bbcgoodfood.com`   | anglais  |
+| `supertoinette` | `www.supertoinette.com` | français |
 
 L'`id` d'une ligne nomme sa source, donc un identifiant lu dans une réponse
 retourne vers le bon site. **Les comptes ne sont jamais additionnés entre
@@ -412,14 +448,14 @@ comme n'ayant rien trouvé.
 
 | Outil               | Ce qu'il fait                                              |
 | ------------------- | ---------------------------------------------------------- |
-| `search_recipes`    | Cherche dans les deux sources avec une seule question.     |
+| `search_recipes`    | Cherche dans toutes les sources avec une seule question.   |
 | `get_recipe`        | Lit une recette de l'une ou l'autre, sous une seule forme. |
 | `compare_recipes`   | Met plusieurs versions d'un même plat côte à côte.         |
 | `scale_ingredients` | Adapte n'importe quelle liste d'ingrédients, sans requête. |
 
 ### `search_recipes`
 
-Cherche dans les deux sources avec une seule question.
+Cherche dans toutes les sources avec une seule question.
 
 | Argument           | Type                             | Requis | Ce qu'il fait                                                           |
 | ------------------ | -------------------------------- | ------ | ----------------------------------------------------------------------- |
@@ -438,22 +474,26 @@ en mots comment la liste a été bâtie.
 
 ### `get_recipe`
 
-Lit une recette de l'une ou l'autre source, sous une seule forme.
+Lit une recette de n'importe quelle source, sous une seule forme.
 
-| Argument         | Type                                                                                                            | Requis | Ce qu'il fait                                |
-| ---------------- | --------------------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------- |
-| `id`             | chaîne, 1 à 500 caractères                                                                                      | oui    | L'identifiant d'une ligne.                   |
-| `servings`       | entier, 1 à 500                                                                                                 | non    | Adapte les ingrédients à ce nombre de parts. |
-| `sections`       | tableau de `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, défaut `["ingredients", "steps"]` | non    | Les parties à rendre.                        |
-| `max_steps`      | entier, 1 à 100, défaut `20`                                                                                    | non    | Étapes à servir.                             |
-| `max_step_chars` | entier, 80 à 4000, défaut `600`                                                                                 | non    | Caractères gardés par étape.                 |
+| Argument         | Type                                                                                                            | Requis | Ce qu'il fait                                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | chaîne, 1 à 500 caractères                                                                                      | oui    | L'identifiant d'une ligne, tel que `marmiton:44078`. Deux sources adressent une recette par un nombre nu : écrivez l'id avec sa source. |
+| `servings`       | entier, 1 à 500                                                                                                 | non    | Adapte les ingrédients à ce nombre de parts.                                                                                            |
+| `sections`       | tableau de `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, défaut `["ingredients", "steps"]` | non    | Les parties à rendre.                                                                                                                   |
+| `max_steps`      | entier, 1 à 100, défaut `20`                                                                                    | non    | Étapes à servir.                                                                                                                        |
+| `max_step_chars` | entier, 80 à 4000, défaut `600`                                                                                 | non    | Caractères gardés par étape.                                                                                                            |
 
-**En retour :** la recette dans la forme où les deux sources sont rendues, quelle
+**En retour :** la recette dans la forme où toutes les sources sont rendues, quelle
 que soit celle qui l'a publiée : son titre, son adresse, ses ingrédients avec le
 `scaling` de chaque ligne, ses étapes, et les parties demandées. Un champ qu'une
-source publie et dont l'autre n'a pas la notion revient absent plutôt
-qu'inventé. Augmentez `max_step_chars` quand une étape a été coupée au milieu
-d'une phrase.
+source publie et dont une autre n'a pas la notion revient absent plutôt
+qu'inventé. `rest_minutes` porte le temps de repos d'une source qui l'imprime à
+part, et il n'entre dans aucun autre temps rendu ici. `steps_as_one_block` dit
+quand une source a publié sa méthode d'un seul bloc de prose plutôt qu'en étapes.
+`withheld` nomme la partie qu'une source réserve à ses abonnés, qui est une
+partie que la page porte et non une partie illisible. Augmentez `max_step_chars`
+quand une étape a été coupée au milieu d'une phrase.
 
 ### `compare_recipes`
 
@@ -466,6 +506,7 @@ Met plusieurs versions d'un même plat côte à côte.
 | `sections`       | tableau de `ingredients`, `steps`, `times`, `nutrition`, `tips`, `equipment`, défaut `["ingredients"]` | non    | Les parties à rendre par version.           |
 | `max_steps`      | entier, 1 à 100, défaut `10`                                                                           | non    | Étapes à servir par version.                |
 | `max_step_chars` | entier, 80 à 4000, défaut `600`                                                                        | non    | Caractères gardés par étape.                |
+| `sources`        | tableau d'ids de source                                                                                | non    | Ne compare que ces sources.                 |
 
 **En retour :** `versions`, une recette par source ayant répondu, toutes adaptées
 au même nombre de parts pour que leurs quantités se lisent l'une contre l'autre,
@@ -503,7 +544,7 @@ qui tombe entre les deux est donc arrondie, et la recette adaptée s'écarte alo
 un peu des proportions de l'originale. La ligne porte `rounded`, et sa note dit
 ce qui a été fait.
 
-Les deux sources écrivent leurs quantités dans leur propre langue, et une ligne
+Les sources écrivent leurs quantités dans leur propre langue, et une ligne
 est lue dans la langue où elle a été écrite. Les chiffres sont l'arithmétique de
 ce serveur, donc dites qu'ils ont été recalculés quand vous les montrez.
 
@@ -570,23 +611,37 @@ codes. Chaque site garde son propre rythme, et le plancher tient également ici.
 
 Chaque site est cadencé pour lui-même, une requête à la fois avec au moins une
 seconde entre deux, et le plancher d'une demi-seconde tient quelle que soit la
-configuration. Interroger les deux à la fois coûte donc à chacun une requête,
+configuration. Les interroger toutes à la fois coûte donc à chacune une requête,
 jamais deux. Le `User-Agent` se termine toujours par l'identité du projet et une
 adresse où joindre une personne.
 
 Chaque ligne porte l'adresse de la page de la recette et le nom du site qui l'a
-publiée. Les recettes de Marmiton appartiennent à Marmiton et aux cuisiniers qui
-les ont écrites ; les pages du Cookbook sont publiées sous
+publiée. Les pages du Cookbook sont publiées sous
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.fr), qui
-demande que ce qu'on bâtit dessus soit partagé sous la même licence.
+demande que ce qu'on bâtit dessus soit partagé sous la même licence. Marmiton,
+Ptitchef, BBC Good Food et Supertoinette n'énoncent aucune condition sur une page
+de recette, et leurs recettes appartiennent à ces sites et aux cuisiniers qui les
+ont écrites. Le silence n'est pas une autorisation : créditez le site et liez la
+page d'où vient la recette.
 
-Ce MCP est un projet non officiel, sans affiliation à l'un ou l'autre site.
+Une recette que BBC Good Food réserve à ses abonnés revient sans ses ingrédients
+ni sa méthode, nommée comme une recette retenue, avec l'adresse de sa page. Ce
+serveur ne reconstitue pas ce que ce site a choisi de vendre.
+
+Deux chiffres que les sites publient ne sont pas repris ici. Une difficulté est
+un mot que chaque site écrit à sa façon, sur aucune échelle publiée : elle ne
+siège sur aucun axe le long duquel deux versions se compareraient. Un coût est un
+prix en euros sur un site et un rang dans sa propre liste sur un autre, et un
+seul champ portant les deux inviterait à les comparer.
+
+Ce MCP est un projet non officiel, sans affiliation à aucun des sites qu'il
+lit.
 
 ## Confidentialité
 
 Ce serveur ne collecte rien sur vous et n'envoie rien à son auteur. Il tourne sur
-votre machine, ne joint que `www.marmiton.org`, `en.wikibooks.org` et
-`api.wikimedia.org`, garde ses réponses en mémoire le temps qu'il tourne, et
+votre machine, ne joint que `www.marmiton.org`, `api.wikimedia.org`,
+`www.ptitchef.com`, `www.bbcgoodfood.com` et `www.supertoinette.com`, garde ses réponses en mémoire le temps qu'il tourne, et
 n'écrit rien sur le disque. [PRIVACY.md](PRIVACY.md) dit ce qu'une requête
 emporte et quels réglages changent cela.
 

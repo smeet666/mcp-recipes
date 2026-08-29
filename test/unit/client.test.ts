@@ -12,7 +12,16 @@ import { describe, expect, it } from "vitest";
 import { RecipesError } from "../../src/errors.js";
 import { interleave } from "../../src/sources/client.js";
 import type { RecipeRow } from "../../src/types.js";
-import { FakeSourceError, cookbookRows, fakeClient, marmitonRows } from "./support.js";
+import {
+  FakeSourceError,
+  cookbookRows,
+  fakeClient,
+  goodfoodRows,
+  marmitonRows,
+  onlyFrom,
+  ptitchefRows,
+  supertoinetteRows,
+} from "./support.js";
 
 const row = (id: string, source: RecipeRow["source"]): RecipeRow => ({
   id,
@@ -51,12 +60,26 @@ describe("every source answering", () => {
     fakeClient()
       .searchRecipes("crepes", 5)
       .then((merged) => {
-        expect(merged.rows).toHaveLength(marmitonRows.length + cookbookRows.length);
+        expect(merged.rows).toHaveLength(
+          marmitonRows.length +
+            cookbookRows.length +
+            ptitchefRows.length +
+            goodfoodRows.length +
+            supertoinetteRows.length,
+        );
+        // One row from each source in turn, in the registry's order, since the
+        // sources share no score to rank them by.
         expect(merged.rows.map((entry) => entry.source)).toEqual([
           "marmiton",
           "cookbook",
+          "ptitchef",
+          "goodfood",
+          "supertoinette",
           "marmiton",
           "cookbook",
+          "ptitchef",
+          "goodfood",
+          "supertoinette",
         ]);
         expect(merged.rows.every((entry) => entry.id.includes(":"))).toBe(true);
       }));
@@ -75,8 +98,8 @@ describe("every source answering", () => {
 
   it("honours a limit per source, applied to each of them", async () => {
     const merged = await fakeClient().searchRecipes("crepes", 1);
-    expect(merged.rows).toHaveLength(2);
-    expect(new Set(merged.rows.map((entry) => entry.source)).size).toBe(2);
+    expect(merged.rows).toHaveLength(5);
+    expect(new Set(merged.rows.map((entry) => entry.source)).size).toBe(5);
   });
 
   it("asks only the sources it was named", async () => {
@@ -88,6 +111,7 @@ describe("every source answering", () => {
 
 describe("one source failing", () => {
   const down = fakeClient({
+    ...onlyFrom("marmiton", "cookbook"),
     marmiton: { fail: new FakeSourceError("rate_limited", "Marmiton asked this client to wait.") },
   });
 
@@ -126,9 +150,13 @@ describe("one source failing", () => {
 
 describe("every source failing", () => {
   it("returns no rows and a failure for each, which is a different answer from an empty one", async () => {
+    const failing = new FakeSourceError("network_error", "The site was unreachable.");
     const merged = await fakeClient({
       marmiton: { fail: new FakeSourceError("timeout", "Marmiton took too long.") },
       cookbook: { fail: new FakeSourceError("network_error", "The gateway was unreachable.") },
+      ptitchef: { fail: failing },
+      goodfood: { fail: failing },
+      supertoinette: { fail: failing },
     }).searchRecipes("crepes", 5);
 
     expect(merged.rows).toEqual([]);

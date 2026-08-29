@@ -6,6 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Config, Logger } from "./config.js";
 import { createLogger, loadConfig } from "./config.js";
+import { PROFILES } from "./sources/registry.js";
 import { RecipesClient } from "./sources/client.js";
 import {
   compareRecipesDescription,
@@ -74,11 +75,11 @@ export function buildInstructions(sources: Array<{ name: string; language: strin
   ].join(" ");
 }
 
-/** The guidance as it reads for the sources this build registers. */
-export const INSTRUCTIONS = buildInstructions([
-  { name: "Marmiton", language: "fr" },
-  { name: "Wikibooks Cookbook", language: "en" },
-]);
+/**
+ * The guidance as it reads for the sources this build registers, taken from the
+ * registry itself so it cannot name a corpus the server does not read.
+ */
+export const INSTRUCTIONS = buildInstructions([...PROFILES]);
 
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const config = options.config ?? loadConfig();

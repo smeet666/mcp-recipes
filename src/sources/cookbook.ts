@@ -205,6 +205,11 @@ export function cookbookDetail(payload: unknown): RecipeDetail {
     nutrition: publishedFigures(recipe.nutrition),
     equipment: textList(recipe.equipment),
     tips: textList(recipe.tips),
+    // The Cookbook publishes no resting time, says nothing about how a page
+    // lays its method out, and keeps nothing behind a subscription.
+    restMinutes: null,
+    stepsAsOneBlock: null,
+    withheld: null,
     // A licence is only stated when both halves of it arrived: a name with no
     // address, or an address with no name, is not terms anyone can follow.
     license: licenseTitle && licenseUrl ? { title: licenseTitle, url: licenseUrl } : null,

@@ -82,6 +82,12 @@ export const compareRecipesInput = strictInput({
     .max(4000)
     .default(600)
     .describe("Characters kept per step. Raise it only if a step was cut mid-sentence."),
+  sources: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Sources to compare, by id. Left out, every source is read, which is the point of this tool. Name two or three to put particular traditions side by side. The ids are the ones 'per_source' reports.",
+    ),
 });
 
 export const compareRecipesOutput = z.object({
@@ -108,6 +114,17 @@ function listNames(names: string[]): string {
     return names.join("");
   }
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * The verb that follows a list of sources.
+ *
+ * A comparison over two sources named one at a time often enough for the
+ * singular to be right by accident; over five it is wrong as often as not, and
+ * a sentence that misagrees reads as a sentence written about something else.
+ */
+function agrees(names: string[], singular: string, plural: string): string {
+  return names.length === 1 ? singular : plural;
 }
 
 /**
@@ -222,7 +239,7 @@ function describeDifferences(
     }
     if (timed.length > 0 && untimed.length > 0) {
       differences.push(
-        `${listNames(untimed.map(nameOf))} states no time for this recipe, so there is nothing there to compare against.`,
+        `${listNames(untimed.map(nameOf))} ${agrees(untimed.map(nameOf), "states", "state")} no time for this recipe, so there is nothing there to compare against.`,
       );
     }
   }
@@ -230,14 +247,14 @@ function describeDifferences(
   const rated = recipes.filter((recipe) => recipe.rating !== null);
   if (rated.length > 0 && rated.length < recipes.length) {
     differences.push(
-      `Only ${listNames(rated.map(nameOf))} carries a reader rating, so the versions cannot be compared on one.`,
+      `Only ${listNames(rated.map(nameOf))} ${agrees(rated.map(nameOf), "carries", "carry")} a reader rating, so the versions cannot be compared on one.`,
     );
   }
 
   const credited = recipes.filter((recipe) => recipe.author !== null);
   if (credited.length > 0 && credited.length < recipes.length) {
     differences.push(
-      `Only ${listNames(credited.map(nameOf))} credits an author; the rest are written by whoever edited the page.`,
+      `Only ${listNames(credited.map(nameOf))} ${agrees(credited.map(nameOf), "credits", "credit")} an author; the rest are written by whoever edited the page.`,
     );
   }
 
@@ -253,7 +270,7 @@ function describeDifferences(
   const silent = recipes.filter((recipe) => recipe.license === null);
   if (silent.length > 0 && silent.length < recipes.length) {
     differences.push(
-      `${listNames(silent.map(nameOf))} states no terms of use. Silence is not permission.`,
+      `${listNames(silent.map(nameOf))} ${agrees(silent.map(nameOf), "states", "state")} no terms of use. Silence is not permission.`,
     );
   }
 
@@ -267,7 +284,11 @@ export async function runCompareRecipes(
   try {
     // A few rows from each source is enough: the point is the traditions side
     // by side rather than a long list from any of them.
-    const merged = await client.searchRecipes(args.dish, 3);
+    const merged = await client.searchRecipes(
+      args.dish,
+      3,
+      args.sources as readonly SourceId[] | undefined,
+    );
 
     const best = new Map<SourceId, string>();
     for (const row of merged.rows) {

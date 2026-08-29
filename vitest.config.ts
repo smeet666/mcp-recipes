@@ -17,10 +17,10 @@ export default defineConfig({
       exclude: ["src/index.ts"],
       // The floor is what the suite reaches, and it does not go down.
       thresholds: {
-        statements: 94,
+        statements: 95,
         branches: 87,
-        functions: 97,
-        lines: 94,
+        functions: 98,
+        lines: 95,
       },
     },
   },
