@@ -66,7 +66,7 @@ Node 24 or later is required, and no environment variable has to be set.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.0"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.1"]
     }
   }
 }
@@ -80,7 +80,7 @@ no volume, no port, no credential.
 
 ### Bundle, without npm
 
-Download `mcp-recipes-3.0.0.mcpb` from
+Download `mcp-recipes-3.0.1.mcpb` from
 [the latest release](https://github.com/smeet666/mcp-recipes/releases/latest) and
 open it. A client that supports MCP bundles installs it on its own, with no npm
 and no configuration file to edit. The bundle carries its dependencies, so
@@ -398,7 +398,7 @@ renseigner.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.0"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.1"]
     }
   }
 }
@@ -412,7 +412,7 @@ rien d'autre : aucun volume, aucun port, aucun identifiant.
 
 ### Bundle, sans npm
 
-Téléchargez `mcp-recipes-3.0.0.mcpb` depuis
+Téléchargez `mcp-recipes-3.0.1.mcpb` depuis
 [la dernière publication](https://github.com/smeet666/mcp-recipes/releases/latest)
 et ouvrez-le. Un client qui gère les bundles MCP l'installe seul, sans npm et
 sans fichier de configuration à modifier. Le bundle emporte ses dépendances, donc
