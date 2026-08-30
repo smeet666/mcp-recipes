@@ -15,17 +15,14 @@ a serving is, and a wiki cookbook in English, with equipment lists and prose the
 first has no field for. Asking a question of one of them answers about one of
 them.
 
-This server reads five at once. Three publish in French:
-[Marmiton](https://www.marmiton.org), where home cooks publish,
-[Ptitchef](https://www.ptitchef.com), which files its recipes under a tree of
-ingredients, and [Supertoinette](https://www.supertoinette.com), which prints a
-resting time of its own. Two publish in English: the
-[Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents),
-written and maintained in the open, and
-[BBC Good Food](https://www.bbcgoodfood.com), which groups an ingredient list
-under headings. You can search them all with one question, read a recipe from any
-of them in one shape, put several versions of the same dish side by side, and
-rescale any ingredient list. It needs no API key and no account.
+This server reads five, three in French:
+[Marmiton](https://www.marmiton.org), [Ptitchef](https://www.ptitchef.com) and
+[Supertoinette](https://www.supertoinette.com), and two in English: the
+[Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents)
+and [BBC Good Food](https://www.bbcgoodfood.com). You can search them all with
+one question, read a recipe from any of them in one shape, put several versions
+of the same dish side by side, and rescale any ingredient list. It needs no API
+key and no account.
 
 _[Version française](#mcp-recipes-français)_
 
@@ -349,18 +346,14 @@ qu'est une part, et un wiki de cuisine en anglais, avec des listes de matériel 
 une prose pour lesquelles le premier n'a aucun champ. Poser une question à l'un
 d'eux répond au sujet de l'un d'eux.
 
-Ce serveur en lit cinq à la fois. Trois publient en français :
-[Marmiton](https://www.marmiton.org), où des cuisiniers publient,
-[Ptitchef](https://www.ptitchef.com), qui range ses recettes sous un arbre
-d'ingrédients, et [Supertoinette](https://www.supertoinette.com), qui imprime un
-temps de repos à part. Deux publient en anglais : le
-[Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents),
-écrit et entretenu à découvert, et
-[BBC Good Food](https://www.bbcgoodfood.com), qui groupe une liste d'ingrédients
-sous des intertitres. On peut chercher dans les cinq avec une seule question,
-lire une recette de n'importe lequel sous une seule forme, mettre plusieurs
-versions d'un même plat côte à côte, et adapter n'importe quelle liste
-d'ingrédients. Aucune clé d'API, aucun compte.
+Ce serveur en lit cinq, trois en français :
+[Marmiton](https://www.marmiton.org), [Ptitchef](https://www.ptitchef.com) et
+[Supertoinette](https://www.supertoinette.com), et deux en anglais : le
+[Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents)
+et [BBC Good Food](https://www.bbcgoodfood.com). On peut chercher dans les cinq
+avec une seule question, lire une recette de n'importe lequel sous une seule
+forme, mettre plusieurs versions d'un même plat côte à côte, et adapter
+n'importe quelle liste d'ingrédients. Aucune clé d'API, aucun compte.
 
 ## Installation
 
