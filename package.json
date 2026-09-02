@@ -80,11 +80,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "mcp-bbc-goodfood": "^1.0.0",
-    "mcp-marmiton": "^2.0.0",
-    "mcp-ptitchef": "^1.0.0",
-    "mcp-supertoinette": "^1.0.1",
-    "mcp-wikibooks-cookbook": "^2.0.0",
+    "mcp-bbc-goodfood": "^1.0.1",
+    "mcp-marmiton": "^2.0.1",
+    "mcp-ptitchef": "^1.0.1",
+    "mcp-supertoinette": "^1.0.2",
+    "mcp-wikibooks-cookbook": "^2.0.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
