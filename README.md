@@ -6,6 +6,7 @@
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.smeet666/mcp-recipes)
 [![Glama](https://glama.ai/mcp/servers/smeet666/mcp-recipes/badges/score.svg)](https://glama.ai/mcp/servers/smeet666/mcp-recipes)
 [![M8ven](https://m8ven.ai/badge/mcp/smeet666-mcp-recipes-1o0x5l?variant=verified)](https://m8ven.ai/mcp/smeet666-mcp-recipes-1o0x5l)
+[![LobeHub](https://lobehub.com/badge/mcp/smeet666-mcp-recipes)](https://lobehub.com/mcp/smeet666-mcp-recipes)
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=recipes&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm1jcC1yZWNpcGVzIl19)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=recipes&config=%7B%22name%22%3A%22recipes%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22mcp-recipes%22%5D%7D)
 
