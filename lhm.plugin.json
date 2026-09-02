@@ -1,0 +1,1899 @@
+{
+  "author": "Damien Bouissou",
+  "authorUrl": "https://github.com/smeet666",
+  "description": "MCP server that asks five recipe sites at once, in French and English, merges the answers, and scales quantities. No API key required.",
+  "homepage": "https://github.com/smeet666/mcp-recipes#readme",
+  "identifier": "smeet666-mcp-recipes",
+  "name": "mcp-recipes",
+  "prompts": [],
+  "resources": [],
+  "tags": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "recipes",
+    "cooking",
+    "marmiton",
+    "wikibooks",
+    "cookbook",
+    "ptitchef",
+    "bbc-good-food",
+    "supertoinette",
+    "ingredient-scaling",
+    "bilingual"
+  ],
+  "tools": [
+    {
+      "name": "search_recipes",
+      "title": "Search every recipe source at once",
+      "description": "Search every recipe source this server reads, at the same time, for a dish or an ingredient, and get one merged list. Each row carries the id get_recipe takes, and that id names the source it came from, so nothing has to be guessed afterwards. The sources are written in different languages and count their own results differently, so 'per_source' says what each one answered, what its own number means, and names any that failed. A short list is never evidence of what exists. Some sources keep recipes and reference pages together, so a row can be a page about an ingredient rather than a recipe using it. Only get_recipe can tell them apart, and it says what it read off the page. The query goes to each source's own search as free text. There is no filtering: a word naming a diet, a time or a calorie count matches only where that source's index happens to carry it. Ask in a whole sentence if that is the question. These indexes answer the words they are handed, so a sentence is also sent as the words naming the dish and as the dish word alone, and the rows are the union; 'per_source' lists every wording and what it returned. What the question says the recipe must not hold is set aside from those shorter wordings rather than searched for, and named back in the notes: a negation, an allergy stated as one, a diet named in one word, and the number of people at the table. No source filters on any of it, so open a row with get_recipe and read the ingredient list before calling it suitable. A condition is read with the food on whichever side of it the sentence put one, so 'allergique aux noix' and 'peanut allergy' both name the nut. Where a sentence puts a food on neither side, the notes say a condition was stated and that its food was not read, because naming the wrong word would hide a dish and search for the food being avoided at once. Rows are interleaved one source at a time rather than ranked, because the sources share no score that could order them against each other.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A dish or an ingredient, in any of the languages the sources publish in."
+          },
+          "limit_per_source": {
+            "default": 5,
+            "description": "Rows to take from each source, so one source cannot fill the whole list.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          },
+          "sources": {
+            "description": "Sources to ask, by id. Left out, they are all asked, which is the point of this tool. The ids are the ones 'per_source' reports.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fan_out": {
+            "default": true,
+            "description": "Whether a question may also be sent in shorter wordings derived from it. On, because these indexes answer the words they are handed: a question written as a sentence comes back empty from a corpus holding several of the dish. Turn it off to send exactly the words typed; 'per_source' then names the wordings that were withheld.",
+            "type": "boolean"
+          }
+        },
+        "required": ["query"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Pass this to get_recipe. It names its source, so nothing has to be guessed."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Which source published this row."
+                },
+                "source_name": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The recipe's own page. Show this when citing it."
+                },
+                "image_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "excerpt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The gloss or matching passage the source offered, when it offered one."
+                }
+              },
+              "required": ["id", "source", "source_name", "title", "url", "image_url", "excerpt"],
+              "additionalProperties": false
+            }
+          },
+          "result_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Rows in this answer, across every source."
+          },
+          "per_source": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["answered", "failed"],
+                  "description": "Whether this source replied at all."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Rows this source contributed to the answer."
+                },
+                "reported_total": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What the source said it saw. Null when it states no number at all."
+                },
+                "reported_total_means": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What 'reported_total' counts on this source. Counts are never summed across sources."
+                },
+                "skipped": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Rows this source sent in a shape the server could not read, and left out."
+                },
+                "cached": {
+                  "type": "boolean",
+                  "description": "Served from this server's short-lived in-memory cache."
+                },
+                "preferred_by_name": {
+                  "type": "boolean",
+                  "description": "Whether this source's rows were arranged so the ones whose title names the dish come first. An order over one source's own rows, never a score against another source."
+                },
+                "wordings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "description": "What was sent to this source, or would have been."
+                      },
+                      "derivation": {
+                        "type": "string",
+                        "description": "How this wording was derived from the question."
+                      },
+                      "ran": {
+                        "type": "boolean"
+                      },
+                      "count": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rows this wording returned. Null when it did not run."
+                      },
+                      "added": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rows it returned that no earlier wording had."
+                      },
+                      "not_run_because": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Why it was held back. Null when it ran."
+                      },
+                      "error": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "hint": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["code", "message"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "query",
+                      "derivation",
+                      "ran",
+                      "count",
+                      "added",
+                      "not_run_because",
+                      "error"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Every wording this source was sent or held back from, in the order tried. A question written as a sentence is also sent in wordings derived from it, because these indexes answer the words they are handed. Counts here belong to one wording each and are never added."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "hint": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Why this source did not answer. Null when it did."
+                },
+                "read": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": ["read", "failed"]
+                        },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "hint": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["status", "error"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What became of the row this source offered, once it was opened. Null when no row was opened, which is what a search that did not answer and a search holding nothing both come to. A search and a read are two moments, and this is the second one."
+                }
+              },
+              "required": [
+                "source",
+                "name",
+                "status",
+                "count",
+                "reported_total",
+                "reported_total_means",
+                "skipped",
+                "cached",
+                "preferred_by_name",
+                "wordings",
+                "error",
+                "read"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "order": {
+            "type": "string",
+            "description": "How the list was built, in words."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["query", "results", "result_count", "per_source", "order", "notes"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_recipe",
+      "title": "Read one recipe, optionally rescaled",
+      "description": "Read one recipe in full: its ingredients, its steps, what it yields, and whatever times, rating and nutrition its source publishes. 'id' must come from search_recipes. It names the source, so this reads the right one without guessing; an identifier no source would have minted is refused, because sending it anywhere would answer about the wrong dish. Pass 'servings' to rescale. Quantities land where a kitchen can follow them: an egg stays whole, anything that pours or cuts can halve, a small measurement moves to a smaller unit before it is rounded, and anything unmultipliable is flagged rather than scaled. A page that states no number of servings comes back as published and says so, because dividing by a yield nobody wrote would answer for a number of people the page never claimed. A part this answer holds nothing for says which of two things happened: the page showed no sign of it, or this server failed to read what the page carries. An empty ingredient list is never evidence that an ingredient is absent from the dish. 'sections' decides what comes back, and 'sections_omitted' names what was left out: a field belonging to an omitted section is empty because nobody asked for it, never because the page states nothing. A field a source does not publish is null, never zero. Credit the source and link the url when you repeat any of it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "From search_recipes, such as 'marmiton:44078', 'goodfood:recipes/carbonara' or 'cookbook:Cookbook:Carbonara'. Two sources address a recipe by a bare number, so spell an id with its source."
+          },
+          "servings": {
+            "description": "Rescale to this many. Left out, the quantities come back as published.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "sections": {
+            "default": ["ingredients", "steps"],
+            "description": "Which parts to return. A full recipe is a lot of text, so this defaults to two.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["ingredients", "steps", "times", "nutrition", "tips", "equipment"]
+            }
+          },
+          "max_steps": {
+            "default": 20,
+            "description": "Steps to return. The answer says how many more there are.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_step_chars": {
+            "default": 600,
+            "description": "Characters kept per step. Raise it only if a step was cut mid-sentence.",
+            "type": "integer",
+            "minimum": 80,
+            "maximum": 4000
+          }
+        },
+        "required": ["id"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recipe": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "source_name": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string",
+                "enum": ["fr", "en"],
+                "description": "The language this recipe is written in."
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "image_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "yield": {
+                "type": "object",
+                "properties": {
+                  "original_count": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Servings the page states as a number. Null when it states none."
+                  },
+                  "original_max": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The upper end when the page states a span, as in '4 à 6 personnes'."
+                  },
+                  "original_text": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The yield in the page's own words. '4 à 6 personnes' and '4 personnes' are different claims, so the wording is kept."
+                  },
+                  "requested": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Servings asked for, when any were."
+                  },
+                  "unit": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What the yield counts when it counts something other than people, such as 'balls'."
+                  },
+                  "factor": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What the quantities were multiplied by. Null when nothing was rescaled."
+                  }
+                },
+                "required": [
+                  "original_count",
+                  "original_max",
+                  "original_text",
+                  "requested",
+                  "unit",
+                  "factor"
+                ],
+                "additionalProperties": false
+              },
+              "ingredients": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "The line as it now reads."
+                    },
+                    "original": {
+                      "type": "string",
+                      "description": "The line as published."
+                    },
+                    "scaling": {
+                      "type": "string",
+                      "enum": ["scaled", "rounded", "unscaled"],
+                      "description": "'scaled' means the arithmetic landed on the exact product, 'rounded' that something had to move for the line to stay usable or that the line carries a second quantity whose match is the page's claim, 'unscaled' that there is nothing to multiply."
+                    },
+                    "amount": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The scaled quantity, in 'unit'. Read the two together, never the number alone."
+                    },
+                    "amount_max": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Upper bound when the line gives a range."
+                    },
+                    "unit": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The unit 'amount' is in, which may differ from the page's."
+                    },
+                    "language": {
+                      "type": "string",
+                      "enum": ["fr", "en"],
+                      "description": "The language the line was read and rewritten in."
+                    },
+                    "note": {
+                      "description": "What happened to this line, when anything did.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "original",
+                    "scaling",
+                    "amount",
+                    "amount_max",
+                    "unit",
+                    "language"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "prep_minutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cook_minutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "total_minutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rest_minutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Time the recipe stands, from a source that publishes it apart. It is in no other time here, and belongs to no other source's cooking time. Null where the source publishes none, which is not a dish that needs no rest."
+              },
+              "steps_as_one_block": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the source publishes the method as one block of prose rather than as steps of its own. Null where the source says neither, so a single entry is not read as step one of several."
+              },
+              "withheld": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "parts": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Which parts, named as 'ingredients' or 'method'."
+                      },
+                      "why": {
+                        "type": "string",
+                        "description": "What the source says about keeping them back."
+                      }
+                    },
+                    "required": ["parts", "why"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A part the source published nothing of because it keeps it for its subscribers. Null from a source that withholds nothing, which is a different statement from an empty list."
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "author": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null on a source written by everyone who edited the page."
+              },
+              "rating": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "count": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "How many readers rated it, when the source says."
+                      },
+                      "max": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The top of the scale. A rating read without its scale means nothing."
+                      }
+                    },
+                    "required": ["value", "count", "max"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null on a source that carries no reader rating."
+              },
+              "nutrition": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The panel as published, key by key. Figures the page omits are absent, never zero."
+              },
+              "equipment": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "tips": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "license": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["title", "url"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Terms the page is published under, when the source states them."
+              },
+              "attribution": {
+                "type": "string",
+                "description": "Show this, with the url, when repeating anything from here."
+              },
+              "sections_returned": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sections this answer carries. Anything outside this list was not looked at."
+              },
+              "sections_omitted": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Sections nobody asked for. A field belonging to one of these is empty because it was not requested, never because the page states nothing."
+              },
+              "scaling_summary": {
+                "type": "object",
+                "properties": {
+                  "scaled_count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "rounded_count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "unscaled_count": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["scaled_count", "rounded_count", "unscaled_count"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "source",
+              "source_name",
+              "language",
+              "title",
+              "url",
+              "image_url",
+              "yield",
+              "ingredients",
+              "steps",
+              "prep_minutes",
+              "cook_minutes",
+              "total_minutes",
+              "rest_minutes",
+              "steps_as_one_block",
+              "withheld",
+              "category",
+              "author",
+              "rating",
+              "nutrition",
+              "equipment",
+              "tips",
+              "license",
+              "attribution",
+              "sections_returned",
+              "sections_omitted",
+              "scaling_summary"
+            ],
+            "additionalProperties": false
+          },
+          "id_read_as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How a raw identifier was routed, when it was not spelled with its source."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["recipe", "id_read_as", "notes"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "scale_ingredients",
+      "title": "Scale an ingredient list, in either language",
+      "description": "Multiply a list of ingredient lines, in French, in English, or in a list holding both. Give either 'factor', or 'from_servings' and 'to_servings' and the factor is worked out from them. Quantities land where a kitchen can follow them: an egg stays whole because half of one is not something a cook takes out of the shell, while anything that pours, weighs or cuts can halve, a spoonful shrinks into the smaller spoon before it is rounded, and a pinch keeps whatever size a hand gives it while its count is multiplied. Every line comes back with 'scaling': 'scaled' when the arithmetic landed on the exact product, 'rounded' when something had to move for the line to stay usable, 'unscaled' when the line carries nothing to multiply. A rounded line says what it was rounded from and in which direction. No quantity is converted between measuring systems: grams stay grams and cups stay cups, because a conversion changes what the recipe said.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ingredients": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "description": "The lines as written, one ingredient each, such as '200 g de farine' or '3 eggs'. One line, not a whole recipe."
+          },
+          "factor": {
+            "description": "What to multiply by. Give exactly one of: 'factor', or both 'from_servings' and 'to_servings'.",
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          },
+          "from_servings": {
+            "description": "What the list serves now. Give it with 'to_servings', and without 'factor'.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "to_servings": {
+            "description": "What it should serve. Give it with 'from_servings', and without 'factor'.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "language": {
+            "default": "auto",
+            "description": "'auto' reads each line on its own, which is what a list holding both languages needs. Name a language to read every line that way.",
+            "type": "string",
+            "enum": ["auto", "fr", "en"]
+          }
+        },
+        "required": ["ingredients"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "factor": {
+            "type": "number",
+            "description": "What every quantity was multiplied by."
+          },
+          "language": {
+            "type": "string",
+            "description": "How the lines were read."
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The line as it now reads."
+                },
+                "original": {
+                  "type": "string",
+                  "description": "The line as published."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": ["scaled", "rounded", "unscaled"],
+                  "description": "'scaled' means the arithmetic landed on the exact product, 'rounded' that something had to move for the line to stay usable or that the line carries a second quantity whose match is the page's claim, 'unscaled' that there is nothing to multiply."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The scaled quantity, in 'unit'. Read the two together, never the number alone."
+                },
+                "amount_max": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Upper bound when the line gives a range."
+                },
+                "unit": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unit 'amount' is in, which may differ from the page's."
+                },
+                "language": {
+                  "type": "string",
+                  "enum": ["fr", "en"],
+                  "description": "The language the line was read and rewritten in."
+                },
+                "note": {
+                  "description": "What happened to this line, when anything did.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "original",
+                "scaling",
+                "amount",
+                "amount_max",
+                "unit",
+                "language"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scaled_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Lines whose arithmetic came out exact."
+          },
+          "rounded_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Lines whose value moved to stay usable."
+          },
+          "unscaled_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Lines carrying nothing that can be multiplied."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "factor",
+          "language",
+          "ingredients",
+          "scaled_count",
+          "rounded_count",
+          "unscaled_count",
+          "notes"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "compare_recipes",
+      "title": "One dish, as each source writes it",
+      "description": "Take a dish and show how each source writes it, side by side. Each source's closest match is read in full, and all of them can be rescaled to the same number of servings so the ingredient lists stand comparison. The answer states what differs and leaves it there: the quantities each asks for, what each measures in, what each yields, and which fields each source publishes at all. No version is ranked above another. Some sources carry reader ratings and some have no author and no rating by nature, so there is no score they share. When only one source answers, the answer says so and shows that one rather than presenting part of a comparison as the whole of it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dish": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The dish to compare, in any of the languages the sources publish in."
+          },
+          "servings": {
+            "description": "Rescale every version to this many, which is what makes the lists comparable.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "sections": {
+            "default": ["ingredients"],
+            "description": "Which parts of each version to return. Several full recipes is a lot of text.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["ingredients", "steps", "times", "nutrition", "tips", "equipment"]
+            }
+          },
+          "max_steps": {
+            "default": 10,
+            "description": "Steps to return per version.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_step_chars": {
+            "default": 600,
+            "description": "Characters kept per step. Raise it only if a step was cut mid-sentence.",
+            "type": "integer",
+            "minimum": 80,
+            "maximum": 4000
+          },
+          "sources": {
+            "description": "Sources to compare, by id. Left out, every source is read, which is the point of this tool. Name two or three to put particular traditions side by side. The ids are the ones 'per_source' reports.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["dish"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dish": {
+            "type": "string"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "source_name": {
+                  "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "enum": ["fr", "en"],
+                  "description": "The language this recipe is written in."
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "image_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "yield": {
+                  "type": "object",
+                  "properties": {
+                    "original_count": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Servings the page states as a number. Null when it states none."
+                    },
+                    "original_max": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The upper end when the page states a span, as in '4 à 6 personnes'."
+                    },
+                    "original_text": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The yield in the page's own words. '4 à 6 personnes' and '4 personnes' are different claims, so the wording is kept."
+                    },
+                    "requested": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Servings asked for, when any were."
+                    },
+                    "unit": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the yield counts when it counts something other than people, such as 'balls'."
+                    },
+                    "factor": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the quantities were multiplied by. Null when nothing was rescaled."
+                    }
+                  },
+                  "required": [
+                    "original_count",
+                    "original_max",
+                    "original_text",
+                    "requested",
+                    "unit",
+                    "factor"
+                  ],
+                  "additionalProperties": false
+                },
+                "ingredients": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "The line as it now reads."
+                      },
+                      "original": {
+                        "type": "string",
+                        "description": "The line as published."
+                      },
+                      "scaling": {
+                        "type": "string",
+                        "enum": ["scaled", "rounded", "unscaled"],
+                        "description": "'scaled' means the arithmetic landed on the exact product, 'rounded' that something had to move for the line to stay usable or that the line carries a second quantity whose match is the page's claim, 'unscaled' that there is nothing to multiply."
+                      },
+                      "amount": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The scaled quantity, in 'unit'. Read the two together, never the number alone."
+                      },
+                      "amount_max": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Upper bound when the line gives a range."
+                      },
+                      "unit": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The unit 'amount' is in, which may differ from the page's."
+                      },
+                      "language": {
+                        "type": "string",
+                        "enum": ["fr", "en"],
+                        "description": "The language the line was read and rewritten in."
+                      },
+                      "note": {
+                        "description": "What happened to this line, when anything did.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "original",
+                      "scaling",
+                      "amount",
+                      "amount_max",
+                      "unit",
+                      "language"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "prep_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cook_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "total_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "rest_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Time the recipe stands, from a source that publishes it apart. It is in no other time here, and belongs to no other source's cooking time. Null where the source publishes none, which is not a dish that needs no rest."
+                },
+                "steps_as_one_block": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the source publishes the method as one block of prose rather than as steps of its own. Null where the source says neither, so a single entry is not read as step one of several."
+                },
+                "withheld": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Which parts, named as 'ingredients' or 'method'."
+                        },
+                        "why": {
+                          "type": "string",
+                          "description": "What the source says about keeping them back."
+                        }
+                      },
+                      "required": ["parts", "why"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A part the source published nothing of because it keeps it for its subscribers. Null from a source that withholds nothing, which is a different statement from an empty list."
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Null on a source written by everyone who edited the page."
+                },
+                "rating": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "number"
+                        },
+                        "count": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "How many readers rated it, when the source says."
+                        },
+                        "max": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The top of the scale. A rating read without its scale means nothing."
+                        }
+                      },
+                      "required": ["value", "count", "max"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Null on a source that carries no reader rating."
+                },
+                "nutrition": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The panel as published, key by key. Figures the page omits are absent, never zero."
+                },
+                "equipment": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "tips": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "license": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["title", "url"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Terms the page is published under, when the source states them."
+                },
+                "attribution": {
+                  "type": "string",
+                  "description": "Show this, with the url, when repeating anything from here."
+                },
+                "sections_returned": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The sections this answer carries. Anything outside this list was not looked at."
+                },
+                "sections_omitted": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Sections nobody asked for. A field belonging to one of these is empty because it was not requested, never because the page states nothing."
+                },
+                "scaling_summary": {
+                  "type": "object",
+                  "properties": {
+                    "scaled_count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "rounded_count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "unscaled_count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["scaled_count", "rounded_count", "unscaled_count"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "source_name",
+                "language",
+                "title",
+                "url",
+                "image_url",
+                "yield",
+                "ingredients",
+                "steps",
+                "prep_minutes",
+                "cook_minutes",
+                "total_minutes",
+                "rest_minutes",
+                "steps_as_one_block",
+                "withheld",
+                "category",
+                "author",
+                "rating",
+                "nutrition",
+                "equipment",
+                "tips",
+                "license",
+                "attribution",
+                "sections_returned",
+                "sections_omitted",
+                "scaling_summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What differs between the versions, stated as fact. No version is ranked."
+          },
+          "per_source": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["answered", "failed"],
+                  "description": "Whether this source replied at all."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Rows this source contributed to the answer."
+                },
+                "reported_total": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What the source said it saw. Null when it states no number at all."
+                },
+                "reported_total_means": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What 'reported_total' counts on this source. Counts are never summed across sources."
+                },
+                "skipped": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "description": "Rows this source sent in a shape the server could not read, and left out."
+                },
+                "cached": {
+                  "type": "boolean",
+                  "description": "Served from this server's short-lived in-memory cache."
+                },
+                "preferred_by_name": {
+                  "type": "boolean",
+                  "description": "Whether this source's rows were arranged so the ones whose title names the dish come first. An order over one source's own rows, never a score against another source."
+                },
+                "wordings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "description": "What was sent to this source, or would have been."
+                      },
+                      "derivation": {
+                        "type": "string",
+                        "description": "How this wording was derived from the question."
+                      },
+                      "ran": {
+                        "type": "boolean"
+                      },
+                      "count": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rows this wording returned. Null when it did not run."
+                      },
+                      "added": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rows it returned that no earlier wording had."
+                      },
+                      "not_run_because": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Why it was held back. Null when it ran."
+                      },
+                      "error": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "hint": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["code", "message"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "query",
+                      "derivation",
+                      "ran",
+                      "count",
+                      "added",
+                      "not_run_because",
+                      "error"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Every wording this source was sent or held back from, in the order tried. A question written as a sentence is also sent in wordings derived from it, because these indexes answer the words they are handed. Counts here belong to one wording each and are never added."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "hint": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Why this source did not answer. Null when it did."
+                },
+                "read": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": ["read", "failed"]
+                        },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "hint": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["status", "error"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "What became of the row this source offered, once it was opened. Null when no row was opened, which is what a search that did not answer and a search holding nothing both come to. A search and a read are two moments, and this is the second one."
+                }
+              },
+              "required": [
+                "source",
+                "name",
+                "status",
+                "count",
+                "reported_total",
+                "reported_total_means",
+                "skipped",
+                "cached",
+                "preferred_by_name",
+                "wordings",
+                "error",
+                "read"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["dish", "versions", "differences", "per_source", "notes"],
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ],
+  "version": "3.0.1"
+}
