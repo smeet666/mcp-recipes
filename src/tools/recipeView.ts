@@ -184,15 +184,34 @@ export const collectionSchema = z.object({
   image_url: z.string().nullable(),
   headings: z
     .array(z.string())
-    .describe("The headings the article is built from, in the order it prints them."),
-  recipes: z.array(rowSchema).describe("The recipes it points at, each readable with get_recipe."),
+    .describe(
+      "The headings the article is built from, in the order it prints them, up to 'max_gathered'.",
+    ),
+  recipes: z
+    .array(rowSchema)
+    .describe(
+      "The recipes it points at, each readable with get_recipe, up to 'max_gathered'. " +
+        "'gathered_count' says how many the article holds.",
+    ),
+  gathered_count: z
+    .number()
+    .int()
+    .describe("Recipes the article points at, whether or not they are all listed here."),
   attribution: z.string().describe("Show this, with the url, when repeating anything from here."),
 });
 
 export type CollectionPayload = z.infer<typeof collectionSchema>;
 
-/** The article an address held, in the shape a tool returns. */
-export function buildCollectionView(recipe: RecipeDetail): CollectionPayload {
+/**
+ * The article an address held, in the shape a tool returns.
+ *
+ * An article can point at a hundred recipes and be built from as many headings,
+ * so both lists are cut to what was asked for and the count says what the
+ * article holds. Returning either whole is the one answer here with no ceiling
+ * on it.
+ */
+export function buildCollectionView(recipe: RecipeDetail, limit: number): CollectionPayload {
+  const gathered = recipe.gathers?.rows ?? [];
   return {
     id: recipe.id,
     source: recipe.source,
@@ -200,8 +219,9 @@ export function buildCollectionView(recipe: RecipeDetail): CollectionPayload {
     title: recipe.title,
     url: recipe.url,
     image_url: recipe.imageUrl,
-    headings: recipe.gathers?.headings ?? [],
-    recipes: (recipe.gathers?.rows ?? []).map(toRowPayload),
+    headings: (recipe.gathers?.headings ?? []).slice(0, limit),
+    recipes: gathered.slice(0, limit).map(toRowPayload),
+    gathered_count: gathered.length,
     attribution: recipe.attribution,
   };
 }

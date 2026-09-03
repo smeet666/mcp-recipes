@@ -384,6 +384,7 @@ describe("a step list is bounded", () => {
       id: "marmiton:1001",
       sections: ["steps"],
       max_steps: 5,
+      max_gathered: 30,
       max_step_chars: 600,
     });
     const payload = payloadOf<{ recipe: { steps: string[] } }>(result);

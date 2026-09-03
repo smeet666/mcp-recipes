@@ -435,6 +435,11 @@ const TIME_UNIT: Record<Language, RegExp> = {
   es: /^(?:h|hs|horas?|mins?|minutos?|segs?|segundos?|días?|dias?|noches?|semanas?)\b/i,
 };
 
+/** Whether a line states its amount for one eater, in any of the vocabularies. */
+function statesAnAmountPerEater(text: string): boolean {
+  return Object.values(PER_PERSON).some((pattern) => pattern.test(text));
+}
+
 /** Whether a figure is followed by a length of time in any of the vocabularies. */
 function namesALengthOfTime(text: string): boolean {
   return Object.values(TIME_UNIT).some((pattern) => pattern.test(text));
@@ -456,6 +461,11 @@ const ORDINAL_SUFFIX = /^(?:ers?|[eè]res?|[eè]mes?|es?|st|nd|rd|th)\b/i;
  * The factor already says how many people the recipe is being made for, so
  * multiplying an amount that is per person applies it twice and asks for twice
  * as much on every plate.
+ *
+ * Every vocabulary is tried on every line, because an amount per eater is not
+ * one to multiply whichever language says so, and a line whose language was
+ * read one way and whose "par personne" was written the other would come back
+ * with twice as much on every plate.
  */
 const PER_PERSON: Record<Language, RegExp> = {
   en: /\bper\s+(?:person|head|serving|guest|diner)\b/i,
@@ -1330,7 +1340,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
   return {
     original,
     language,
-    heldBack: PER_PERSON[language].test(text) ? "perPerson" : null,
+    heldBack: statesAnAmountPerEater(text) ? "perPerson" : null,
     decoration,
     approximation: loose ? loose[0] : null,
     measureAdjective: behind?.unit ? described.adjective : null,

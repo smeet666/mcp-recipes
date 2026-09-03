@@ -19,6 +19,7 @@ import type { RecipePayload, Section } from "./recipeView.js";
 import type { RecipeView } from "./recipeView.js";
 import {
   creditLine,
+  listNames,
   fitLines,
   mustKeep,
   omittedLinesLine,
@@ -107,14 +108,6 @@ const TEXT_INGREDIENT_LINES = 8;
 
 /** Differences the text block states before pointing at the rest. */
 const TEXT_DIFFERENCE_LINES = 4;
-
-/** Sources named the way a sentence names them. */
-function listNames(names: string[]): string {
-  if (names.length <= 1) {
-    return names.join("");
-  }
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-}
 
 /**
  * The verb that follows a list of sources.

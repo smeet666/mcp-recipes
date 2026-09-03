@@ -16,7 +16,9 @@ import { PequerecetasClient } from "mcp-pequerecetas/client";
 import { SupertoinetteClient } from "mcp-supertoinette/client";
 import { describe, expect, it } from "vitest";
 import { createLogger, loadConfig, MIN_ALLOWED_INTERVAL_MS } from "../../src/config.js";
+import { RecipesClient } from "../../src/sources/client.js";
 import { PACED_SOURCES, pacedConfig, pacingFor, PROFILES } from "../../src/sources/registry.js";
+import { fakeReaders } from "./support.js";
 
 /**
  * What each site asks for, in its own package.
@@ -102,5 +104,51 @@ describe("what the client actually spaces its requests by", () => {
         logger: silent,
       }).currentIntervalMs,
     ).toBe(ASKS_FOR.ptitchef);
+  });
+});
+
+describe("the backstop over one source", () => {
+  /**
+   * The backstop is a wall clock this server keeps under the deadline each
+   * reader keeps for itself. Firing first abandons a read whose requests carry
+   * on reaching the site, so it has to allow everything a reader can spend.
+   */
+  const deadlineFor = (client: RecipesClient, source: string) =>
+    (client as unknown as { deadlineFor: (id: string) => number }).deadlineFor(source);
+
+  it("allows the pace that source is read at, not the shared setting", () => {
+    const client = new RecipesClient({
+      config: { minIntervalMs: MIN_ALLOWED_INTERVAL_MS },
+      readers: fakeReaders(),
+      logger: silent,
+    });
+
+    expect(deadlineFor(client, "pequerecetas")).toBeGreaterThan(deadlineFor(client, "marmiton"));
+  });
+
+  it("allows the longest wait a site can ask for between two attempts", () => {
+    const client = new RecipesClient({
+      config: { minIntervalMs: MIN_ALLOWED_INTERVAL_MS, timeoutMs: 1000, maxRetries: 3 },
+      readers: fakeReaders(),
+      logger: silent,
+    });
+    const attempts = 4 * 1000;
+    const spacing = pacingFor("marmiton", MIN_ALLOWED_INTERVAL_MS) * 3;
+
+    // Whatever the figure, it is more than the attempts and the spacing alone:
+    // a site answering "slow down" names a wait, and the reader honours it.
+    expect(deadlineFor(client, "marmiton")).toBeGreaterThan(attempts + spacing);
+  });
+
+  it("gives every source more room than its own attempts take", () => {
+    const client = new RecipesClient({ readers: fakeReaders(), logger: silent });
+    const config = loadConfig({});
+
+    for (const profile of PROFILES) {
+      expect(deadlineFor(client, profile.id), profile.id).toBeGreaterThan(
+        config.timeoutMs * (config.maxRetries + 1) +
+          pacingFor(profile.id, config.minIntervalMs) * config.maxRetries,
+      );
+    }
   });
 });

@@ -414,14 +414,12 @@ const HEALTH_MARKERS = new Set([
   "intolerant",
   "intolerante",
   "intolerantes",
-  "intolerants",
   "alergia",
   "alergias",
   "alergica",
   "alergico",
   "celiaca",
   "celiaco",
-  "intolerantes",
 ]);
 
 /**

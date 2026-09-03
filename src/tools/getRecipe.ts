@@ -77,6 +77,16 @@ export const getRecipeInput = strictInput({
     .max(100)
     .default(20)
     .describe("Steps to return. The answer says how many more there are."),
+  max_gathered: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .default(30)
+    .describe(
+      "Recipes and headings to return from an address that gathers recipes. The answer says how " +
+        "many the article holds.",
+    ),
   max_step_chars: z
     .number()
     .int()
@@ -114,6 +124,15 @@ export const getRecipeOutput = z.object({
 
 export type GetRecipeArgs = z.infer<typeof getRecipeInput>;
 
+/**
+ * The arguments that only mean something for a recipe.
+ *
+ * An address holding an article has no quantities to rescale and no method to
+ * cut, so these reach nothing. An argument accepted and left without effect is
+ * a promise the answer did not keep, and the answer says which ones.
+ */
+const ARGUMENTS_FOR_A_RECIPE = ["servings"] as const satisfies ReadonlyArray<keyof GetRecipeArgs>;
+
 export async function runGetRecipe(
   client: RecipesClient,
   args: GetRecipeArgs,
@@ -129,7 +148,20 @@ export async function runGetRecipe(
     const served = cached ? ["Served from this server's short-lived in-memory cache."] : [];
 
     if (recipe.gathers) {
-      return gatheredAnswer(recipe, read.inferred, [...routed, ...served]);
+      const ignored = ARGUMENTS_FOR_A_RECIPE.filter((name) => args[name] !== undefined);
+      const said =
+        ignored.length > 0
+          ? [
+              `This address held an article, so ${ignored.map((name) => `'${name}'`).join(" and ")} ` +
+                "had nothing to act on. Call get_recipe on one of the recipes it lists.",
+            ]
+          : [];
+      return gatheredAnswer(
+        recipe,
+        read.inferred,
+        [...routed, ...served, ...said],
+        args.max_gathered,
+      );
     }
 
     const view = buildRecipeView(recipe, {
@@ -207,10 +239,17 @@ function gatheredAnswer(
   recipe: RecipeDetail,
   inferred: string | null,
   earlier: Note[],
+  limit: number,
 ): ToolResult {
-  const payload = buildCollectionView(recipe);
+  const payload = buildCollectionView(recipe, limit);
   const notes: Note[] = [
     ...earlier,
+    ...(payload.gathered_count > payload.recipes.length
+      ? [
+          `This article points at ${payload.gathered_count} recipes and ${payload.recipes.length} ` +
+            "are here. Raise 'max_gathered' for the rest.",
+        ]
+      : []),
     mustKeep(
       "This address gathers other recipes, so there are no " +
         `ingredients and no method to read. ${payload.source_name} publishes both at this kind ` +
@@ -222,7 +261,7 @@ function gatheredAnswer(
   const head = [
     `${quoteForeign(payload.title)} · ${quoteForeign(payload.source_name)}`,
     quoteForeign(payload.url),
-    `An article that gathers ${payload.recipes.length} recipe(s).`,
+    `An article that gathers ${payload.gathered_count} recipe(s).`,
   ];
   const rows = payload.recipes.map(
     (row) => `- ${quoteForeign(row.title)} (${quoteForeign(row.id)})`,

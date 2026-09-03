@@ -66,7 +66,7 @@ describe("search_recipes", () => {
 
   it("says a source is silent about totals, and invents no number for it", async () => {
     const result = await runSearchRecipes(fakeClient(), { ...searchArgs });
-    expect(textOf(result)).toMatch(/states no total/);
+    expect(textOf(result)).toMatch(/publishes no count of what a search matched/);
   });
 
   it("distinguishes every source answering nothing from every source failing", async () => {

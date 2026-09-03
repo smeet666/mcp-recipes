@@ -835,7 +835,13 @@ export function searchArgs(
 export function recipeArgs(
   over: Partial<import("../../src/tools/getRecipe.js").GetRecipeArgs> & { id: string },
 ): import("../../src/tools/getRecipe.js").GetRecipeArgs {
-  return { sections: ["ingredients"], max_steps: 20, max_step_chars: 600, ...over };
+  return {
+    sections: ["ingredients"],
+    max_steps: 20,
+    max_gathered: 30,
+    max_step_chars: 600,
+    ...over,
+  };
 }
 
 /** The arguments a caller sends compare_recipes, with the defaults filled in. */

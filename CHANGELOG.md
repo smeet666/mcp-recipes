@@ -40,6 +40,18 @@
   asks for.
 - **The library section of the README states the API the client actually has.**
   It documented a call that does not exist.
+- **An amount stated per eater is recognised in every language.** "50 g par
+  personne" and "50 g por persona" were multiplied by the factor, which asks for
+  twice as much on every plate; only the English wording was read. A length of
+  time is read the same way, in whichever language names it.
+- **The backstop over one source allows what a reader actually spends.** It was
+  computed on the shared spacing and left out the wait a site asks for by name,
+  so it could fire while the reader was still working: the read was abandoned
+  while its requests carried on reaching the site.
+- **An article that gathers recipes is returned bounded.** It was the one answer
+  with no ceiling on it, and an article can point at a hundred recipes.
+  `max_gathered` says how many to return and `gathered_count` how many there
+  are.
 
 ## 3.0.1
 

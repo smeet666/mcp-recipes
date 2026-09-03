@@ -404,10 +404,10 @@ describe("an article with many headings stays readable", () => {
       // crowd out.
       expect(text.split("\n").filter((line) => line.startsWith("- ")).length).toBeGreaterThan(1);
       // Nothing is lost in silence: what was left out is counted.
-      expect(text).toMatch(/of 40/);
-      expect(payloadOf<{ collection: { headings: string[] } }>(answer).collection.headings).toEqual(
-        many,
-      );
+      expect(text).toMatch(/shown here/);
+      expect(
+        payloadOf<{ collection: { gathered_count: number } }>(answer).collection.gathered_count,
+      ).toBe(40);
     });
   });
 });
@@ -443,5 +443,50 @@ describe("what a Spanish yield is counted in", () => {
     );
 
     expect(payload.notes.some((note) => /galletas/.test(note))).toBe(true);
+  });
+});
+
+describe("an article that gathers a great many recipes", () => {
+  const hundred = (): PequerecetasPage => ({
+    kind: "collection",
+    collection: {
+      ...(collectionPage as { collection: PequerecetasCollection }).collection,
+      headings: Array.from({ length: 100 }, (_, index) => `Encabezado ${index + 1}`),
+      recipes: Array.from({ length: 100 }, (_, index) => ({
+        id: `receta-${index + 1}`,
+        title: `Receta número ${index + 1}`,
+        url: `https://www.pequerecetas.com/receta/receta-${index + 1}/`,
+        image_url: null,
+      })),
+    },
+  });
+
+  it("bounds what it returns, and says what it left out", async () => {
+    const payload = payloadOf<{
+      collection: { recipes: unknown[]; headings: string[]; gathered_count: number };
+      notes: string[];
+    }>(
+      await runGetRecipe(
+        fakeClient({ pequerecetas: { page: hundred() } }),
+        recipeArgs({ id: "pequerecetas:recetas-con-huevo" }),
+      ),
+    );
+
+    // Every other list this server returns has a ceiling; this one had none,
+    // and an article can point at a hundred recipes.
+    expect(payload.collection.recipes.length).toBeLessThan(100);
+    expect(payload.collection.gathered_count).toBe(100);
+    expect(payload.notes.some((note) => /100/.test(note))).toBe(true);
+  });
+
+  it("returns as many as a caller asks for", async () => {
+    const payload = payloadOf<{ collection: { recipes: unknown[] } }>(
+      await runGetRecipe(fakeClient({ pequerecetas: { page: hundred() } }), {
+        ...recipeArgs({ id: "pequerecetas:recetas-con-huevo" }),
+        max_gathered: 100,
+      }),
+    );
+
+    expect(payload.collection.recipes).toHaveLength(100);
   });
 });

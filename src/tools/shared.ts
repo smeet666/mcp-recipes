@@ -122,7 +122,7 @@ export const ingredientSchema = z.object({
   scaling: z
     .enum(["scaled", "rounded", "unscaled"])
     .describe(
-      "'scaled' means the arithmetic landed on the exact product, 'rounded' that something had to move for the line to stay usable or that the line carries a second quantity whose match is the page's claim, 'unscaled' that there is nothing to multiply.",
+      "'scaled' means the arithmetic landed on the exact product, 'rounded' that something had to move for the line to stay usable or that the line carries a second quantity whose match is the page's claim, 'unscaled' that the line was left as given. Read 'is_equipment' beside it: a tool line is 'unscaled' whether or not it carries a figure.",
     ),
   amount: z
     .number()
@@ -266,13 +266,6 @@ function answeredNotes(report: SourceReport): Note[] {
         .join(", ")}. Those counts are per wording and are never added.`,
     );
   }
-  if (report.preferredByName) {
-    notes.push(
-      `${report.name}'s rows are arranged with the ones naming the dish first, so a wording that ` +
-        "returned near-misses cannot crowd out what another wording found. That is an order over " +
-        "one source's own rows and not a score against any other source.",
-    );
-  }
   if (report.skipped > 0) {
     notes.push(
       mustKeep(
@@ -290,11 +283,19 @@ function answeredNotes(report: SourceReport): Note[] {
     );
   } else {
     notes.push(
-      `${report.name} states no total and offers no second page, so a short list here is not evidence that little exists.`,
+      `${report.name} publishes no count of what a search matched, so a short list here is not evidence that little exists.`,
     );
   }
 
   return notes;
+}
+
+/** Sources named the way a sentence names them. */
+export function listNames(names: string[]): string {
+  if (names.length <= 1) {
+    return names.join("");
+  }
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 /**
@@ -347,6 +348,19 @@ export function reportNotes(reports: SourceReport[]): Note[] {
 
   for (const report of answered) {
     notes.push(...answeredNotes(report));
+  }
+
+  // Said once for however many sources it applies to. The sentence is the same
+  // whichever source it names, and six copies of it fill an answer without
+  // adding to it.
+  const arranged = answered.filter((report) => report.preferredByName);
+  if (arranged.length > 0) {
+    notes.push(
+      `${listNames(arranged.map((report) => report.name))} had their rows arranged with the ones ` +
+        "naming the dish first, so a wording that returned near-misses cannot crowd out what " +
+        "another wording found. That is an order over one source's own rows and not a score " +
+        "against any other source.",
+    );
   }
 
   // Each source says in its own words what else one of its rows can be, because
