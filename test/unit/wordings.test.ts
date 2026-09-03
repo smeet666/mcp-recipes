@@ -766,3 +766,43 @@ describe("the union of what came back", () => {
     expect(payload.notes.join(" ")).toMatch(/wording/i);
   });
 });
+
+describe("a question asked in Spanish", () => {
+  it("keeps the words naming the dish and drops the ones framing the question", () => {
+    const wordings = deriveWordings("hola, quiero una receta facil de tortilla de patatas");
+    const words = wordings.map((wording) => wording.query);
+
+    expect(words[0]).toBe("hola, quiero una receta facil de tortilla de patatas");
+    // The dish is what is left once the question's own words are taken off.
+    expect(words.at(-1)).toContain("tortilla");
+    expect(words.at(-1)).not.toContain("quiero");
+    expect(words.at(-1)).not.toContain("receta");
+  });
+
+  it("sets aside a food a Spanish question puts out of the dish", () => {
+    expect(readConditions("tarta de manzana sin mantequilla").conditions).toEqual([
+      { named: "mantequilla", kind: "excluded" },
+    ]);
+  });
+
+  it("reads a declared allergy as a food to keep out", () => {
+    const { conditions } = readConditions("postre con alergia a los frutos secos");
+
+    expect(conditions.some((entry) => entry.kind === "allergy")).toBe(true);
+  });
+
+  it("reads a diet named in Spanish", () => {
+    const { conditions } = readConditions("receta vegana de lasaña");
+
+    expect(conditions.some((entry) => entry.kind === "diet")).toBe(true);
+  });
+
+  it("never turns a Spanish question into another language", () => {
+    // A source publishing in another language and holding nothing under the
+    // words written is an honest absence; a guessed translation is a word
+    // nobody wrote.
+    for (const wording of deriveWordings("tortilla de patatas")) {
+      expect(wording.query).not.toMatch(/omelette|omelet/i);
+    }
+  });
+});

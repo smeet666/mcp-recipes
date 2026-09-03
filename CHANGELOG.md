@@ -1,5 +1,64 @@
 # Changelog
 
+## 4.0.0
+
+- **The published client entry renames a field on `SourceProfile` and
+  `SourceReport`.** A program importing `mcp-recipes/client` reads
+  `rowsThatAreNotRecipes` where it read `mixesReferencePages`: a sentence in the
+  source's own words saying what else one of its rows can be, and null where
+  every row is a recipe. The boolean forced one wording on two different
+  situations, a page about an ingredient filed beside the recipes using it and
+  an article that gathers recipes, and one sentence could only describe one of
+  them truthfully. The tools' own answers are unaffected: `per_source` never
+  published the field, and the note it produces now names each source in that
+  source's terms.
+- **`get_recipe` answers in two shapes, and `kind` says which.** One source
+  publishes articles that gather recipes at the same kind of address as a
+  recipe. Such an answer carries `collection` with the headings and the recipes
+  it points at, and no `recipe`; a recipe carries `recipe` and no `collection`.
+  A caller that read the article as a recipe would have offered a dish nobody
+  can cook. `compare_recipes` leaves such a page out and says why.
+- **Pequerecetas is added**, under the id `pequerecetas`, beside the five
+  sources already read. It publishes in Spanish, states no total anywhere, and
+  addresses a recipe by the slug in its own address.
+- **Spanish is read and written like the other two languages.** The scaler
+  reads a Spanish line for what it is, keeps a huevo whole, halves a diente,
+  quarters a cebolla, moves a cucharada into the cucharadita before rounding
+  it, multiplies the count of a pizca while leaving the size of one to the
+  cook, and agrees nouns and adjectives with the number in front of them. A
+  list holding all three languages comes back with each line written in its
+  own. `scale_ingredients` takes `es` beside `fr`, `en` and `auto`.
+- **A line naming a tool is recognised and never multiplied.** Some sites write
+  what a recipe is cooked with among its ingredients, so a mould or an air
+  fryer arrives in the same list as the chicken. Every ingredient line carries
+  `is_equipment`, and `scale_ingredients` reports `equipment_count` beside the
+  counts of what was scaled: a recipe made for more people uses the same pan.
+- **Each site is read at the pace it asks for.** Two of the sites declare three
+  seconds between two requests where the shared default is one second, and they
+  were being read four times faster than that. A setting posted for every
+  source can now only make this server more patient than the slowest of them
+  asks for.
+- **A row that does not name the dish is no longer called a recipe for it.**
+  One of the sources answers any wording with something, so a question asked in
+  a language it does not publish in came back as several confident recipes for a
+  dish nobody published. Every source's rows are now arranged with the ones
+  naming the dish first, `per_source` carries `names_the_dish` beside `count`,
+  and the answer opens on "rows" rather than "recipes" where no source named it.
+- **The library section of the README states the API the client actually has.**
+  It documented a call that does not exist.
+- **An amount stated per eater is recognised in every language.** "50 g par
+  personne" and "50 g por persona" were multiplied by the factor, which asks for
+  twice as much on every plate; only the English wording was read. A length of
+  time is read the same way, in whichever language names it.
+- **The backstop over one source allows what a reader actually spends.** It was
+  computed on the shared spacing and left out the wait a site asks for by name,
+  so it could fire while the reader was still working: the read was abandoned
+  while its requests carried on reaching the site.
+- **An article that gathers recipes is returned bounded.** It was the one answer
+  with no ceiling on it, and an article can point at a hundred recipes.
+  `max_gathered` says how many to return and `gathered_count` how many there
+  are.
+
 ## 3.0.1
 
 - **Every tool is documented, with its arguments and what its answer carries.**

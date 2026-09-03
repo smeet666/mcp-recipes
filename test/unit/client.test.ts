@@ -20,6 +20,7 @@ import {
   marmitonRows,
   onlyFrom,
   ptitchefRows,
+  pequerecetasRows,
   supertoinetteRows,
 } from "./support.js";
 
@@ -65,7 +66,8 @@ describe("every source answering", () => {
             cookbookRows.length +
             ptitchefRows.length +
             goodfoodRows.length +
-            supertoinetteRows.length,
+            supertoinetteRows.length +
+            pequerecetasRows.length,
         );
         // One row from each source in turn, in the registry's order, since the
         // sources share no score to rank them by.
@@ -75,11 +77,13 @@ describe("every source answering", () => {
           "ptitchef",
           "goodfood",
           "supertoinette",
+          "pequerecetas",
           "marmiton",
           "cookbook",
           "ptitchef",
           "goodfood",
           "supertoinette",
+          "pequerecetas",
         ]);
         expect(merged.rows.every((entry) => entry.id.includes(":"))).toBe(true);
       }));
@@ -98,8 +102,8 @@ describe("every source answering", () => {
 
   it("honours a limit per source, applied to each of them", async () => {
     const merged = await fakeClient().searchRecipes("crepes", 1);
-    expect(merged.rows).toHaveLength(5);
-    expect(new Set(merged.rows.map((entry) => entry.source)).size).toBe(5);
+    expect(merged.rows).toHaveLength(6);
+    expect(new Set(merged.rows.map((entry) => entry.source)).size).toBe(6);
   });
 
   it("asks only the sources it was named", async () => {
@@ -157,6 +161,7 @@ describe("every source failing", () => {
       ptitchef: { fail: failing },
       goodfood: { fail: failing },
       supertoinette: { fail: failing },
+      pequerecetas: { fail: failing },
     }).searchRecipes("crepes", 5);
 
     expect(merged.rows).toEqual([]);

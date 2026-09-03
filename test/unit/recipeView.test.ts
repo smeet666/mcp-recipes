@@ -35,6 +35,7 @@ function recipe(over: Partial<RecipeDetail> = {}): RecipeDetail {
     restMinutes: null,
     stepsAsOneBlock: null,
     withheld: null,
+    gathers: null,
     category: null,
     author: null,
     rating: null,

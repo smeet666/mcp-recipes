@@ -18,6 +18,7 @@ export default defineConfig({
     "mcp-ptitchef",
     "mcp-bbc-goodfood",
     "mcp-supertoinette",
+    "mcp-pequerecetas",
   ],
   // src/index.ts opens with the shebang and esbuild keeps it on the entry
   // point; a global banner would also stamp it onto the library entries.

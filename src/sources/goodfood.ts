@@ -110,9 +110,7 @@ export const GOODFOOD_PROFILE = {
   homeUrl: "https://www.bbcgoodfood.com",
   language: "en" as const,
   attribution: "Source: BBC Good Food",
-  // The search serves recipe pages; a question aimed at the site's reviews and
-  // buying guides is answered with recipes all the same.
-  mixesReferencePages: false,
+  rowsThatAreNotRecipes: null,
 };
 
 const SITE_URL = /^https?:\/\/(?:www\.)?bbcgoodfood\.com\//i;
@@ -301,6 +299,7 @@ export function goodfoodDetail(payload: unknown): RecipeDetail {
         : null,
     // The site files a recipe under collections rather than under one category
     // on the page itself.
+    gathers: null,
     category: null,
     author: text(recipe.author),
     rating: value === null ? null : { value, count: count(recipe.rating_count), max: 5 },

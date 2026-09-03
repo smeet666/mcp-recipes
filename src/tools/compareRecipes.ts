@@ -13,12 +13,13 @@
 import { z } from "zod";
 import type { RecipesClient } from "../sources/client.js";
 import { dishWordsMissing } from "../sources/wordings.js";
-import type { RecipeDetail, SourceId } from "../types.js";
+import type { RecipeDetail, SourceId, SourceReport } from "../types.js";
 import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
 import type { RecipePayload, Section } from "./recipeView.js";
 import type { RecipeView } from "./recipeView.js";
 import {
   creditLine,
+  listNames,
   fitLines,
   mustKeep,
   omittedLinesLine,
@@ -107,14 +108,6 @@ const TEXT_INGREDIENT_LINES = 8;
 
 /** Differences the text block states before pointing at the rest. */
 const TEXT_DIFFERENCE_LINES = 4;
-
-/** Sources named the way a sentence names them. */
-function listNames(names: string[]): string {
-  if (names.length <= 1) {
-    return names.join("");
-  }
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-}
 
 /**
  * The verb that follows a list of sources.
@@ -217,14 +210,16 @@ function describeDifferences(
     );
   }
 
-  const counts = payloads.map((payload) => payload.ingredients.length);
+  // Tools are left out of the count: some sites write what a dish is cooked
+  // with among its ingredients, and counting those would report a difference
+  // in the length of two lists that hold the same food.
+  const foodLines = (payload: RecipePayload) =>
+    payload.ingredients.filter((entry) => !entry.is_equipment).length;
+  const counts = payloads.map(foodLines);
   if (new Set(counts).size > 1 && counts.every((value) => value > 0)) {
     differences.push(
       `${payloads
-        .map(
-          (payload) =>
-            `${payload.source_name} lists ${payload.ingredients.length} ingredient lines`,
-        )
+        .map((payload) => `${payload.source_name} lists ${foodLines(payload)} ingredient lines`)
         .join("; ")}.`,
     );
   }
@@ -277,6 +272,47 @@ function describeDifferences(
   return differences;
 }
 
+/**
+ * Why a source that was asked is not among the versions.
+ *
+ * Four different statements about the world, and reading a fetch failure as
+ * "that source offered nothing" is the one that turns a bad minute into a claim
+ * about what a corpus holds.
+ */
+function whyItIsMissing(
+  report: SourceReport,
+  dish: string,
+  outcome: {
+    article: RecipeDetail | undefined;
+    failedRead: { code: string; message: string } | undefined;
+  },
+): Note {
+  if (outcome.article) {
+    return mustKeep(
+      `${report.name} is missing from this comparison because the page its search offered ` +
+        `gathers other recipes: ${quoteForeign(outcome.article.title)}, ` +
+        `${quoteForeign(outcome.article.url)}. Read one of the recipes it lists with get_recipe.`,
+    );
+  }
+  if (report.status === "failed") {
+    return mustKeep(
+      `${report.name} is missing from this comparison because its search did not answer (${quoteForeign(
+        `${report.error?.code ?? "unknown"}: ${report.error?.message ?? "unknown"}`,
+      )}). Nothing here is evidence about what it holds.`,
+    );
+  }
+  if (outcome.failedRead) {
+    return mustKeep(
+      `${report.name}'s search answered and offered a version, and that version could not be read (${quoteForeign(
+        `${outcome.failedRead.code}: ${outcome.failedRead.message}`,
+      )}). The failure is in the reading, so nothing here says whether ${report.name} holds this dish.`,
+    );
+  }
+  return mustKeep(
+    `${report.name} answered and offered nothing close enough to "${quoteForeign(dish)}" to compare.`,
+  );
+}
+
 export async function runCompareRecipes(
   client: RecipesClient,
   args: CompareRecipesArgs,
@@ -303,6 +339,8 @@ export async function runCompareRecipes(
     const recipes: RecipeDetail[] = [];
     /** Sources whose row was found and whose page then could not be read. */
     const unread = new Map<SourceId, { code: string; message: string }>();
+    /** Sources whose row opened onto an article gathering recipes. */
+    const gathered = new Map<SourceId, RecipeDetail>();
     /** Sources whose row was opened, whichever way that went. */
     const opened = new Set<SourceId>();
 
@@ -313,6 +351,12 @@ export async function runCompareRecipes(
       }
       opened.add(source);
       if (read.status === "fulfilled") {
+        // An article gathering recipes is not a version of the dish, and
+        // comparing it would put an empty ingredient list beside real ones.
+        if (read.value.recipe.gathers) {
+          gathered.set(source, read.value.recipe);
+          return;
+        }
         recipes.push(read.value.recipe);
         return;
       }
@@ -349,38 +393,16 @@ export async function runCompareRecipes(
       );
     }
 
-    // Three reasons a source can be missing from a comparison, and they are
-    // three different statements about the world. Reading a fetch failure as
-    // "that source offered nothing" is the one that turns a bad minute into a
-    // claim about what a corpus holds.
     for (const report of merged.reports) {
       if (recipes.some((recipe) => recipe.source === report.source)) {
         continue;
       }
-      const failedRead = unread.get(report.source);
-      if (report.status === "failed") {
-        notes.push(
-          mustKeep(
-            `${report.name} is missing from this comparison because its search did not answer (${quoteForeign(
-              `${report.error?.code ?? "unknown"}: ${report.error?.message ?? "unknown"}`,
-            )}). Nothing here is evidence about what it holds.`,
-          ),
-        );
-      } else if (failedRead) {
-        notes.push(
-          mustKeep(
-            `${report.name}'s search answered and offered a version, and that version could not be read (${quoteForeign(
-              `${failedRead.code}: ${failedRead.message}`,
-            )}). The failure is in the reading, so nothing here says whether ${report.name} holds this dish.`,
-          ),
-        );
-      } else {
-        notes.push(
-          mustKeep(
-            `${report.name} answered and offered nothing close enough to "${quoteForeign(args.dish)}" to compare.`,
-          ),
-        );
-      }
+      notes.push(
+        whyItIsMissing(report, args.dish, {
+          article: gathered.get(report.source),
+          failedRead: unread.get(report.source),
+        }),
+      );
     }
 
     // One of these indexes answers almost any spelling with its closest row, so

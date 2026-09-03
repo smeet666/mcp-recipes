@@ -64,7 +64,7 @@ export const searchRecipesDescription = [
   "Search every recipe source this server reads, at the same time, for a dish or an ingredient, and get one merged list.",
   "Each row carries the id get_recipe takes, and that id names the source it came from, so nothing has to be guessed afterwards.",
   "The sources are written in different languages and count their own results differently, so 'per_source' says what each one answered, what its own number means, and names any that failed. A short list is never evidence of what exists.",
-  "Some sources keep recipes and reference pages together, so a row can be a page about an ingredient rather than a recipe using it. Only get_recipe can tell them apart, and it says what it read off the page.",
+  "Not every row opens onto a recipe. Some sources file pages about an ingredient beside the recipes using it, and some publish articles that gather recipes; 'per_source' says in each source's own words what one of its rows can be. Only get_recipe tells them apart, and it says what it read off the page.",
   "The query goes to each source's own search as free text. There is no filtering: a word naming a diet, a time or a calorie count matches only where that source's index happens to carry it.",
   "Ask in a whole sentence if that is the question. These indexes answer the words they are handed, so a sentence is also sent as the words naming the dish and as the dish word alone, and the rows are the union; 'per_source' lists every wording and what it returned.",
   "What the question says the recipe must not hold is set aside from those shorter wordings rather than searched for, and named back in the notes: a negation, an allergy stated as one, a diet named in one word, and the number of people at the table. No source filters on any of it, so open a row with get_recipe and read the ingredient list before calling it suitable.",
@@ -280,9 +280,13 @@ export async function runSearchRecipes(
         ? `\nAlso searched for: ${derived.map((wording) => `"${quoteForeign(wording)}"`).join(", ")}.`
         : "";
 
+    // A row is what a source returned for the words it was handed. Where none of
+    // them carries the dish, calling them recipes for it states the one thing
+    // the search did not establish.
+    const anyNamesTheDish = merged.reports.some((report) => report.namesTheDish > 0);
     const body =
       results.length > 0
-        ? `${results.length} recipes for "${args.query}":\n${renderRows(results)}${alsoSent}`
+        ? `${results.length} ${anyNamesTheDish ? "recipes" : "rows"} for "${args.query}":\n${renderRows(results)}${alsoSent}`
         : nothingCameBack(answered.length, args.query, alsoSent);
 
     return ok(

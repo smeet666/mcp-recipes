@@ -1,7 +1,7 @@
 {
   "name": "mcp-recipes",
-  "version": "3.0.1",
-  "description": "MCP server that asks five recipe sites at once, in French and English, merges the answers, and scales quantities. No API key required.",
+  "version": "4.0.0",
+  "description": "MCP server that asks six recipe sites at once, in French, English and Spanish, merges the answers, and scales quantities. No API key required.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -14,8 +14,9 @@
     "ptitchef",
     "bbc-good-food",
     "supertoinette",
+    "pequerecetas",
     "ingredient-scaling",
-    "bilingual"
+    "multilingual"
   ],
   "homepage": "https://github.com/smeet666/mcp-recipes#readme",
   "bugs": {
@@ -82,6 +83,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "mcp-bbc-goodfood": "^1.0.1",
     "mcp-marmiton": "^2.0.1",
+    "mcp-pequerecetas": "^1.0.0",
     "mcp-ptitchef": "^1.0.1",
     "mcp-supertoinette": "^1.0.2",
     "mcp-wikibooks-cookbook": "^2.0.1",

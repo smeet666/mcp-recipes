@@ -48,7 +48,7 @@ Lifestyle & Food
 - Searches every source at the same time, and returns one list
 - Every identifier names the source it came from, so the right one is read without guessing
 - Puts one dish side by side as each source writes it, all rescaled to the same yield
-- Scales quantities in French and English, including a list holding both at once
+- Scales quantities in French, English and Spanish, including a list holding all three at once
 - A countable thing lands where a kitchen can follow it: an egg whole, and anything that pours or cuts halved
 - A measurement moves to a smaller unit before it is rounded, so a small share never rounds to nothing
 - A pinch, a poignée and a capful have their count multiplied while the size of one stays the cook's
@@ -68,7 +68,7 @@ Lifestyle & Food
 - "What does the Cookbook ask for in a Victoria sponge, for 6?"
 - Tool: search_recipes — Searches every source at once and returns one merged list
 - Tool: get_recipe — Reads one recipe, optionally rescaled
-- Tool: scale_ingredients — Scales a list from anywhere, offline, in either language
+- Tool: scale_ingredients — Scales a list from anywhere, offline, in French, English or Spanish
 - Tool: compare_recipes — One dish, as each source writes it
 
 ## Tags

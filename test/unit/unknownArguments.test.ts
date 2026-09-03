@@ -108,3 +108,52 @@ describe("an argument no tool declares", () => {
     await client.close();
   });
 });
+
+describe("how a refusal names what it did not recognise", () => {
+  it("names one argument in the singular and several in the plural", async () => {
+    const client = await connect();
+
+    expect((await call(client, "search_recipes", { query: "x", quiery: 1 })).text).toMatch(
+      /Unknown argument /,
+    );
+    expect(
+      (await call(client, "search_recipes", { query: "x", quiery: 1, limitt: 2 })).text,
+    ).toMatch(/Unknown arguments /);
+
+    await client.close();
+  });
+
+  it("offers the argument a near miss was probably meant to be", async () => {
+    const client = await connect();
+
+    expect((await call(client, "search_recipes", { query: "x", quiery: 1 })).text).toMatch(
+      /did you mean 'query'/,
+    );
+    // Case and punctuation are not what a caller got wrong.
+    expect(
+      (await call(client, "search_recipes", { query: "x", "Limit-Per-Source": 2 })).text,
+    ).toMatch(/did you mean 'limit_per_source'/);
+
+    await client.close();
+  });
+
+  it("offers nothing where the name is too far from any argument", async () => {
+    const client = await connect();
+    const { text } = await call(client, "search_recipes", { query: "x", zzzzzzzzzzzz: 1 });
+
+    expect(text).toMatch(/Unknown argument/);
+    expect(text).not.toMatch(/did you mean/i);
+
+    await client.close();
+  });
+
+  it("offers nothing for a name carrying no letters at all", async () => {
+    const client = await connect();
+    const { text } = await call(client, "search_recipes", { query: "x", ___: 1 });
+
+    expect(text).toMatch(/Unknown argument/);
+    expect(text).not.toMatch(/did you mean/i);
+
+    await client.close();
+  });
+});

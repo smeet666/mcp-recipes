@@ -25,11 +25,18 @@ export interface SourceProfile {
   /** What a caller has to say when repeating the source's text. */
   attribution: string;
   /**
-   * Whether the corpus files pages about ingredients beside recipes using
-   * them. Where it does, a search row can be either, and only reading the page
-   * tells them apart, so an answer holding rows from such a source says so.
+   * What a search row from this corpus can be besides a recipe, in that
+   * corpus's own words, or null where every row is one.
+   *
+   * A source files pages about ingredients beside the recipes using them, and
+   * another publishes articles gathering recipes at the address a recipe lives
+   * at. Both mean a row can open onto something a cook cannot make, and only
+   * reading the page tells them apart, so an answer holding rows from such a
+   * source says what else a row might be. The sentence is the source's own,
+   * because the two are different things and one wording would misdescribe one
+   * of them.
    */
-  mixesReferencePages: boolean;
+  rowsThatAreNotRecipes: string | null;
 }
 
 /** A search row, trimmed to what picks one recipe out of a list. */
@@ -112,6 +119,17 @@ export interface RecipeDetail {
    * page never said.
    */
   withheld: { parts: PagePart[]; why: string } | null;
+  /**
+   * The recipes an address gathers, from a source that publishes articles
+   * collecting recipes at the same kind of address as a recipe.
+   *
+   * Null from a source that serves only recipes there, which is a different
+   * statement from an article that gathers nothing. A record carrying this has
+   * no ingredients and no method of its own, and it is not a recipe this server
+   * failed to read: it is a page nobody can cook from, whose listing is worth
+   * following.
+   */
+  gathers: { headings: string[]; rows: RecipeRow[] } | null;
   category: string | null;
   author: string | null;
   rating: Rating | null;
@@ -177,10 +195,21 @@ export interface SourceReport {
    * near-misses cannot fill the limit and cut away what a later wording found.
    */
   preferredByName: boolean;
+  /**
+   * How many of the rows this answer holds from this source carry the dish in
+   * their title, out of `count`.
+   *
+   * A row is what a source returned for the words it was handed, which is a
+   * candidate rather than a claim that it is the dish. One of these indexes
+   * answers any wording with something, so a source can offer rows and none of
+   * them be the dish; a count of zero says so instead of leaving an answer to
+   * read as several recipes for something nobody published.
+   */
+  namesTheDish: number;
   /** Rows the source sent that could not be read, and were left out. */
   skipped: number;
-  /** Whether this source files reference pages beside recipes. */
-  mixesReferencePages: boolean;
+  /** What a row from this source can be besides a recipe, or null where every row is one. */
+  rowsThatAreNotRecipes: string | null;
   cached: boolean;
   error: { code: string; message: string; hint?: string } | null;
 }

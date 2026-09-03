@@ -27,7 +27,7 @@ suite("the sources, as they are today", () => {
       expect(report.status, `${report.name}: ${report.error?.message ?? ""}`).toBe("answered");
     }
     expect(merged.rows.length).toBeGreaterThan(0);
-    expect(new Set(merged.rows.map((row) => row.source)).size).toBe(5);
+    expect(new Set(merged.rows.map((row) => row.source)).size).toBe(6);
   });
 
   it("hands back identifiers that read back as recipes", async () => {
@@ -39,6 +39,7 @@ suite("the sources, as they are today", () => {
       "ptitchef",
       "goodfood",
       "supertoinette",
+      "pequerecetas",
     ] as const) {
       const row = merged.rows.find((entry) => entry.source === source);
       expect(row, `no row from ${source}`).toBeDefined();
@@ -78,6 +79,26 @@ suite("the sources, as they are today", () => {
 
     const read = await client.getRecipe(row!.id);
     expect(read.recipe.yieldText).toBeTruthy();
+  });
+
+  it("reads Pequerecetas, which answers in Spanish and states no total", async () => {
+    // The site's search matches the words a page was written with, so the
+    // question is asked in the language the site publishes in.
+    const merged = await client.searchRecipes("tortilla de patatas", 2, ["pequerecetas"]);
+    const report = merged.reports[0];
+
+    expect(report?.status).toBe("answered");
+    expect(report?.reportedTotal).toBeNull();
+    expect(report?.reportedTotalMeans).toBeNull();
+    expect(merged.rows.length).toBeGreaterThan(0);
+  });
+
+  it("scales a Spanish recipe in Spanish", async () => {
+    const merged = await client.searchRecipes("tortilla de patatas", 2, ["pequerecetas"]);
+    const read = await client.getRecipe(merged.rows[0]!.id);
+
+    expect(read.recipe.language).toBe("es");
+    expect(read.recipe.ingredients.length).toBeGreaterThan(0);
   });
 
   it("states no total for Supertoinette, which prints none", async () => {

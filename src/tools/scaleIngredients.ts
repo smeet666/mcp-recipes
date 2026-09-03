@@ -3,8 +3,8 @@
  *
  * Nothing here touches the network. The list can come from any of the sources,
  * from a cookbook on a shelf or from a photograph of a card, and it can mix
- * French and English lines: each line is read in the language it is written in
- * and comes back written the same way.
+ * languages: each line is read in the one it is written in and comes back
+ * written the same way.
  */
 
 import { z } from "zod";
@@ -16,7 +16,7 @@ import { ingredientSchema, ok, quoteForeign, toIngredientPayload, toToolError } 
 import type { ToolResult } from "./shared.js";
 
 export const scaleIngredientsDescription = [
-  "Multiply a list of ingredient lines, in French, in English, or in a list holding both.",
+  "Multiply a list of ingredient lines, in French, in English, in Spanish, or in a list holding more than one of them.",
   "Give either 'factor', or 'from_servings' and 'to_servings' and the factor is worked out from them.",
   "Quantities land where a kitchen can follow them: an egg stays whole because half of one is not something a cook takes out of the shell, while anything that pours, weighs or cuts can halve, a spoonful shrinks into the smaller spoon before it is rounded, and a pinch keeps whatever size a hand gives it while its count is multiplied.",
   "Every line comes back with 'scaling': 'scaled' when the arithmetic landed on the exact product, 'rounded' when something had to move for the line to stay usable, 'unscaled' when the line carries nothing to multiply. A rounded line says what it was rounded from and in which direction.",
@@ -54,10 +54,10 @@ export const scaleIngredientsInput = strictInput({
     .optional()
     .describe("What it should serve. Give it with 'from_servings', and without 'factor'."),
   language: z
-    .enum(["auto", "fr", "en"])
+    .enum(["auto", "fr", "en", "es"])
     .default("auto")
     .describe(
-      "'auto' reads each line on its own, which is what a list holding both languages needs. Name a language to read every line that way.",
+      "'auto' reads each line on its own, which is what a list holding more than one language needs. Name a language to read every line that way.",
     ),
 });
 
@@ -67,7 +67,17 @@ export const scaleIngredientsOutput = z.object({
   ingredients: z.array(ingredientSchema),
   scaled_count: z.number().int().describe("Lines whose arithmetic came out exact."),
   rounded_count: z.number().int().describe("Lines whose value moved to stay usable."),
-  unscaled_count: z.number().int().describe("Lines carrying nothing that can be multiplied."),
+  unscaled_count: z
+    .number()
+    .int()
+    .describe("Lines carrying nothing that can be multiplied, tools excepted."),
+  equipment_count: z
+    .number()
+    .int()
+    .describe(
+      "Lines naming a tool, which are never multiplied: a recipe " +
+        "made for more people uses the same pan.",
+    ),
   notes: z.array(z.string()),
 });
 
@@ -135,7 +145,9 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
     const counts = {
       scaled_count: scaled.filter((entry) => entry.scaling === "scaled").length,
       rounded_count: scaled.filter((entry) => entry.scaling === "rounded").length,
-      unscaled_count: scaled.filter((entry) => entry.scaling === "unscaled").length,
+      unscaled_count: scaled.filter((entry) => entry.scaling === "unscaled" && !entry.isEquipment)
+        .length,
+      equipment_count: scaled.filter((entry) => entry.isEquipment).length,
     };
 
     const notes: string[] = [];
@@ -150,11 +162,17 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
         `${counts.unscaled_count} line(s) carry no quantity to multiply and are repeated as given.`,
       );
     }
+    if (counts.equipment_count > 0) {
+      notes.push(
+        `${counts.equipment_count} line(s) name a tool and were left as ` +
+          "given: a recipe made for more people uses the same one.",
+      );
+    }
     if (args.language === "auto") {
       const languages = new Set(scaled.map((entry) => entry.language));
       if (languages.size > 1) {
         notes.push(
-          "This list holds lines in both languages, and each was read and rewritten in its own.",
+          "This list holds lines in more than one language, and each was read and rewritten in its own.",
         );
       }
     }

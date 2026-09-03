@@ -31,7 +31,7 @@ import type {
 import type { SourceAdapter } from "./adapter.js";
 import { resolveId } from "./ids.js";
 import type { ResolvedId } from "./ids.js";
-import { buildSources, selectSources } from "./registry.js";
+import { buildSources, pacingFor, selectSources } from "./registry.js";
 import type { Readers } from "./registry.js";
 import { MAX_WORDINGS_PER_SOURCE, deriveWordings, namesDish } from "./wordings.js";
 import type { Wording } from "./wordings.js";
@@ -51,6 +51,16 @@ export type {
 } from "../types.js";
 
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+
+/**
+ * The longest a reader may wait between two attempts, beyond the spacing.
+ *
+ * A site that answers "slow down" can name the wait it wants, and the readers
+ * honour it up to half a minute; a reader backs off on its own after an
+ * ordinary failure as well. Neither is visible from here, so the backstop
+ * allows the larger of the two rather than assuming a reader spends nothing.
+ */
+const LONGEST_WAIT_BETWEEN_TRIES_MS = 30_000;
 
 export interface RecipesClientOptions {
   config?: Partial<Config>;
@@ -131,7 +141,8 @@ function withGuarantees(config: Config): Config {
  * milliseconds are never returned.
  *
  * The allowance covers every attempt a reader is entitled to make, plus the
- * pacing between them, so this never fires before the reader's own deadline has.
+ * spacing that source is read at and the longest wait a site can ask for
+ * between two of them, so this never fires before the reader's own deadline has.
  */
 function withDeadline<T>(work: Promise<T>, ms: number, source: SourceAdapter): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -163,7 +174,8 @@ interface Attempt {
   wordings: WordingAttempt[];
 }
 
-function reportOf(attempt: Attempt, count: number): SourceReport {
+function reportOf(attempt: Attempt, rows: RecipeRow[], question: string): SourceReport {
+  const count = rows.length;
   return {
     source: attempt.source.id,
     name: attempt.source.name,
@@ -172,11 +184,14 @@ function reportOf(attempt: Attempt, count: number): SourceReport {
     reportedTotal: attempt.reportedTotal,
     reportedTotalMeans: attempt.reportedTotalMeans,
     skipped: attempt.skipped,
-    mixesReferencePages: attempt.source.mixesReferencePages,
+    rowsThatAreNotRecipes: attempt.source.rowsThatAreNotRecipes,
     cached: attempt.cached,
     error: attempt.error,
     wordings: attempt.wordings,
     preferredByName: attempt.preferredByName,
+    // Counted over the rows this answer holds, so it is read against `count`
+    // and never against a number of rows nobody was shown.
+    namesTheDish: rows.filter((row) => namesDish(row.title, question)).length,
   };
 }
 
@@ -288,11 +303,20 @@ export class RecipesClient {
 
   /**
    * The backstop deadline over one source, covering every attempt it is
-   * entitled to make and the pacing between them.
+   * entitled to make and the waiting between them.
+   *
+   * Three things a reader spends between two attempts, and all three belong
+   * here or this fires while the reader is still working: the spacing that
+   * source is read at, which is its own and not the shared setting; the backoff
+   * a reader adds after a failure; and the wait a site asks for by name when it
+   * answers "slow down". A deadline shorter than the reader's own abandons a
+   * read whose requests carry on reaching the site, and leaves that source's
+   * queue occupied behind an answer nobody waits for.
    */
-  private get deadlineMs(): number {
+  private deadlineFor(source: SourceId): number {
     const attempts = this.config.maxRetries + 1;
-    return this.config.timeoutMs * attempts + this.config.minIntervalMs * this.config.maxRetries;
+    const between = pacingFor(source, this.config.minIntervalMs) + LONGEST_WAIT_BETWEEN_TRIES_MS;
+    return this.config.timeoutMs * attempts + between * this.config.maxRetries;
   }
 
   /**
@@ -334,7 +358,7 @@ export class RecipesClient {
     const answered = attempts.map((attempt) => ({ attempt, rows: attempt.rows.slice(0, limit) }));
     return {
       rows: interleave(answered.map((one) => one.rows)),
-      reports: answered.map(({ attempt, rows }) => reportOf(attempt, rows.length)),
+      reports: answered.map(({ attempt, rows }) => reportOf(attempt, rows, trimmed)),
     };
   }
 
@@ -413,7 +437,7 @@ export class RecipesClient {
       try {
         const read = await withDeadline(
           source.search(wording.query, limit),
-          this.deadlineMs,
+          this.deadlineFor(source.id),
           source,
         );
         answered = true;
@@ -465,20 +489,17 @@ export class RecipesClient {
       }
     }
 
-    // Where several wordings contributed, the rows naming the dish are put in
-    // front of the rows that do not, each group keeping the order it arrived
-    // in. Without this, a first wording answering with a page of near-misses
-    // fills the limit and cuts away the rows a later wording found. A single
-    // wording is left in the order its source returned it, since there is
-    // nothing to rescue it from.
-    const contributing = wordings.filter((attempt) => (attempt.added ?? 0) > 0).length;
-    const ordered =
-      contributing > 1
-        ? [
-            ...rows.filter((row) => namesDish(row.title, question)),
-            ...rows.filter((row) => !namesDish(row.title, question)),
-          ]
-        : rows;
+    // The rows naming the dish are put in front of the rows that do not, each
+    // group keeping the order it arrived in.
+    //
+    // Two things it prevents. A first wording answering with a page of
+    // near-misses fills the limit and cuts away what a later wording found. And
+    // one of these indexes answers any wording with something, so the rows it
+    // returned for a dish it does not hold arrive in its own order and the
+    // first of them reads as the answer. This is an order over one source's own
+    // rows, and never a score against another source.
+    const onTopicRows = rows.filter((row) => namesDish(row.title, question));
+    const ordered = [...onTopicRows, ...rows.filter((row) => !namesDish(row.title, question))];
 
     // A source that answered one wording answered. Reporting it as failed
     // because a later wording timed out would hide the rows it did return
@@ -486,7 +507,7 @@ export class RecipesClient {
     return {
       source,
       rows: ordered,
-      preferredByName: contributing > 1,
+      preferredByName: true,
       cached,
       reportedTotal,
       reportedTotalMeans,
@@ -510,7 +531,7 @@ export class RecipesClient {
     try {
       const outcome = await withDeadline(
         read.source.getRecipe(read.reference),
-        this.deadlineMs,
+        this.deadlineFor(read.source.id),
         read.source,
       );
       return { recipe: outcome.recipe, cached: outcome.cached, read };

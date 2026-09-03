@@ -100,9 +100,7 @@ export const SUPERTOINETTE_PROFILE = {
   homeUrl: "https://www.supertoinette.com",
   language: "fr" as const,
   attribution: "Source: Supertoinette",
-  // The reader sets aside any row that opens onto something other than a
-  // recipe, so what arrives here is recipes.
-  mixesReferencePages: false,
+  rowsThatAreNotRecipes: null,
 };
 
 /** Recipe pages, whose address carries the number the site addresses it by. */
@@ -230,6 +228,7 @@ export function supertoinetteDetail(payload: unknown): RecipeDetail {
     // the page numbered them.
     stepsAsOneBlock: null,
     withheld: null,
+    gathers: null,
     category: text(recipe.category),
     author: text(recipe.author),
     // The scale is published, so a value is never read against a guess.

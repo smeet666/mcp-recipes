@@ -172,6 +172,7 @@ describe("search_recipes when nothing answered", () => {
       ptitchef: { fail: waiting },
       goodfood: { fail: waiting },
       supertoinette: { fail: waiting },
+      pequerecetas: { fail: waiting },
     });
   };
 
@@ -253,7 +254,14 @@ describe("compare_recipes stays readable", () => {
   });
 
   it("states a section choice once rather than once per version", async () => {
-    const text = textOf(await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes" })));
+    // Two sources, so the sentence is measured rather than the room the text
+    // block had left for it.
+    const text = textOf(
+      await runCompareRecipes(
+        fakeClient(onlyFrom("marmiton", "cookbook")),
+        compareArgs({ dish: "crepes", sources: ["marmiton", "cookbook"] }),
+      ),
+    );
     const omissions = text.split("\n").filter((line) => line.includes("Not requested"));
     expect(omissions).toHaveLength(1);
   });
@@ -376,6 +384,7 @@ describe("a step list is bounded", () => {
       id: "marmiton:1001",
       sections: ["steps"],
       max_steps: 5,
+      max_gathered: 30,
       max_step_chars: 600,
     });
     const payload = payloadOf<{ recipe: { steps: string[] } }>(result);

@@ -66,8 +66,7 @@ export const COOKBOOK_PROFILE = {
   homeUrl: "https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents",
   language: "en" as const,
   attribution: "Source: Wikibooks Cookbook",
-  // The namespace holds pages about salt and about a dish made with it alike.
-  mixesReferencePages: true,
+  rowsThatAreNotRecipes: "a page about an ingredient",
 };
 
 const SITE_URL = /^https?:\/\/en\.wikibooks\.org\/wiki\//i;
@@ -197,6 +196,7 @@ export function cookbookDetail(payload: unknown): RecipeDetail {
     prepMinutes: null,
     cookMinutes: null,
     totalMinutes: count(recipe.totalMinutes),
+    gathers: null,
     category: text(recipe.category),
     // The page is written by everyone who edited it, so it credits nobody in
     // particular and carries no reader rating.
