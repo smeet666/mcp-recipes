@@ -38,6 +38,12 @@
   were being read four times faster than that. A setting posted for every
   source can now only make this server more patient than the slowest of them
   asks for.
+- **A row that does not name the dish is no longer called a recipe for it.**
+  One of the sources answers any wording with something, so a question asked in
+  a language it does not publish in came back as several confident recipes for a
+  dish nobody published. Every source's rows are now arranged with the ones
+  naming the dish first, `per_source` carries `names_the_dish` beside `count`,
+  and the answer opens on "rows" rather than "recipes" where no source named it.
 - **The library section of the README states the API the client actually has.**
   It documented a call that does not exist.
 - **An amount stated per eater is recognised in every language.** "50 g par

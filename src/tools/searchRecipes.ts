@@ -280,9 +280,13 @@ export async function runSearchRecipes(
         ? `\nAlso searched for: ${derived.map((wording) => `"${quoteForeign(wording)}"`).join(", ")}.`
         : "";
 
+    // A row is what a source returned for the words it was handed. Where none of
+    // them carries the dish, calling them recipes for it states the one thing
+    // the search did not establish.
+    const anyNamesTheDish = merged.reports.some((report) => report.namesTheDish > 0);
     const body =
       results.length > 0
-        ? `${results.length} recipes for "${args.query}":\n${renderRows(results)}${alsoSent}`
+        ? `${results.length} ${anyNamesTheDish ? "recipes" : "rows"} for "${args.query}":\n${renderRows(results)}${alsoSent}`
         : nothingCameBack(answered.length, args.query, alsoSent);
 
     return ok(

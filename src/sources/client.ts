@@ -174,7 +174,8 @@ interface Attempt {
   wordings: WordingAttempt[];
 }
 
-function reportOf(attempt: Attempt, count: number): SourceReport {
+function reportOf(attempt: Attempt, rows: RecipeRow[], question: string): SourceReport {
+  const count = rows.length;
   return {
     source: attempt.source.id,
     name: attempt.source.name,
@@ -188,6 +189,9 @@ function reportOf(attempt: Attempt, count: number): SourceReport {
     error: attempt.error,
     wordings: attempt.wordings,
     preferredByName: attempt.preferredByName,
+    // Counted over the rows this answer holds, so it is read against `count`
+    // and never against a number of rows nobody was shown.
+    namesTheDish: rows.filter((row) => namesDish(row.title, question)).length,
   };
 }
 
@@ -354,7 +358,7 @@ export class RecipesClient {
     const answered = attempts.map((attempt) => ({ attempt, rows: attempt.rows.slice(0, limit) }));
     return {
       rows: interleave(answered.map((one) => one.rows)),
-      reports: answered.map(({ attempt, rows }) => reportOf(attempt, rows.length)),
+      reports: answered.map(({ attempt, rows }) => reportOf(attempt, rows, trimmed)),
     };
   }
 
@@ -485,20 +489,17 @@ export class RecipesClient {
       }
     }
 
-    // Where several wordings contributed, the rows naming the dish are put in
-    // front of the rows that do not, each group keeping the order it arrived
-    // in. Without this, a first wording answering with a page of near-misses
-    // fills the limit and cuts away the rows a later wording found. A single
-    // wording is left in the order its source returned it, since there is
-    // nothing to rescue it from.
-    const contributing = wordings.filter((attempt) => (attempt.added ?? 0) > 0).length;
-    const ordered =
-      contributing > 1
-        ? [
-            ...rows.filter((row) => namesDish(row.title, question)),
-            ...rows.filter((row) => !namesDish(row.title, question)),
-          ]
-        : rows;
+    // The rows naming the dish are put in front of the rows that do not, each
+    // group keeping the order it arrived in.
+    //
+    // Two things it prevents. A first wording answering with a page of
+    // near-misses fills the limit and cuts away what a later wording found. And
+    // one of these indexes answers any wording with something, so the rows it
+    // returned for a dish it does not hold arrive in its own order and the
+    // first of them reads as the answer. This is an order over one source's own
+    // rows, and never a score against another source.
+    const onTopicRows = rows.filter((row) => namesDish(row.title, question));
+    const ordered = [...onTopicRows, ...rows.filter((row) => !namesDish(row.title, question))];
 
     // A source that answered one wording answered. Reporting it as failed
     // because a later wording timed out would hide the rows it did return
@@ -506,7 +507,7 @@ export class RecipesClient {
     return {
       source,
       rows: ordered,
-      preferredByName: contributing > 1,
+      preferredByName: true,
       cached,
       reportedTotal,
       reportedTotalMeans,

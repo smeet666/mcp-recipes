@@ -145,8 +145,10 @@ Searches every source with one question.
 `image_url`; and an `excerpt` where the source offers one. `per_source` gives one
 report per site with its `status`, reading `answered` or `failed`, the `count` it
 contributed, and its `reported_total` alongside `reported_total_means`, which
-says what that number counts on that site. `order` says in words how the list was
-built.
+says what that number counts on that site. `names_the_dish` says how many of that
+site's rows carry the dish in their title, out of `count`: a search index answers
+the words it is handed, so a site can offer rows and none of them be the dish.
+`order` says in words how the list was built.
 
 ### `get_recipe`
 
@@ -518,8 +520,11 @@ Cherche dans toutes les sources avec une seule question.
 `url` ; `image_url` ; et un `excerpt` là où la source en propose un.
 `per_source` donne un rapport par site avec son `status`, valant `answered` ou
 `failed`, le `count` qu'il a fourni, et son `reported_total` accompagné de
-`reported_total_means`, qui dit ce que ce nombre compte sur ce site. `order` dit
-en mots comment la liste a été bâtie.
+`reported_total_means`, qui dit ce que ce nombre compte sur ce site.
+`names_the_dish` dit combien des lignes de ce site portent le plat dans leur
+titre, sur `count` : un index de recherche répond aux mots qu'on lui tend, donc
+un site peut rendre des lignes dont aucune n'est le plat. `order` dit en mots
+comment la liste a été bâtie.
 
 ### `get_recipe`
 

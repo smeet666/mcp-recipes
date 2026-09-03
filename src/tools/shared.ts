@@ -69,6 +69,15 @@ export const reportSchema = z.object({
     .describe(
       "Whether this source's rows were arranged so the ones whose title names the dish come first. An order over one source's own rows, never a score against another source.",
     ),
+  names_the_dish: z
+    .number()
+    .int()
+    .describe(
+      "How many of this source's rows in this answer carry the dish in their title, out of " +
+        "'count'. A row is what the source returned for the words it was handed, and one of these " +
+        "indexes answers any wording with something, so zero means the source offered rows and " +
+        "none of them is the dish.",
+    ),
   wordings: z
     .array(
       z.object({
@@ -186,6 +195,7 @@ export function toReportPayload(report: SourceReport): z.infer<typeof reportSche
     skipped: report.skipped,
     cached: report.cached,
     preferred_by_name: report.preferredByName,
+    names_the_dish: report.namesTheDish,
     wordings: report.wordings.map((attempt) => ({
       query: attempt.query,
       derivation: attempt.derivation,
@@ -350,16 +360,32 @@ export function reportNotes(reports: SourceReport[]): Note[] {
     notes.push(...answeredNotes(report));
   }
 
-  // Said once for however many sources it applies to. The sentence is the same
-  // whichever source it names, and six copies of it fill an answer without
-  // adding to it.
-  const arranged = answered.filter((report) => report.preferredByName);
-  if (arranged.length > 0) {
+  // A source whose index answers any wording returns rows for a dish it does
+  // not hold, and their order is its own. Naming those sources is what keeps
+  // their rows from reading as the answer.
+  //
+  // Said only where another source did name the dish: where none did, the
+  // answer already says so once about the whole of it, and repeating it per
+  // source fills the block without adding to it.
+  const offTopic = answered.filter((report) => report.count > 0 && report.namesTheDish === 0);
+  const onTopic = answered.some((report) => report.namesTheDish > 0);
+  if (offTopic.length > 0 && onTopic) {
     notes.push(
-      `${listNames(arranged.map((report) => report.name))} had their rows arranged with the ones ` +
-        "naming the dish first, so a wording that returned near-misses cannot crowd out what " +
-        "another wording found. That is an order over one source's own rows and not a score " +
-        "against any other source.",
+      mustKeep(
+        `No row from ${listNames(offTopic.map((report) => report.name))} carries this dish in its ` +
+          "title. Those indexes answer the words they are handed, so rows came back for a dish " +
+          "they may not hold. Ask in the language that source publishes in, or open a row with " +
+          "get_recipe before calling it the dish.",
+      ),
+    );
+  }
+
+  // Said once, without naming the sources: every source's rows are arranged
+  // this way, so a list of them is a list of every source that answered.
+  if (answered.some((report) => report.count > 0)) {
+    notes.push(
+      "Each source's rows are arranged with the ones naming the dish first. That is an order over " +
+        "one source's own rows and not a score against any other source.",
     );
   }
 
@@ -376,8 +402,12 @@ export function reportNotes(reports: SourceReport[]): Note[] {
   }
 
   if (answered.length > 1) {
+    // Nothing may drop this: a caller who adds two of those counts reports a
+    // number no source published.
     notes.push(
-      "Each count above measures something different, and they are never added together into one total.",
+      mustKeep(
+        "Each count above measures something different, and they are never added together into one total.",
+      ),
     );
   }
 

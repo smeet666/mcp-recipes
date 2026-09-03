@@ -195,6 +195,17 @@ export interface SourceReport {
    * near-misses cannot fill the limit and cut away what a later wording found.
    */
   preferredByName: boolean;
+  /**
+   * How many of the rows this answer holds from this source carry the dish in
+   * their title, out of `count`.
+   *
+   * A row is what a source returned for the words it was handed, which is a
+   * candidate rather than a claim that it is the dish. One of these indexes
+   * answers any wording with something, so a source can offer rows and none of
+   * them be the dish; a count of zero says so instead of leaving an answer to
+   * read as several recipes for something nobody published.
+   */
+  namesTheDish: number;
   /** Rows the source sent that could not be read, and were left out. */
   skipped: number;
   /** What a row from this source can be besides a recipe, or null where every row is one. */
