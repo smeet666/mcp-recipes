@@ -4,7 +4,7 @@
   "display_name": "Recipes",
   "version": "4.0.0",
   "description": "MCP server that asks six recipe sites at once, in French, English and Spanish, merges the answers, and scales quantities. No API key required.",
-  "long_description": "Ask one question and six kitchens answer: Marmiton, Ptitchef and Supertoinette in French, the Wikibooks Cookbook and BBC Good Food in English, Pequerecetas in Spanish. Search them all at once and get one merged list, read any recipe in full, rescale it to any number of people, and put the same dish side by side as each tradition writes it.\n\nThe scaling is what this server exists for. Quantities land where a cook can follow them: an egg and a sealed sachet stay whole, a clove halves, a spoonful shrinks into the smaller spoon before it is rounded, and a pinch keeps whatever size a hand gives it while its count is multiplied. One list can hold lines in all three languages at once, and each comes back written the way its own writes numbers, plurals and measures. A line naming a pan rather than something eaten is recognised and left alone, since a recipe made for more people uses the same one.\n\nNothing is converted between measuring systems, no rating is compared across sites, and a site that fails is named as a site that failed rather than folded into an answer as silence. A recipe one site keeps for its subscribers is named as a recipe held back, never as a page this server could not read.",
+  "long_description": "Ask one question and six kitchens answer: Marmiton, Ptitchef and Supertoinette in French, the Wikibooks Cookbook and BBC Good Food in English, Pequerecetas in Spanish. Search them all at once and get one merged list, read any recipe in full, rescale it to any number of people, and put the same dish side by side as each tradition writes it.\n\nThe scaling is what this server exists for. Quantities land where a cook can follow them: an egg and a sealed sachet stay whole, a clove halves, a spoonful shrinks into the smaller spoon before it is rounded, and a pinch keeps whatever size a hand gives it while its count is multiplied. One list can hold lines in all three languages at once, and each comes back written the way its own writes numbers, plurals and measures. A line naming a pan is recognised and left alone, since a recipe made for more people uses the same one.\n\nNothing is converted between measuring systems, no rating is compared across sites, and a site that fails is named as a site that failed rather than folded into an answer as silence. A recipe one site keeps for its subscribers is named as a recipe held back, never as a page this server could not read.",
   "author": {
     "name": "Damien Bouissou",
     "url": "https://github.com/smeet666"
@@ -38,23 +38,21 @@
     "entry_point": "server/index.js",
     "mcp_config": {
       "command": "node",
-      "args": [
-        "${__dirname}/server/index.js"
-      ]
+      "args": ["${__dirname}/server/index.js"]
     }
   },
   "tools": [
     {
       "name": "search_recipes",
-      "description": "Search both recipe sites at once and get one merged list."
+      "description": "Search every recipe site at once and get one merged list."
     },
     {
       "name": "get_recipe",
-      "description": "Read one recipe, optionally rescaled to a number of servings."
+      "description": "Read one page, a recipe or an article gathering recipes, optionally rescaled."
     },
     {
       "name": "scale_ingredients",
-      "description": "Scale a list of ingredient lines, in French, English or both."
+      "description": "Scale a list of ingredient lines, in French, English or Spanish."
     },
     {
       "name": "compare_recipes",
@@ -62,11 +60,7 @@
     }
   ],
   "compatibility": {
-    "platforms": [
-      "darwin",
-      "win32",
-      "linux"
-    ],
+    "platforms": ["darwin", "win32", "linux"],
     "runtimes": {
       "node": ">=24.0.0"
     }

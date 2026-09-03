@@ -85,7 +85,7 @@ export interface PequerecetasRecipe {
   images: string[];
 }
 
-/** An article that gathers recipes rather than being one. */
+/** An article that gathers recipes. */
 export interface PequerecetasCollection {
   id: string;
   title: string;
@@ -120,7 +120,7 @@ export const PEQUERECETAS_PROFILE = {
   homeUrl: "https://www.pequerecetas.com",
   language: "es" as const,
   attribution: "Source: Pequerecetas",
-  rowsThatAreNotRecipes: "an article gathering other recipes rather than a recipe of its own",
+  rowsThatAreNotRecipes: "an article gathering other recipes",
 };
 
 /** Recipe pages, whose address carries the slug the site addresses one by. */
@@ -158,10 +158,12 @@ export function pequerecetasAdapter(reader: PequerecetasReader): SourceAdapter {
       return null;
     },
 
-    async search(query: string, limit: number): Promise<ReadRows> {
+    async search(query: string): Promise<ReadRows> {
       // The site serves one page of results and answers a request for a second
-      // with the first again, so nothing here pages and the limit is applied to
-      // what came back.
+      // with the first again, so nothing here pages. Every readable row is
+      // handed over and the caller cuts the list: a row dropped here would be
+      // one a second wording could no longer be found to have added, and the
+      // count this answer reports would mean fewer rows than the page held.
       const outcome = await reader.searchRecipes(query);
       const listing = (outcome.data ?? {}) as Partial<PequerecetasListing>;
       const list = rowsOf<Partial<PequerecetasListingRow>>(listing.rows, PEQUERECETAS_PROFILE);
@@ -174,9 +176,7 @@ export function pequerecetasAdapter(reader: PequerecetasReader): SourceAdapter {
           skipped += 1;
           continue;
         }
-        if (rows.length < limit) {
-          rows.push(row);
-        }
+        rows.push(row);
       }
 
       return {

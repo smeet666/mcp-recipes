@@ -51,6 +51,8 @@ const GARLIC = /\bgarlic\b/i;
 const IES_ENDING = /ies$/i;
 const LETTER = /\p{L}/u;
 const LETTERS_ONLY = /^[A-Za-z]+$/;
+/** A word of letters in any of the alphabets these languages write. */
+const WORD_LETTERS = /^\p{L}+$/u;
 const OF_JOINER = / of /i;
 const PLURAL_ENDING = /s$|eaux$|aux$/i;
 const SIBILANT_ENDING = /(?:ch|sh|s|x|z)$/i;
@@ -95,7 +97,7 @@ export interface ScaledIngredient {
   /** The language the line was read and rewritten in. */
   language: Language;
   /**
-   * Whether the line names a tool rather than something eaten.
+   * Whether the line names a tool.
    *
    * Some sites write what a recipe is cooked with inside the list they write
    * the ingredients in, so a mould or an air fryer arrives among the food. Such
@@ -111,7 +113,7 @@ export interface ScaledIngredient {
  *
  * The language is still read, so an answer can say which vocabulary the line
  * was understood in, and no quantity is reported: the number a tool line
- * carries counts tools rather than an amount of the dish.
+ * carries counts tools.
  */
 function equipmentIngredient(line: string, language: LanguageChoice = "auto"): ScaledIngredient {
   return {
@@ -1166,7 +1168,7 @@ function agreeInSpanish(item: string, amount: number): string {
 
   const words = item.split(" ");
   const head = words[0] ?? "";
-  if (head.length <= 2 || !LETTERS_ONLY.test(head)) {
+  if (head.length <= 2 || !WORD_LETTERS.test(head)) {
     return item;
   }
 
@@ -1179,15 +1181,19 @@ function agreeInSpanish(item: string, amount: number): string {
 
   words[0] = wantsPlural ? spanishPlural(head) : singular;
 
-  // The word right after the head is an adjective when nothing separates them,
-  // and it takes the same number. A partitive in between marks what follows as
-  // the food rather than a description of the head, and that stays as written.
-  const next = words[1];
-  if (next !== undefined && LETTERS_ONLY.test(next) && !SPANISH_PARTITIVE.test(next)) {
-    const adjectiveSingular = spanishSingular(next);
-    const adjectiveIsPlural = next.toLowerCase() !== adjectiveSingular.toLowerCase();
+  // Every adjective standing after the head takes the same number, and a
+  // partitive ends the run: what follows one names the food, "2 dientes de ajo
+  // picado", where the head's own adjectives describe the head, "2 nueces
+  // moscadas molidas".
+  for (let index = 1; index < words.length; index += 1) {
+    const word = words[index] ?? "";
+    if (!WORD_LETTERS.test(word) || SPANISH_PARTITIVE.test(word)) {
+      break;
+    }
+    const adjectiveSingular = spanishSingular(word);
+    const adjectiveIsPlural = word.toLowerCase() !== adjectiveSingular.toLowerCase();
     if (wantsPlural !== adjectiveIsPlural) {
-      words[1] = wantsPlural ? spanishPlural(next) : adjectiveSingular;
+      words[index] = wantsPlural ? spanishPlural(word) : adjectiveSingular;
     }
   }
 
@@ -1205,7 +1211,7 @@ const SPANISH_PARTITIVE = /^(?:de|del|con|sin|para|al|y|en|o)$/i;
  * qualifies, and it is already written the way the page wrote it.
  */
 function agreeSpanishAdjective(word: string, amount: number): string {
-  if (!LETTERS_ONLY.test(word)) {
+  if (!WORD_LETTERS.test(word)) {
     return word;
   }
   const wantsPlural = amount > 1;
@@ -1252,11 +1258,14 @@ const MUTE_H_WORDS = /^(?:huile|huiles|huitre|huitres|huître|huîtres|herbe|her
  * French needs the partitive: "6 cuillères à soupe **de** beurre". English puts
  * the two side by side: "6 tablespoons butter".
  */
-function joinItem(item: string, language: Language): string {
+function joinItem(item: string, language: Language, partitive: boolean): string {
   if (!item) {
     return "";
   }
-  if (language === "en") {
+  // A page writes the partitive where it chose to: "2 tazas de arroz" and "2
+  // tazas arroz" are both Spanish, and putting one back where the page wrote
+  // none rewrites the line rather than rescaling it.
+  if (language === "en" || !partitive) {
     return ` ${item}`;
   }
   // Spanish writes the partitive in full whatever follows it, so there is no
@@ -1441,9 +1450,10 @@ function itemLabelFor(
   item: string,
   counted: string,
   language: Language,
+  partitive: boolean,
 ): string {
   if (named) {
-    return joinItem(item, language);
+    return joinItem(item, language, partitive);
   }
   if (counted) {
     return ` ${counted}`;
@@ -1657,7 +1667,7 @@ function renderScaledLine(
   const counted = parsed.capacity
     ? agreeCountedContainer(parsed.item, shown, language)
     : agreeWithAmount(parsed.item, shown, language);
-  const itemLabel = itemLabelFor(named, parsed.item, counted, language);
+  const itemLabel = itemLabelFor(named, parsed.item, counted, language, parsed.itemPartitive);
 
   return { named, unitLabel, capacityLabel, altLabel, trailingLabel, itemLabel };
 }

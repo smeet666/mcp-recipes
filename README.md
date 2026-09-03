@@ -160,15 +160,23 @@ Reads one recipe from any source, in one shape.
 | `max_steps`      | integer, 1 to 100, default `20`                                                                                | no       | Steps to serve.                                                                                                                        |
 | `max_step_chars` | integer, 80 to 4000, default `600`                                                                             | no       | Characters kept per step.                                                                                                              |
 
-**In return:** the recipe in the shape every source is rendered into, whichever
-published it: its title, its address, its ingredients with each line's `scaling`,
+**In return:** `kind` says what the address held. A `recipe` answer carries
+`recipe` and no `collection`; a `collection` answer carries `collection` and no
+`recipe`, and is an article gathering other recipes, with the `headings` it is
+built from and the `recipes` it points at, each of them readable with
+`get_recipe`.
+
+A recipe comes in the shape every source is rendered into, whichever
+published it: its title, its address, its ingredients with each line's `scaling`
+and `is_equipment`,
 its steps, and the sections asked for. A field one source publishes and another
 has no notion of comes back absent rather than invented. `rest_minutes` carries a
 resting time from a source that prints one apart, and is in no other time here.
 `steps_as_one_block` says when a source published its method as one block of
 prose rather than as steps. `withheld` names a part a source keeps for its
 subscribers, which is a part the page has rather than a part that could not be
-read. Raise `max_step_chars` when a step was cut mid-sentence.
+read. `scaling_summary` counts the lines four ways, and the four add up to the
+list. Raise `max_step_chars` when a step was cut mid-sentence.
 
 ### `compare_recipes`
 
@@ -190,18 +198,18 @@ search does.
 
 ### `scale_ingredients`
 
-Rescales any ingredient list, with no request to either site.
+Rescales any ingredient list, with no request to any site.
 
-| Argument        | Type                                 | Required   | What it does                               |
-| --------------- | ------------------------------------ | ---------- | ------------------------------------------ |
-| `ingredients`   | array of 1 to 200 lines              | yes        | The lines to rescale.                      |
-| `factor`        | number, up to 1000                   | one of two | The multiplier to apply.                   |
-| `from_servings` | integer, 1 to 500                    | one of two | How many servings the list is written for. |
-| `to_servings`   | integer, 1 to 500                    | one of two | How many servings are wanted.              |
-| `language`      | `auto`, `fr` or `en`, default `auto` | no         | How each line is read.                     |
+| Argument        | Type                                       | Required   | What it does                               |
+| --------------- | ------------------------------------------ | ---------- | ------------------------------------------ |
+| `ingredients`   | array of 1 to 200 lines                    | yes        | The lines to rescale.                      |
+| `factor`        | number, up to 1000                         | one of two | The multiplier to apply.                   |
+| `from_servings` | integer, 1 to 500                          | one of two | How many servings the list is written for. |
+| `to_servings`   | integer, 1 to 500                          | one of two | How many servings are wanted.              |
+| `language`      | `auto`, `fr`, `en` or `es`, default `auto` | no         | How each line is read.                     |
 
 Pass `factor`, or the `from_servings` and `to_servings` pair. `auto` reads each
-line on its own, which is what a list holding both languages needs; naming a
+line on its own, which is what a list holding more than one language needs; naming a
 language reads every line that way.
 
 **In return:** the rescaled lines in the shape `get_recipe` returns, each with
@@ -228,8 +236,8 @@ say they were recomputed when you show them.
 Every answer accounts for each source separately. A site that failed, one nobody
 asked, and one that answered with nothing are three different things, and they
 are reported as three. A total stays beside the source that published it, with
-what that source counts when it says it: one site counts a whole category and the
-other counts the rows it served.
+what that source counts when it says it: one site counts a whole category, another
+counts the rows it served, and a third publishes no total at all.
 
 ## Configuration
 
@@ -486,12 +494,12 @@ page.
 
 ## Les outils
 
-| Outil               | Ce qu'il fait                                              |
-| ------------------- | ---------------------------------------------------------- |
-| `search_recipes`    | Cherche dans toutes les sources avec une seule question.   |
-| `get_recipe`        | Lit une recette de l'une ou l'autre, sous une seule forme. |
-| `compare_recipes`   | Met plusieurs versions d'un même plat côte à côte.         |
-| `scale_ingredients` | Adapte n'importe quelle liste d'ingrédients, sans requête. |
+| Outil               | Ce qu'il fait                                                     |
+| ------------------- | ----------------------------------------------------------------- |
+| `search_recipes`    | Cherche dans toutes les sources avec une seule question.          |
+| `get_recipe`        | Lit une recette de n'importe quelle source, sous une seule forme. |
+| `compare_recipes`   | Met plusieurs versions d'un même plat côte à côte.                |
+| `scale_ingredients` | Adapte n'importe quelle liste d'ingrédients, sans requête.        |
 
 ### `search_recipes`
 
@@ -524,14 +532,22 @@ Lit une recette de n'importe quelle source, sous une seule forme.
 | `max_steps`      | entier, 1 à 100, défaut `20`                                                                                    | non    | Étapes à servir.                                                                                                                        |
 | `max_step_chars` | entier, 80 à 4000, défaut `600`                                                                                 | non    | Caractères gardés par étape.                                                                                                            |
 
-**En retour :** la recette dans la forme où toutes les sources sont rendues, quelle
+**En retour :** `kind` dit ce que l'adresse portait. Une réponse `recipe` porte
+`recipe` et pas de `collection` ; une réponse `collection` porte `collection` et
+pas de `recipe`, et c'est un article rassemblant d'autres recettes, avec les
+`headings` dont il est bâti et les `recipes` vers lesquelles il pointe, chacune
+lisible par `get_recipe`.
+
+Une recette vient dans la forme où toutes les sources sont rendues, quelle
 que soit celle qui l'a publiée : son titre, son adresse, ses ingrédients avec le
-`scaling` de chaque ligne, ses étapes, et les parties demandées. Un champ qu'une
+`scaling` et l'`is_equipment` de chaque ligne, ses étapes, et les parties
+demandées. Un champ qu'une
 source publie et dont une autre n'a pas la notion revient absent plutôt
 qu'inventé. `rest_minutes` porte le temps de repos d'une source qui l'imprime à
 part, et il n'entre dans aucun autre temps rendu ici. `steps_as_one_block` dit
 quand une source a publié sa méthode d'un seul bloc de prose plutôt qu'en étapes.
-`withheld` nomme la partie qu'une source réserve à ses abonnés, qui est une
+`scaling_summary` compte les lignes de quatre façons, et les quatre font le
+total de la liste. `withheld` nomme la partie qu'une source réserve à ses abonnés, qui est une
 partie que la page porte et non une partie illisible. Augmentez `max_step_chars`
 quand une étape a été coupée au milieu d'une phrase.
 
@@ -555,22 +571,24 @@ fait une recherche.
 
 ### `scale_ingredients`
 
-Adapte n'importe quelle liste d'ingrédients, sans requête à l'un ou l'autre site.
+Adapte n'importe quelle liste d'ingrédients, sans requête à aucun site.
 
-| Argument        | Type                                | Requis        | Ce qu'il fait                             |
-| --------------- | ----------------------------------- | ------------- | ----------------------------------------- |
-| `ingredients`   | tableau de 1 à 200 lignes           | oui           | Les lignes à adapter.                     |
-| `factor`        | nombre, jusqu'à 1000                | l'un des deux | Le multiplicateur à appliquer.            |
-| `from_servings` | entier, 1 à 500                     | l'un des deux | Le nombre de parts de la liste d'origine. |
-| `to_servings`   | entier, 1 à 500                     | l'un des deux | Le nombre de parts voulu.                 |
-| `language`      | `auto`, `fr` ou `en`, défaut `auto` | non           | Comment chaque ligne est lue.             |
+| Argument        | Type                                      | Requis        | Ce qu'il fait                             |
+| --------------- | ----------------------------------------- | ------------- | ----------------------------------------- |
+| `ingredients`   | tableau de 1 à 200 lignes                 | oui           | Les lignes à adapter.                     |
+| `factor`        | nombre, jusqu'à 1000                      | l'un des deux | Le multiplicateur à appliquer.            |
+| `from_servings` | entier, 1 à 500                           | l'un des deux | Le nombre de parts de la liste d'origine. |
+| `to_servings`   | entier, 1 à 500                           | l'un des deux | Le nombre de parts voulu.                 |
+| `language`      | `auto`, `fr`, `en` ou `es`, défaut `auto` | non           | Comment chaque ligne est lue.             |
 
 Passez `factor`, ou le couple `from_servings` et `to_servings`. `auto` lit chaque
-ligne pour elle-même, ce dont a besoin une liste portant les deux langues ;
+ligne pour elle-même, ce dont a besoin une liste portant plusieurs langues ;
 nommer une langue lit toutes les lignes ainsi.
 
 **En retour :** les lignes adaptées dans la forme que rend `get_recipe`, chacune
-avec son `scaling`.
+avec son `scaling` et son `is_equipment`, vrai pour une ligne qui nomme un outil
+et qu'on laisse telle quelle. `scaled_count`, `rounded_count`, `unscaled_count`
+et `equipment_count` font le total des lignes envoyées.
 
 ## L'adaptation des quantités
 
@@ -594,7 +612,8 @@ Chaque réponse rend compte de chaque source séparément. Un site qui a échou�
 que personne n'a interrogé et un qui a répondu vide sont trois choses
 différentes, et elles sont rapportées comme trois. Un total reste à côté de la
 source qui l'a publié, avec ce que cette source compte en le disant : l'un compte
-une catégorie entière et l'autre compte les lignes qu'il a servies.
+une catégorie entière, un autre compte les lignes qu'il a servies, et un
+troisième ne publie aucun total.
 
 ## Configuration
 

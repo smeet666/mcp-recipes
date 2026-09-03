@@ -137,7 +137,7 @@ export const ingredientSchema = z.object({
   is_equipment: z
     .boolean()
     .describe(
-      "True for a line naming a tool rather than something eaten, which some sites write among " +
+      "True for a line naming a tool, which some sites write among " +
         "the ingredients. Such a line is never multiplied: a recipe made for more people uses " +
         "the same pan.",
     ),
@@ -262,7 +262,7 @@ function answeredNotes(report: SourceReport): Note[] {
   if (sent.length > 1) {
     notes.push(
       `${report.name} was asked ${sent.length} wordings and these rows are their union: ${sent
-        .map((attempt) => `"${attempt.query}" (${attempt.count ?? 0})`)
+        .map((attempt) => `"${quoteForeign(attempt.query)}" (${attempt.count ?? 0})`)
         .join(", ")}. Those counts are per wording and are never added.`,
     );
   }
@@ -281,7 +281,10 @@ function answeredNotes(report: SourceReport): Note[] {
     );
   }
   if (report.reportedTotal !== null && report.reportedTotalMeans !== null) {
-    const forWording = sent.length > 1 ? ` That number belongs to "${sent[0]?.query}" alone.` : "";
+    const forWording =
+      sent.length > 1
+        ? ` That number belongs to "${quoteForeign(sent[0]?.query ?? "")}" alone.`
+        : "";
     notes.push(
       `${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.${forWording}`,
     );
@@ -295,7 +298,7 @@ function answeredNotes(report: SourceReport): Note[] {
 }
 
 /**
- * What a source offering nothing has actually established.
+ * What a source offering nothing has established.
  *
  * A wording that returned no row is a statement about that wording. Several of
  * them together are the closest this server comes to saying the corpus holds
@@ -305,7 +308,7 @@ function nothingOfferedNote(report: SourceReport, sent: WordingAttempt[]): Note 
   return mustKeep(
     sent.length > 1
       ? `${report.name} answered and offered no row for any of the ${sent.length} wordings it was ` +
-          `sent (${sent.map((attempt) => `"${attempt.query}"`).join(", ")}). Each of those is a ` +
+          `sent (${sent.map((attempt) => `"${quoteForeign(attempt.query)}"`).join(", ")}). Each of those is a ` +
           "statement about a wording; together they are the closest this server comes to saying " +
           "the corpus holds nothing. Try a main ingredient, or the dish's name in the language " +
           "that source publishes in."

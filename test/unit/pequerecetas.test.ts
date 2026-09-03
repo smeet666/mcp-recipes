@@ -19,6 +19,7 @@ import {
 import type {
   PequerecetasCollection,
   PequerecetasListing,
+  PequerecetasRecipe,
   PequerecetasPage,
   PequerecetasReader,
 } from "../../src/sources/pequerecetas.js";
@@ -162,10 +163,13 @@ describe("searching", () => {
     expect(found.reportedTotalMeans).toBeNull();
   });
 
-  it("keeps no more rows than the caller asked for", async () => {
+  it("hands over every readable row and leaves the cut to the caller", async () => {
+    // A row dropped here is one a second wording could no longer be found to
+    // have added, and the count this answer reports would mean fewer rows than
+    // the page held.
     const found = await pequerecetasAdapter(reader()).search("tortilla", 1);
 
-    expect(found.rows).toHaveLength(1);
+    expect(found.rows).toHaveLength(listing.rows.length);
   });
 
   it("counts a row it could not read rather than dropping it in silence", async () => {
@@ -405,5 +409,39 @@ describe("an article with many headings stays readable", () => {
         many,
       );
     });
+  });
+});
+
+describe("what a Spanish yield is counted in", () => {
+  it("does not call a ración something other than a serving", async () => {
+    const payload = payloadOf<{ recipe: { yield: { unit: string } }; notes: string[] }>(
+      await runGetRecipe(
+        fakeClient(),
+        recipeArgs({ id: "pequerecetas:crepes-caseras", servings: 8 }),
+      ),
+    );
+
+    expect(payload.recipe.yield.unit).toBe("raciones");
+    // A ración is a serving. Saying it counts something else would tell a
+    // reader the page never said how many people it feeds.
+    expect(payload.notes.some((note) => /not a number of eaters/.test(note))).toBe(false);
+  });
+
+  it("says so for a yield that really counts something else", async () => {
+    const page: PequerecetasPage = {
+      kind: "recipe",
+      recipe: {
+        ...(recipePage as { recipe: PequerecetasRecipe }).recipe,
+        yield_text: "24 galletas",
+      },
+    };
+    const payload = payloadOf<{ notes: string[] }>(
+      await runGetRecipe(
+        fakeClient({ pequerecetas: { page } }),
+        recipeArgs({ id: "pequerecetas:crepes-caseras", servings: 8 }),
+      ),
+    );
+
+    expect(payload.notes.some((note) => /galletas/.test(note))).toBe(true);
   });
 });

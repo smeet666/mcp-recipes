@@ -13,6 +13,8 @@
 
 import { describe, expect, it } from "vitest";
 import { scaleIngredient } from "../../src/recipe/scale.js";
+import { runGetRecipe } from "../../src/tools/getRecipe.js";
+import { fakeClient, payloadOf, recipeArgs } from "./support.js";
 
 const scale = (line: string, factor: number) => scaleIngredient(line, { factor });
 
@@ -96,5 +98,119 @@ describe("an ambiguous noun with nothing beside it stays food", () => {
   it("reads a tool word further along the line as part of the food", () => {
     // The noun the line is about is the one it opens with.
     expect(scale("200 g de queso rallado", 2).isEquipment).toBe(false);
+  });
+});
+
+/**
+ * The lines a recipe site actually writes among its ingredients.
+ *
+ * A site that lists what a dish is cooked with writes these, and every one of
+ * them multiplied is an answer nobody can catch: the arithmetic is right and
+ * the sentence is absurd. The corpus stands apart from the cases above so that
+ * a change to the vocabulary is measured against all of it at once.
+ */
+const NAMES_A_TOOL = [
+  "1 paellera de 40 cm",
+  "1 rodillo",
+  "1 cuchillo afilado",
+  "1 rejilla",
+  "1 tabla de cortar",
+  "1 cuchara de madera",
+  "1 robot de cocina",
+  "1 termómetro de cocina",
+  "1 tamiz",
+  "1 manga pastelera",
+  "1 plancha eléctrica",
+  "1 pincel de silicona",
+  "1 vaso medidor",
+  "Brocha de silicona",
+  "Thermomix",
+  "Palillos",
+  "Freidora de aire",
+  "2 moldes de 20 cm",
+  "1 sartén antiadherente",
+  "papel de hornear",
+  "film transparente",
+  "1 boquilla rizada",
+  "1 exprimidor",
+  "1 pelador",
+  "1 escurridor",
+  "1 cuenco grande",
+  "1 moule à tarte",
+  "1 baking tin",
+];
+
+const NAMES_A_FOOD = [
+  "200 g de harina",
+  "6 huevos",
+  "1 cebolla",
+  "2 dientes de ajo",
+  "100 g de papel de arroz",
+  "2 latas de atún",
+  "200 g de queso de cabra",
+  "1 pizca de sal",
+  "2 cucharadas de aceite",
+  "1 vaso de vino blanco",
+  "2 cazos de caldo",
+  "1 plato de sopa",
+  "6 moules",
+  "1 tin tomatoes",
+];
+
+describe("the lines a site writes among its ingredients", () => {
+  it("recognises every one that names a tool", () => {
+    expect(NAMES_A_TOOL.filter((line) => !scale(line, 2).isEquipment)).toEqual([]);
+  });
+
+  it("leaves every one that names food to be scaled", () => {
+    expect(NAMES_A_FOOD.filter((line) => scale(line, 2).isEquipment)).toEqual([]);
+  });
+});
+
+describe("a French line an existing recipe already carries", () => {
+  it("scales a food whose preparation shares a word with a tool", () => {
+    // "râpé" is how the cheese arrives, and a râpe is what grated it. The line
+    // is about the cheese.
+    const carrots = scale("2 carottes râpées", 2);
+
+    expect(carrots.isEquipment).toBe(false);
+    expect(carrots.text).toBe("4 carottes râpées");
+    expect(scale("Gruyère râpé", 2).isEquipment).toBe(false);
+    expect(scale("100 g de chocolat râpé", 2).isEquipment).toBe(false);
+  });
+
+  it("reads a container of something as an amount of that something", () => {
+    // "une casserole de lait" measures milk by the pan, and "1 cuchillo" is the
+    // knife itself. What follows the partitive decides.
+    expect(scale("1 casserole de lait", 2).isEquipment).toBe(false);
+    expect(scale("Cazuela de mariscos", 2).isEquipment).toBe(false);
+    expect(scale("2 brochetas de pollo", 2).isEquipment).toBe(false);
+  });
+});
+
+describe("the counts a recipe reports about its own lines", () => {
+  it("add up to the lines in the list", async () => {
+    const payload = payloadOf<{
+      recipe: {
+        ingredients: unknown[];
+        scaling_summary: {
+          scaled_count: number;
+          rounded_count: number;
+          unscaled_count: number;
+          equipment_count: number;
+        };
+      };
+    }>(
+      await runGetRecipe(
+        fakeClient(),
+        recipeArgs({ id: "pequerecetas:crepes-caseras", servings: 8 }),
+      ),
+    );
+    const counts = payload.recipe.scaling_summary;
+
+    expect(counts.equipment_count).toBeGreaterThan(0);
+    expect(
+      counts.scaled_count + counts.rounded_count + counts.unscaled_count + counts.equipment_count,
+    ).toBe(payload.recipe.ingredients.length);
   });
 });

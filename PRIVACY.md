@@ -25,7 +25,7 @@ It needs no API key and no account, so there is no credential for it to hold and
 | `www.ptitchef.com`      | the site's pages                                                                                 |
 | `www.bbcgoodfood.com`   | a JSON route the site's own front end uses, for a search; the recipe's page itself, for a recipe |
 | `www.supertoinette.com` | the site's pages                                                                                 |
-| `www.pequerecetas.com`  | the site's pages, and the sitemaps it publishes its own listings in                              |
+| `www.pequerecetas.com`  | the site's pages                                                                                 |
 
 A Cookbook page is linked as `en.wikibooks.org`, which is where a reader opens
 it. That host is never contacted by this server: the pages themselves are read
@@ -108,7 +108,7 @@ Il ne demande ni clé d'API ni compte, donc il ne détient aucun identifiant et 
 | `www.ptitchef.com`      | les pages du site                                                                                           |
 | `www.bbcgoodfood.com`   | une route JSON qu'emploie l'interface du site, pour une recherche ; la page de la recette, pour une recette |
 | `www.supertoinette.com` | les pages du site                                                                                           |
-| `www.pequerecetas.com`  | les pages du site, et les sitemaps où il publie ses propres listes                                          |
+| `www.pequerecetas.com`  | les pages du site                                                                                           |
 
 Une page du Cookbook est liée sous `en.wikibooks.org`, où un lecteur l'ouvre. Ce
 serveur ne joint jamais cet hôte : les pages elles-mêmes sont lues par la

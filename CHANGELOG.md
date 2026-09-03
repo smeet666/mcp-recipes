@@ -2,12 +2,16 @@
 
 ## 4.0.0
 
-- **`per_source` no longer carries `mixesReferencePages`.** A caller reading
-  that field reads `rowsThatAreNotRecipes` instead, which is null where every
-  row is a recipe and otherwise a sentence in the source's own words. The
-  boolean forced one wording on two different situations: a page about an
-  ingredient filed beside the recipes using it, and an article that gathers
-  recipes, and one sentence could only describe one of them truthfully.
+- **The published client entry renames a field on `SourceProfile` and
+  `SourceReport`.** A program importing `mcp-recipes/client` reads
+  `rowsThatAreNotRecipes` where it read `mixesReferencePages`: a sentence in the
+  source's own words saying what else one of its rows can be, and null where
+  every row is a recipe. The boolean forced one wording on two different
+  situations, a page about an ingredient filed beside the recipes using it and
+  an article that gathers recipes, and one sentence could only describe one of
+  them truthfully. The tools' own answers are unaffected: `per_source` never
+  published the field, and the note it produces now names each source in that
+  source's terms.
 - **`get_recipe` answers in two shapes, and `kind` says which.** One source
   publishes articles that gather recipes at the same kind of address as a
   recipe. Such an answer carries `collection` with the headings and the recipes

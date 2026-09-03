@@ -217,14 +217,16 @@ function describeDifferences(
     );
   }
 
-  const counts = payloads.map((payload) => payload.ingredients.length);
+  // Tools are left out of the count: some sites write what a dish is cooked
+  // with among its ingredients, and counting those would report a difference
+  // in the length of two lists that hold the same food.
+  const foodLines = (payload: RecipePayload) =>
+    payload.ingredients.filter((entry) => !entry.is_equipment).length;
+  const counts = payloads.map(foodLines);
   if (new Set(counts).size > 1 && counts.every((value) => value > 0)) {
     differences.push(
       `${payloads
-        .map(
-          (payload) =>
-            `${payload.source_name} lists ${payload.ingredients.length} ingredient lines`,
-        )
+        .map((payload) => `${payload.source_name} lists ${foodLines(payload)} ingredient lines`)
         .join("; ")}.`,
     );
   }
@@ -295,7 +297,7 @@ function whyItIsMissing(
   if (outcome.article) {
     return mustKeep(
       `${report.name} is missing from this comparison because the page its search offered ` +
-        `gathers other recipes rather than holding one: ${quoteForeign(outcome.article.title)}, ` +
+        `gathers other recipes: ${quoteForeign(outcome.article.title)}, ` +
         `${quoteForeign(outcome.article.url)}. Read one of the recipes it lists with get_recipe.`,
     );
   }
@@ -344,7 +346,7 @@ export async function runCompareRecipes(
     const recipes: RecipeDetail[] = [];
     /** Sources whose row was found and whose page then could not be read. */
     const unread = new Map<SourceId, { code: string; message: string }>();
-    /** Sources whose row opened onto an article gathering recipes rather than one. */
+    /** Sources whose row opened onto an article gathering recipes. */
     const gathered = new Map<SourceId, RecipeDetail>();
     /** Sources whose row was opened, whichever way that went. */
     const opened = new Set<SourceId>();

@@ -56,14 +56,14 @@ describe("Marcus misspells the dish and only one source recognises it", () => {
 });
 
 describe("Amara asks vaguely and gets a page about an ingredient", () => {
-  it("warns that a row from such a source can be a page rather than a recipe", async () => {
+  it("warns that a row from such a source can be a page about an ingredient", async () => {
     const result = await runSearchRecipes(fakeClient(), {
       query: "something with chicken and rice",
       limit_per_source: 3,
       fan_out: true,
       sources: ["cookbook"],
     });
-    expect(textOf(result)).toMatch(/page about an ingredient rather than a recipe/);
+    expect(textOf(result)).toMatch(/page about an ingredient/);
   });
 
   it("says nothing of the kind when no such source contributed", async () => {

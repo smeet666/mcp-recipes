@@ -75,7 +75,7 @@ export const scaleIngredientsOutput = z.object({
     .number()
     .int()
     .describe(
-      "Lines naming a tool rather than something eaten, which are never multiplied: a recipe " +
+      "Lines naming a tool, which are never multiplied: a recipe " +
         "made for more people uses the same pan.",
     ),
   notes: z.array(z.string()),
@@ -164,7 +164,7 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
     }
     if (counts.equipment_count > 0) {
       notes.push(
-        `${counts.equipment_count} line(s) name a tool rather than an ingredient and were left as ` +
+        `${counts.equipment_count} line(s) name a tool and were left as ` +
           "given: a recipe made for more people uses the same one.",
       );
     }

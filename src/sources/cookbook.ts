@@ -66,7 +66,7 @@ export const COOKBOOK_PROFILE = {
   homeUrl: "https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents",
   language: "en" as const,
   attribution: "Source: Wikibooks Cookbook",
-  rowsThatAreNotRecipes: "a page about an ingredient rather than a recipe",
+  rowsThatAreNotRecipes: "a page about an ingredient",
 };
 
 const SITE_URL = /^https?:\/\/en\.wikibooks\.org\/wiki\//i;

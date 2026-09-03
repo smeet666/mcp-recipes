@@ -68,7 +68,7 @@ Lifestyle & Food
 - "What does the Cookbook ask for in a Victoria sponge, for 6?"
 - Tool: search_recipes — Searches every source at once and returns one merged list
 - Tool: get_recipe — Reads one recipe, optionally rescaled
-- Tool: scale_ingredients — Scales a list from anywhere, offline, in either language
+- Tool: scale_ingredients — Scales a list from anywhere, offline, in French, English or Spanish
 - Tool: compare_recipes — One dish, as each source writes it
 
 ## Tags

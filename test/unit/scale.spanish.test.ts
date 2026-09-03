@@ -185,3 +185,18 @@ describe("a share Spanish writes in words", () => {
     expect(scale("2 medialunas", 2).text).toBe("4 medialunas");
   });
 });
+
+describe("agreement reaches a word written with an accent", () => {
+  it("agrees an adjective the plain alphabet does not spell", () => {
+    expect(scale("1 tortilla española", 2).text).toBe("2 tortillas españolas");
+    expect(scale("1 cebolla pequeña", 2).text).toBe("2 cebollas pequeñas");
+  });
+
+  it("writes the plural Spanish gives a word ending in z", () => {
+    expect(scale("1 nuez moscada molida", 3).text).toBe("3 nueces moscadas molidas");
+  });
+
+  it("writes the plural Spanish gives a word ending in a consonant", () => {
+    expect(scale("1 flan de huevo", 2).text).toBe("2 flanes de huevo");
+  });
+});

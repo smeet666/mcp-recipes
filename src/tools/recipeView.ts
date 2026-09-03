@@ -25,7 +25,16 @@ import {
 } from "./shared.js";
 import type { Note } from "./shared.js";
 
-const SERVING_WORD = /personne|people|serving|portion|part\b/i;
+/**
+ * The words a page counts eaters with, in each language its sources publish in.
+ *
+ * A yield counted in anything else counts something the factor does not: a
+ * recipe for 24 balls asked for 8 makes 8 balls. The note that says so is only
+ * true where the word really names something other than an eater, so a word
+ * naming a share of a dish belongs here whichever language wrote it.
+ */
+const SERVING_WORD =
+  /personne|people|serving|portion|part\b|racion|raciones|rac\b|persona|personas|comensal|comensales/i;
 
 /**
  * What the other half of the recipe holds, when this half is being read alone.
@@ -144,11 +153,17 @@ export const recipeSchema = z.object({
     .describe(
       "Sections nobody asked for. A field belonging to one of these is empty because it was not requested, never because the page states nothing.",
     ),
-  scaling_summary: z.object({
-    scaled_count: z.number().int(),
-    rounded_count: z.number().int(),
-    unscaled_count: z.number().int(),
-  }),
+  scaling_summary: z
+    .object({
+      scaled_count: z.number().int(),
+      rounded_count: z.number().int(),
+      unscaled_count: z.number().int(),
+      equipment_count: z
+        .number()
+        .int()
+        .describe("Lines naming a tool, which some sites write among the ingredients."),
+    })
+    .describe("The four counts add up to the number of ingredient lines."),
 });
 
 export type RecipePayload = z.infer<typeof recipeSchema>;
@@ -278,7 +293,7 @@ function resolveFactor(
   const unit = recipe.yieldUnit;
   if (unit && !SERVING_WORD.test(unit)) {
     notes.push(
-      `This page states its yield in ${quoteForeign(unit)} rather than in servings, so asking for ` +
+      `This page counts its yield in ${quoteForeign(unit)}, which is not a number of eaters, so asking for ` +
         `${servings} multiplied the quantities by ${round(factor)} to give ${servings} ${quoteForeign(unit)}.`,
     );
   }
@@ -418,6 +433,14 @@ function partNotes(recipe: RecipeDetail, wants: (section: Section) => boolean): 
   if (wants("steps") && recipe.steps.length === 0) {
     notes.push(emptyPartNote(recipe, METHOD_PART));
   }
+  // A site that writes what a dish is cooked with among its ingredients keeps
+  // no list of its own, so an empty one here says nothing about the recipe.
+  if (wants("equipment") && recipe.equipment.length === 0 && recipe.ingredients.length > 0) {
+    notes.push(
+      `${recipe.sourceName} keeps no equipment list of its own. What a recipe is cooked with is ` +
+        "written among the ingredients, where each such line carries 'is_equipment'.",
+    );
+  }
   if (wants("steps") && recipe.stepsAsOneBlock === true && recipe.steps.length > 0) {
     notes.push(
       mustKeep(
@@ -441,7 +464,7 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
 
   const notes: Note[] = [...yieldNotes, ...partNotes(recipe, wants)];
 
-  const rounded = ingredients.filter((entry) => entry.scaling === "rounded");
+  const rounded = ingredients.filter((entry) => entry.scaling === "rounded" && !entry.isEquipment);
   const equipment = ingredients.filter((entry) => entry.isEquipment);
   // A tool is counted apart from a line that simply carries no figure: the two
   // are repeated as published for opposite reasons, and merging them would say
@@ -463,7 +486,7 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
   }
   if (equipment.length > 0) {
     notes.push(
-      `${equipment.length} line(s) name a tool rather than an ingredient, which this site writes ` +
+      `${equipment.length} line(s) name a tool, which this site writes ` +
         "among them. They were left as published: a recipe made for more people uses the same one.",
     );
   }
@@ -528,9 +551,15 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
     sections_returned: [...options.sections],
     sections_omitted: omitted,
     scaling_summary: {
-      scaled_count: ingredients.filter((entry) => entry.scaling === "scaled").length,
+      // A tool line is counted apart, so the four counts add up to the lines in
+      // the list. It carries "unscaled" like a line with no figure on it, and
+      // merging the two would say this server found no quantity where it found
+      // one and declined it.
+      scaled_count: ingredients.filter((entry) => entry.scaling === "scaled" && !entry.isEquipment)
+        .length,
       rounded_count: rounded.length,
       unscaled_count: unscaled.length,
+      equipment_count: equipment.length,
     },
   };
 

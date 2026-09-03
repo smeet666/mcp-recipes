@@ -37,6 +37,7 @@ export const getRecipeDescription = [
   "'id' must come from search_recipes. It names the source, so this reads the right one without guessing; an identifier no source would have minted is refused, because sending it anywhere would answer about the wrong dish.",
   "Pass 'servings' to rescale. Quantities land where a kitchen can follow them: an egg stays whole, anything that pours or cuts can halve, a small measurement moves to a smaller unit before it is rounded, and anything unmultipliable is flagged rather than scaled.",
   "A page that states no number of servings comes back as published and says so, because dividing by a yield nobody wrote would answer for a number of people the page never claimed.",
+  "Read 'kind' first. Some sources publish articles gathering other recipes at the same kind of address as a recipe, and such an answer carries 'collection' with the recipes it points at and no 'recipe' at all: there is nothing to cook from that page, and the recipes it lists are read with get_recipe.",
   "A part this answer holds nothing for says which of two things happened: the page showed no sign of it, or this server failed to read what the page carries. An empty ingredient list is never evidence that an ingredient is absent from the dish.",
   "'sections' decides what comes back, and 'sections_omitted' names what was left out: a field belonging to an omitted section is empty because nobody asked for it, never because the page states nothing.",
   "A field a source does not publish is null, never zero. Credit the source and link the url when you repeat any of it.",
@@ -56,7 +57,7 @@ export const getRecipeInput = strictInput({
     .min(1)
     .max(500)
     .describe(
-      "From search_recipes, such as 'marmiton:44078', 'goodfood:recipes/carbonara' or 'cookbook:Cookbook:Carbonara'. Two sources address a recipe by a bare number, so spell an id with its source.",
+      "From search_recipes, such as 'marmiton:44078', 'pequerecetas:paella-de-marisco' or 'cookbook:Cookbook:Carbonara'. Two sources address a recipe by a bare number, so spell an id with its source.",
     ),
   servings: z
     .number()
@@ -99,8 +100,8 @@ export const getRecipeOutput = z.object({
     .enum(["recipe", "collection"])
     .describe(
       "What the address held. 'recipe' comes with 'recipe' and no 'collection'; 'collection' " +
-        "comes with 'collection' and no 'recipe', and is an article gathering other recipes " +
-        "rather than a dish anyone can cook from this page.",
+        "comes with 'collection' and no 'recipe', and is an article gathering other recipes, " +
+        "with no ingredients and no method of its own.",
     ),
   recipe: recipeSchema.optional().describe("Present when 'kind' is 'recipe'."),
   collection: collectionSchema.optional().describe("Present when 'kind' is 'collection'."),
@@ -148,11 +149,17 @@ export async function runGetRecipe(
       renderYield(payload),
     ];
 
-    const ingredientLines = payload.ingredients.map((entry) =>
-      entry.scaling === "unscaled"
+    // A tool line is left as published for a reason of its own, and it can carry
+    // a figure the server read and declined to multiply, so it is never marked
+    // as a line with no quantity on it.
+    const ingredientLines = payload.ingredients.map((entry) => {
+      if (entry.is_equipment) {
+        return `- ${quoteForeign(entry.text)} (a tool)`;
+      }
+      return entry.scaling === "unscaled"
         ? `- ${quoteForeign(entry.text)} (no quantity)`
-        : `- ${quoteForeign(entry.text)}`,
-    );
+        : `- ${quoteForeign(entry.text)}`;
+    });
     const stepLines = payload.steps.map((step, index) => `${index + 1}. ${quoteForeign(step)}`);
 
     // A long method and a long ingredient list share what the notes leave, so
@@ -190,11 +197,11 @@ export async function runGetRecipe(
 }
 
 /**
- * The answer for an address that held an article rather than a recipe.
+ * The answer for an address that held an article gathering recipes.
  *
  * It carries no ingredients and no method because the page has none, which is a
- * different statement from a recipe this server failed to read. What the page
- * does carry is the listing, and that is worth following.
+ * different statement from a recipe this server failed to read. The listing it
+ * carries is worth following.
  */
 function gatheredAnswer(
   recipe: RecipeDetail,
@@ -205,7 +212,7 @@ function gatheredAnswer(
   const notes: Note[] = [
     ...earlier,
     mustKeep(
-      "This address gathers other recipes rather than holding one of its own, so there are no " +
+      "This address gathers other recipes, so there are no " +
         `ingredients and no method to read. ${payload.source_name} publishes both at this kind ` +
         "of address. Call get_recipe on one of the recipes listed here.",
     ),
@@ -218,7 +225,7 @@ function gatheredAnswer(
     `An article that gathers ${payload.recipes.length} recipe(s).`,
   ];
   const rows = payload.recipes.map(
-    (row) => `- ${quoteForeign(row.title)} — ${quoteForeign(row.id)}`,
+    (row) => `- ${quoteForeign(row.title)} (${quoteForeign(row.id)})`,
   );
   const headings = payload.headings.map(quoteForeign);
 

@@ -462,7 +462,6 @@ const SPANISH_UNITS: Record<string, UnitInfo> = {
   cazos: { canonical: "cazo", kind: "approximate", system: "none" },
   cucharon: { canonical: "cucharón", kind: "approximate", system: "none", plural: "cucharones" },
   cucharones: { canonical: "cucharón", kind: "approximate", system: "none", plural: "cucharones" },
-  nuez: { canonical: "nuez", kind: "approximate", system: "none", plural: "nueces" },
   toque: { canonical: "toque", kind: "approximate", system: "none" },
   toques: { canonical: "toque", kind: "approximate", system: "none" },
 };

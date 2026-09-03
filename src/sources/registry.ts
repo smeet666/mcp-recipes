@@ -66,25 +66,44 @@ export interface Readers {
 const PAGE_READ_BOUNDS = { maxBodyBytes: 8_000_000, budgetMs: 60_000 };
 
 /**
- * The spacing a site imposes at home, which a setting here cannot go below.
+ * The spacing each site imposes at home, which a setting here cannot go below.
  *
- * Each source publishes a floor of its own, and a client built with a
- * configuration object takes the number it is handed: nothing downstream clamps
- * it. So the floor is applied here, where the configuration meets the client,
- * and one setting governing every source can only ever make this server more
- * patient than the slowest of them asks for.
+ * Every source publishes a floor of its own, and several of the clients take
+ * the number a configuration object hands them without clamping it. So the
+ * floor is applied here, where the configuration meets the client, and one
+ * setting governing every source can only ever make this server more patient
+ * than each of them asks for.
  *
- * A source absent from this table asks for no more than the shared default.
+ * Every registered source has an entry, and `PACED_SOURCES` holds the registry
+ * to that: a source added without one would be read at whatever the shared
+ * setting says, which for two of these sites is twice as fast as they ask and
+ * for two others six times.
  */
 const PACING_FLOOR_MS: Record<SourceId, number> = {
+  marmiton: 500,
+  cookbook: 500,
+  ptitchef: 1000,
+  goodfood: 1000,
   supertoinette: 3000,
   pequerecetas: 3000,
 };
 
-/** The spacing one source is read at: the setting, or its own floor when that is higher. */
+/** The sources the table above covers, for a test that holds it to the registry. */
+export const PACED_SOURCES = Object.keys(PACING_FLOOR_MS);
+
+/**
+ * The spacing one source is read at: the setting, or its own floor when that is
+ * higher.
+ *
+ * A source with no entry falls back to the slowest floor in the table. A source
+ * this server knows nothing about is not one to be optimistic with, and the
+ * test above keeps the case from arising.
+ */
 export function pacingFor(source: SourceId, configured: number): number {
-  return Math.max(configured, PACING_FLOOR_MS[source] ?? 0);
+  return Math.max(configured, PACING_FLOOR_MS[source] ?? SLOWEST_FLOOR_MS);
 }
+
+const SLOWEST_FLOOR_MS = Math.max(...Object.values(PACING_FLOOR_MS));
 
 /** The settings one source's client is handed, which is the shared set at that source's pace. */
 export function pacedConfig(config: Config, source: SourceId) {

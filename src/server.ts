@@ -66,6 +66,7 @@ export function buildInstructions(sources: Array<{ name: string; language: strin
     `Tools for recipes, reading ${sources.length} sources: ${named}. No API key and no account are needed.`,
     "search_recipes asks every source at once and returns one list; every id it hands back names the source it came from, and get_recipe routes on that.",
     "Use compare_recipes when the question is how a dish differs between traditions: it reads each source's closest version and can rescale them all to the same number of servings so the lists stand comparison.",
+    "get_recipe answers in two shapes and says which under 'kind': a recipe, or an article gathering other recipes, which some sources publish at the same kind of address and which carries no ingredients and no method of its own.",
     "Do not rescale quantities yourself. get_recipe and scale_ingredients keep an egg whole, halve what pours or cuts, move a small measurement to a smaller unit before rounding it, and flag what cannot be scaled, which is what stops answers like '2.4 eggs'.",
     "scale_ingredients works offline on a list from anywhere and reads French, English and Spanish lines in one call, each in its own language.",
     "A source that fails is named as a source that failed. An answer holding rows from some sources is never evidence about what the others hold, and 'per_source' says which was which.",

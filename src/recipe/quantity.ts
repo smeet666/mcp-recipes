@@ -837,6 +837,14 @@ export interface ParsedIngredient {
    */
   measureAdjective: string | null;
   /**
+   * Whether the line wrote a partitive between its measure and what it measures.
+   *
+   * French and Spanish write one where the page chose to, "6 cucharadas de
+   * aceite", and leave it out where they did not, "2 tazas arroz". The rewrite
+   * puts back what the page had rather than deciding for it.
+   */
+  itemPartitive: boolean;
+  /**
    * Whether that size word stood behind the measure rather than in front of it.
    *
    * Spanish writes "1 cucharada colmada" where French writes "1 grosse pincée",
@@ -1095,6 +1103,8 @@ function takeEquivalents(
   bracketed: ReturnType<typeof takeAlternates>;
   slashed: ReturnType<typeof takeSlashAlternates>;
   item: string;
+  /** Whether the line wrote a partitive between its measure and what it measures. */
+  partitive: boolean;
   trailing: ReturnType<typeof takeTrailingAlternates>;
   group:
     | ReturnType<typeof takeTrailingAlternates>
@@ -1113,7 +1123,8 @@ function takeEquivalents(
     rest = slashed.rest;
   }
 
-  let item = stripItemLead(rest, language);
+  const lead = stripItemLead(rest, language);
+  let item = lead.item;
 
   const trailing =
     bracketed.measures.length === 0 && !slashed ? takeTrailingAlternates(item, language) : null;
@@ -1127,7 +1138,7 @@ function takeEquivalents(
   // opened, and a tin of twice the size is a tin no shop sells, so the figure
   // goes back exactly as the page wrote it.
 
-  return { rest, item, bracketed, slashed, trailing, group };
+  return { rest, item, partitive: lead.partitive, bracketed, slashed, trailing, group };
 }
 
 /**
@@ -1245,6 +1256,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     approximation: null,
     measureAdjective: null,
     measureAdjectiveFollows: false,
+    itemPartitive: false,
     amount: null,
     amountMax: null,
     rangeSeparator: null,
@@ -1323,6 +1335,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     approximation: loose ? loose[0] : null,
     measureAdjective: behind?.unit ? described.adjective : null,
     measureAdjectiveFollows: measure.follows,
+    itemPartitive: equivalents.partitive,
     amount: whole * times,
     amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
@@ -1483,11 +1496,18 @@ function takeLeadingUnit(
  * stood. Leaving the article behind produces "4 un flacon", which reads as
  * broken text rather than as a quantity.
  */
-function stripItemLead(text: string, language: Language): string {
+function stripItemLead(text: string, language: Language): { item: string; partitive: boolean } {
   if (usesPartitiveDe(language)) {
-    return text.replace(LEADING_PARTITIVE, "").replace(ROMANCE_ARTICLE[language], "").trim();
+    const partitive = LEADING_PARTITIVE.test(text);
+    return {
+      item: text.replace(LEADING_PARTITIVE, "").replace(ROMANCE_ARTICLE[language], "").trim(),
+      partitive,
+    };
   }
-  return text.replace(OF_OPENING, "").replace(LEADING_INDEFINITE_WITH_SPACE, "").trim();
+  return {
+    item: text.replace(OF_OPENING, "").replace(LEADING_INDEFINITE_WITH_SPACE, "").trim(),
+    partitive: false,
+  };
 }
 
 /**
