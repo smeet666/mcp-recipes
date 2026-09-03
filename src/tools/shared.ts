@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { RecipesError } from "../errors.js";
 import type { ScaledIngredient } from "../recipe/scale.js";
-import type { RecipeRow, SourceReport } from "../types.js";
+import type { RecipeRow, SourceReport, WordingAttempt } from "../types.js";
 
 /**
  * The text block is what many clients render, and some render nothing else, so
@@ -133,7 +133,14 @@ export const ingredientSchema = z.object({
     .string()
     .nullable()
     .describe("The unit 'amount' is in, which may differ from the page's."),
-  language: z.enum(["fr", "en"]).describe("The language the line was read and rewritten in."),
+  language: z.enum(["fr", "en", "es"]).describe("The language the line was read and rewritten in."),
+  is_equipment: z
+    .boolean()
+    .describe(
+      "True for a line naming a tool rather than something eaten, which some sites write among " +
+        "the ingredients. Such a line is never multiplied: a recipe made for more people uses " +
+        "the same pan.",
+    ),
   note: z.string().optional().describe("What happened to this line, when anything did."),
 });
 
@@ -146,6 +153,7 @@ export function toIngredientPayload(entry: ScaledIngredient): z.infer<typeof ing
     amount_max: entry.amountMax,
     unit: entry.unit,
     language: entry.language,
+    is_equipment: entry.isEquipment,
     ...(entry.note ? { note: entry.note } : {}),
   };
 }
@@ -243,6 +251,70 @@ export function labelNote(label: string, note: Note): Note {
   return mustKeep(`${label}: ${said}`);
 }
 
+/** What one source that answered has to say about the rows it offered. */
+function answeredNotes(report: SourceReport): Note[] {
+  const notes: Note[] = [];
+  const sent = report.wordings.filter((attempt) => attempt.ran && attempt.error === null);
+
+  if (report.count === 0) {
+    notes.push(nothingOfferedNote(report, sent));
+  }
+  if (sent.length > 1) {
+    notes.push(
+      `${report.name} was asked ${sent.length} wordings and these rows are their union: ${sent
+        .map((attempt) => `"${attempt.query}" (${attempt.count ?? 0})`)
+        .join(", ")}. Those counts are per wording and are never added.`,
+    );
+  }
+  if (report.preferredByName) {
+    notes.push(
+      `${report.name}'s rows are arranged with the ones naming the dish first, so a wording that ` +
+        "returned near-misses cannot crowd out what another wording found. That is an order over " +
+        "one source's own rows and not a score against any other source.",
+    );
+  }
+  if (report.skipped > 0) {
+    notes.push(
+      mustKeep(
+        `${report.name} sent ${report.skipped} row(s) in a shape this server could not read, and they were left out.`,
+      ),
+    );
+  }
+  if (report.reportedTotal !== null && report.reportedTotalMeans !== null) {
+    const forWording = sent.length > 1 ? ` That number belongs to "${sent[0]?.query}" alone.` : "";
+    notes.push(
+      `${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.${forWording}`,
+    );
+  } else {
+    notes.push(
+      `${report.name} states no total and offers no second page, so a short list here is not evidence that little exists.`,
+    );
+  }
+
+  return notes;
+}
+
+/**
+ * What a source offering nothing has actually established.
+ *
+ * A wording that returned no row is a statement about that wording. Several of
+ * them together are the closest this server comes to saying the corpus holds
+ * nothing, and the sentence says which of the two happened.
+ */
+function nothingOfferedNote(report: SourceReport, sent: WordingAttempt[]): Note {
+  return mustKeep(
+    sent.length > 1
+      ? `${report.name} answered and offered no row for any of the ${sent.length} wordings it was ` +
+          `sent (${sent.map((attempt) => `"${attempt.query}"`).join(", ")}). Each of those is a ` +
+          "statement about a wording; together they are the closest this server comes to saying " +
+          "the corpus holds nothing. Try a main ingredient, or the dish's name in the language " +
+          "that source publishes in."
+      : `${report.name} answered and offered no row for this wording. That is a statement about ` +
+          "the wording as much as about the corpus: try the dish's name in another language, or a " +
+          "main ingredient.",
+  );
+}
+
 /**
  * Turn the per-source reports into sentences a reader can act on.
  *
@@ -271,64 +343,19 @@ export function reportNotes(reports: SourceReport[]): Note[] {
   }
 
   for (const report of answered) {
-    const sent = report.wordings.filter((attempt) => attempt.ran && attempt.error === null);
-
-    if (report.count === 0) {
-      notes.push(
-        mustKeep(
-          sent.length > 1
-            ? `${report.name} answered and offered no row for any of the ${sent.length} wordings it was ` +
-                `sent (${sent.map((attempt) => `"${attempt.query}"`).join(", ")}). Each of those is a ` +
-                "statement about a wording; together they are the closest this server comes to saying " +
-                "the corpus holds nothing. Try a main ingredient, or the dish's name in the language " +
-                "that source publishes in."
-            : `${report.name} answered and offered no row for this wording. That is a statement about ` +
-                "the wording as much as about the corpus: try the dish's name in another language, or a " +
-                "main ingredient.",
-        ),
-      );
-    }
-    if (sent.length > 1) {
-      notes.push(
-        `${report.name} was asked ${sent.length} wordings and these rows are their union: ${sent
-          .map((attempt) => `"${attempt.query}" (${attempt.count ?? 0})`)
-          .join(", ")}. Those counts are per wording and are never added.`,
-      );
-    }
-    if (report.preferredByName) {
-      notes.push(
-        `${report.name}'s rows are arranged with the ones naming the dish first, so a wording that ` +
-          "returned near-misses cannot crowd out what another wording found. That is an order over " +
-          "one source's own rows and not a score against any other source.",
-      );
-    }
-    if (report.skipped > 0) {
-      notes.push(
-        mustKeep(
-          `${report.name} sent ${report.skipped} row(s) in a shape this server could not read, and they were left out.`,
-        ),
-      );
-    }
-    if (report.reportedTotal !== null && report.reportedTotalMeans !== null) {
-      const forWording =
-        sent.length > 1 ? ` That number belongs to "${sent[0]?.query}" alone.` : "";
-      notes.push(
-        `${report.name} reported ${report.reportedTotal}: ${report.reportedTotalMeans}.${forWording}`,
-      );
-    } else {
-      notes.push(
-        `${report.name} states no total and offers no second page, so a short list here is not evidence that little exists.`,
-      );
-    }
+    notes.push(...answeredNotes(report));
   }
 
-  if (answered.some((report) => report.mixesReferencePages && report.count > 0)) {
-    const mixing = answered.filter((report) => report.mixesReferencePages && report.count > 0);
-    notes.push(
-      `${mixing.map((report) => report.name).join(" and ")} files pages about an ingredient beside ` +
-        "recipes using it, so a row here can be a page about an ingredient rather than a recipe. " +
-        "get_recipe says what it read off the page.",
-    );
+  // Each source says in its own words what else one of its rows can be, because
+  // a page about an ingredient and an article gathering recipes are different
+  // things and one wording would misdescribe one of them.
+  for (const report of answered) {
+    if (report.rowsThatAreNotRecipes !== null && report.count > 0) {
+      notes.push(
+        `A row from ${report.name} can be ${report.rowsThatAreNotRecipes}. ` +
+          "get_recipe says what it read off the page.",
+      );
+    }
   }
 
   if (answered.length > 1) {

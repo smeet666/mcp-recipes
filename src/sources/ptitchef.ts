@@ -120,10 +120,7 @@ export const PTITCHEF_PROFILE = {
   homeUrl: "https://www.ptitchef.com",
   language: "fr" as const,
   attribution: "Source: Ptitchef",
-  // Every row a listing serves names a recipe; a topic the site answers with a
-  // guide of its own groups recipes under headings rather than mixing in pages
-  // about ingredients.
-  mixesReferencePages: false,
+  rowsThatAreNotRecipes: null,
 };
 
 const SITE_URL = /^https?:\/\/(?:www\.)?ptitchef\.com\//i;
@@ -272,6 +269,7 @@ export function ptitchefDetail(payload: unknown): RecipeDetail {
     stepsAsOneBlock:
       typeof recipe.steps_are_one_block === "boolean" ? recipe.steps_are_one_block : null,
     withheld: null,
+    gathers: null,
     category: text(recipe.category),
     author: text(recipe.author),
     // The site prints two counts beside a rating, one of readers who rated and

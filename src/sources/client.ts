@@ -172,7 +172,7 @@ function reportOf(attempt: Attempt, count: number): SourceReport {
     reportedTotal: attempt.reportedTotal,
     reportedTotalMeans: attempt.reportedTotalMeans,
     skipped: attempt.skipped,
-    mixesReferencePages: attempt.source.mixesReferencePages,
+    rowsThatAreNotRecipes: attempt.source.rowsThatAreNotRecipes,
     cached: attempt.cached,
     error: attempt.error,
     wordings: attempt.wordings,

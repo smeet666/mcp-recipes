@@ -17,10 +17,15 @@ const EAU_ENDING = /eau$/i;
 const FUL_MEASURE = /^[a-z]{3,}fuls?$/;
 const HEAD_BEFORE_DE = /^\s*(\p{L}+)\s+(?=(?:de|du|des)\s|d')/u;
 const HOUSEHOLD_MEASURE =
-  /^(cup|tablespoon|Tbsp|teaspoon|tsp|cuillère à soupe|cuillère à café|tasse)$/;
+  /^(cup|tablespoon|Tbsp|teaspoon|tsp|cuillère à soupe|cuillère à café|tasse|taza|cucharada|cucharadita|cda|cdta)$/;
 const SIBILANT_LETTER = /[sxz]$/i;
 const TRAILING_S_ANY_CASE = /s$/i;
 const VOWEL_THEN_S = /[aiou]s$/i;
+/** Spanish nouns already carrying their -s in the singular: "análisis", "virus". */
+const INVARIABLE_SPANISH = /(?:is|us)$/i;
+const ES_ENDING = /(?:[^aeiouáéíóú]es)$/i;
+const SPANISH_VOWEL_ENDING = /[aeiouáéíóú]$/i;
+const Z_ENDING = /z$/i;
 
 export type UnitKind =
   /** Mass or volume: scales continuously and cleanly. */
@@ -48,10 +53,10 @@ export interface UnitInfo {
 }
 
 /**
- * Measures written the same way in both languages: the metric symbols.
+ * Measures written the same way in every language: the metric symbols.
  *
- * "g", "kg", "ml" and "l" are read off a French line and an English line alike,
- * and they take no plural mark in either.
+ * "g", "kg", "ml" and "l" are read off a French, an English and a Spanish line
+ * alike, and they take no plural mark in any of them.
  */
 const SHARED_UNITS: Record<string, UnitInfo> = {
   mg: { canonical: "mg", kind: "measured", system: "metric", symbol: true },
@@ -355,9 +360,117 @@ const ENGLISH_UNITS: Record<string, UnitInfo> = {
   knobs: { canonical: "knob", kind: "approximate", system: "none" },
 };
 
+/**
+ * Spanish measures.
+ *
+ * The spoon vocabulary is where a Spanish list differs most from the other
+ * two: "cucharada" and "cucharadita" are the tablespoon and the teaspoon, and
+ * a page writes them as "cda" and "cdta" as readily as in full. The countable
+ * packagings, "lata", "sobre", "loncha", carry the divisibility a cook can
+ * follow rather than a plain multiplication.
+ */
+const SPANISH_UNITS: Record<string, UnitInfo> = {
+  ...SHARED_UNITS,
+
+  gramo: { canonical: "g", kind: "measured", system: "metric", symbol: true },
+  gramos: { canonical: "g", kind: "measured", system: "metric", symbol: true },
+  kilogramo: { canonical: "kg", kind: "measured", system: "metric", symbol: true },
+  kilogramos: { canonical: "kg", kind: "measured", system: "metric", symbol: true },
+  litro: { canonical: "l", kind: "measured", system: "metric", symbol: true },
+  litros: { canonical: "l", kind: "measured", system: "metric", symbol: true },
+  mililitro: { canonical: "ml", kind: "measured", system: "metric", symbol: true },
+  mililitros: { canonical: "ml", kind: "measured", system: "metric", symbol: true },
+  decilitro: { canonical: "dl", kind: "measured", system: "metric", symbol: true },
+  decilitros: { canonical: "dl", kind: "measured", system: "metric", symbol: true },
+  centilitro: { canonical: "cl", kind: "measured", system: "metric", symbol: true },
+  centilitros: { canonical: "cl", kind: "measured", system: "metric", symbol: true },
+  // A page glossing a metric weight names the pound and the ounce, which
+  // Spanish writes in full.
+  libra: { canonical: "libra", kind: "measured", system: "imperial", plural: "libras" },
+  libras: { canonical: "libra", kind: "measured", system: "imperial", plural: "libras" },
+  onza: { canonical: "onza", kind: "measured", system: "imperial", plural: "onzas" },
+  onzas: { canonical: "onza", kind: "measured", system: "imperial", plural: "onzas" },
+
+  // Spoons and cups: real measures, but only in sensible fractions.
+  cucharada: { canonical: "cucharada", kind: "portioned", system: "none", plural: "cucharadas" },
+  cucharadas: { canonical: "cucharada", kind: "portioned", system: "none", plural: "cucharadas" },
+  cda: { canonical: "cda", kind: "portioned", system: "none", symbol: true },
+  cdas: { canonical: "cda", kind: "portioned", system: "none", symbol: true },
+  "c s": { canonical: "cucharada", kind: "portioned", system: "none", plural: "cucharadas" },
+  cucharadita: {
+    canonical: "cucharadita",
+    kind: "portioned",
+    system: "none",
+    plural: "cucharaditas",
+  },
+  cucharaditas: {
+    canonical: "cucharadita",
+    kind: "portioned",
+    system: "none",
+    plural: "cucharaditas",
+  },
+  cdta: { canonical: "cdta", kind: "portioned", system: "none", symbol: true },
+  cdtas: { canonical: "cdta", kind: "portioned", system: "none", symbol: true },
+  "c p": { canonical: "cucharadita", kind: "portioned", system: "none", plural: "cucharaditas" },
+  taza: { canonical: "taza", kind: "portioned", system: "none", plural: "tazas" },
+  tazas: { canonical: "taza", kind: "portioned", system: "none", plural: "tazas" },
+  vaso: { canonical: "vaso", kind: "portioned", system: "none" },
+  vasos: { canonical: "vaso", kind: "portioned", system: "none" },
+
+  // Packaging and natural units: countable, so they round to whole things.
+  sobre: { canonical: "sobre", kind: "portioned", system: "none" },
+  sobres: { canonical: "sobre", kind: "portioned", system: "none" },
+  diente: { canonical: "diente", kind: "portioned", system: "none" },
+  dientes: { canonical: "diente", kind: "portioned", system: "none" },
+  lata: { canonical: "lata", kind: "portioned", system: "none", plural: "latas" },
+  latas: { canonical: "lata", kind: "portioned", system: "none", plural: "latas" },
+  bote: { canonical: "bote", kind: "portioned", system: "none" },
+  botes: { canonical: "bote", kind: "portioned", system: "none" },
+  tarro: { canonical: "tarro", kind: "portioned", system: "none" },
+  tarros: { canonical: "tarro", kind: "portioned", system: "none" },
+  paquete: { canonical: "paquete", kind: "portioned", system: "none" },
+  paquetes: { canonical: "paquete", kind: "portioned", system: "none" },
+  loncha: { canonical: "loncha", kind: "portioned", system: "none", plural: "lonchas" },
+  lonchas: { canonical: "loncha", kind: "portioned", system: "none", plural: "lonchas" },
+  rebanada: { canonical: "rebanada", kind: "portioned", system: "none", plural: "rebanadas" },
+  rebanadas: { canonical: "rebanada", kind: "portioned", system: "none", plural: "rebanadas" },
+  rodaja: { canonical: "rodaja", kind: "portioned", system: "none", plural: "rodajas" },
+  rodajas: { canonical: "rodaja", kind: "portioned", system: "none", plural: "rodajas" },
+  hoja: { canonical: "hoja", kind: "portioned", system: "none", plural: "hojas" },
+  hojas: { canonical: "hoja", kind: "portioned", system: "none", plural: "hojas" },
+  rama: { canonical: "rama", kind: "portioned", system: "none", plural: "ramas" },
+  ramas: { canonical: "rama", kind: "portioned", system: "none", plural: "ramas" },
+  ramita: { canonical: "ramita", kind: "portioned", system: "none", plural: "ramitas" },
+  ramitas: { canonical: "ramita", kind: "portioned", system: "none", plural: "ramitas" },
+  manojo: { canonical: "manojo", kind: "portioned", system: "none" },
+  manojos: { canonical: "manojo", kind: "portioned", system: "none" },
+  unidad: { canonical: "unidad", kind: "portioned", system: "none", plural: "unidades" },
+  unidades: { canonical: "unidad", kind: "portioned", system: "none", plural: "unidades" },
+
+  // Held to no better than a hand: the count scales, the size of one does not.
+  pizca: { canonical: "pizca", kind: "approximate", system: "none", plural: "pizcas" },
+  pizcas: { canonical: "pizca", kind: "approximate", system: "none", plural: "pizcas" },
+  punado: { canonical: "puñado", kind: "approximate", system: "none", plural: "puñados" },
+  punados: { canonical: "puñado", kind: "approximate", system: "none", plural: "puñados" },
+  chorro: { canonical: "chorro", kind: "approximate", system: "none" },
+  chorros: { canonical: "chorro", kind: "approximate", system: "none" },
+  chorrito: { canonical: "chorrito", kind: "approximate", system: "none" },
+  chorritos: { canonical: "chorrito", kind: "approximate", system: "none" },
+  gota: { canonical: "gota", kind: "approximate", system: "none", plural: "gotas" },
+  gotas: { canonical: "gota", kind: "approximate", system: "none", plural: "gotas" },
+  cazo: { canonical: "cazo", kind: "approximate", system: "none" },
+  cazos: { canonical: "cazo", kind: "approximate", system: "none" },
+  cucharon: { canonical: "cucharón", kind: "approximate", system: "none", plural: "cucharones" },
+  cucharones: { canonical: "cucharón", kind: "approximate", system: "none", plural: "cucharones" },
+  nuez: { canonical: "nuez", kind: "approximate", system: "none", plural: "nueces" },
+  toque: { canonical: "toque", kind: "approximate", system: "none" },
+  toques: { canonical: "toque", kind: "approximate", system: "none" },
+};
+
 const VOCABULARY: Record<Language, Record<string, UnitInfo>> = {
   fr: FRENCH_UNITS,
   en: ENGLISH_UNITS,
+  es: SPANISH_UNITS,
 };
 
 /**
@@ -392,6 +505,7 @@ function orderedKeys(vocabulary: Record<string, UnitInfo>): string[] {
 const UNIT_KEYS: Record<Language, string[]> = {
   fr: orderedKeys(FRENCH_UNITS),
   en: orderedKeys(ENGLISH_UNITS),
+  es: orderedKeys(SPANISH_UNITS),
 };
 
 export function unitKeys(language: Language): string[] {
@@ -412,6 +526,7 @@ export function lookupUnit(text: string, language: Language): UnitInfo | null {
 const EMBEDDED: Record<Language, RegExp> = {
   fr: buildEmbedded("fr"),
   en: buildEmbedded("en"),
+  es: buildEmbedded("es"),
 };
 
 function buildEmbedded(language: Language): RegExp {
@@ -436,7 +551,7 @@ function buildEmbedded(language: Language): RegExp {
  * doubling the recipe means opening a second tin rather than finding a bigger
  * one.
  *
- * Written in either language, because what a word names has nothing to do with
+ * Written in every language, because what a word names has nothing to do with
  * which language names it.
  */
 export const CONTAINER_NOUN =
@@ -472,23 +587,27 @@ const NOT_A_MEASURE = new Set([
 ]);
 
 /**
- * Read a French measure named with a container or a gesture the vocabulary has
- * no entry for.
+ * Read a measure named with a container or a gesture the vocabulary has no
+ * entry for.
  *
  * What makes a measure approximate is that its size belongs to whoever pours
- * it: a bouchon, a poignée, a ramequin hold what they hold, and the recipe's
- * proportion lives in how many are asked for. French marks that grammatically,
- * by placing the noun between the amount and the partitive that introduces the
- * thing measured: "un bouchon de rhum", "2 bouquets de persil". A noun in that
- * position measures whatever follows it, so a container nobody thought to list
- * is read by the same rule as the ones that are, and the vocabulary only has to
- * carry the words whose plural or spelling the rule would get wrong.
+ * it: a bouchon, a poignée, a chorrito, a ramequin hold what they hold, and the
+ * recipe's proportion lives in how many are asked for. French and Spanish both
+ * mark that grammatically, by placing the noun between the amount and the
+ * partitive that introduces the thing measured: "un bouchon de rhum",
+ * "2 bouquets de persil", "un chorrito de aceite". A noun in that position
+ * measures whatever follows it, so a container nobody thought to list is read
+ * by the same rule as the ones that are, and the vocabulary only has to carry
+ * the words whose plural or spelling the rule would get wrong.
  *
  * The amount has to come first. A line opening on the noun, as in "beurre
  * pommade", carries no quantity, and inventing one from the grammar would put a
  * number where the recipe wrote none.
  */
-export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: string } | null {
+export function readPartitiveMeasure(
+  text: string,
+  language: Language,
+): { unit: UnitInfo; rest: string } | null {
   const match = HEAD_BEFORE_DE.exec(text);
   if (!match) {
     return null;
@@ -501,17 +620,17 @@ export function readPartitiveMeasure(text: string): { unit: UnitInfo; rest: stri
   if (NOT_A_MEASURE.has(normalizeUnitKey(word))) {
     return null;
   }
-  if (lookupUnit(word, "fr")) {
+  if (lookupUnit(word, language)) {
     return null;
   }
 
-  const canonical = frenchSingular(word);
+  const canonical = language === "es" ? spanishSingular(word) : frenchSingular(word);
   return {
     unit: {
       canonical,
       kind: "approximate",
       system: "none",
-      plural: frenchPlural(canonical),
+      plural: language === "es" ? spanishPlural(canonical) : frenchPlural(canonical),
     },
     rest: text.slice(match[0].length),
   };
@@ -566,6 +685,40 @@ function frenchSingular(word: string): string {
   return word;
 }
 
+/**
+ * The singular of a Spanish noun a line wrote in the plural.
+ *
+ * Spanish marks the plural with "-s" after a vowel and "-es" after a consonant,
+ * so both endings are undone. A noun already carrying its "-s" in the singular,
+ * such as "análisis", ends in "-is" or "-us" and is left alone.
+ */
+export function spanishSingular(word: string): string {
+  if (INVARIABLE_SPANISH.test(word)) {
+    return word;
+  }
+  if (ES_ENDING.test(word) && word.length > 4) {
+    return word.slice(0, -2);
+  }
+  if (TRAILING_S_ANY_CASE.test(word) && word.length > 3) {
+    return word.slice(0, -1);
+  }
+  return word;
+}
+
+/** The plural Spanish writes for a noun: "-s" after a vowel, "-es" after a consonant. */
+export function spanishPlural(word: string): string {
+  if (INVARIABLE_SPANISH.test(word)) {
+    return word;
+  }
+  if (SPANISH_VOWEL_ENDING.test(word)) {
+    return `${word}s`;
+  }
+  if (Z_ENDING.test(word)) {
+    return `${word.slice(0, -1)}ces`;
+  }
+  return `${word}es`;
+}
+
 /** The plural French writes for a noun, or the noun itself when it takes no mark. */
 function frenchPlural(word: string): string {
   if (SIBILANT_LETTER.test(word)) {
@@ -605,6 +758,12 @@ const APPROXIMATE_EQUIVALENT: Record<string, string> = {
   noix: "commonly taken as about a tablespoon of butter",
   louche: "commonly taken as about half a cup",
   soupcon: "commonly taken as the smallest amount a spoon tip carries",
+  pizca: "commonly taken as about half a teaspoon",
+  punado: "commonly taken as about a quarter of a cup",
+  chorrito: "commonly taken as about a teaspoon poured in a thin line",
+  chorro: "commonly taken as about a tablespoon poured free-hand",
+  gota: "commonly taken as a single drop",
+  cucharon: "commonly taken as about half a cup",
 };
 
 /** The everyday equivalence for an approximate measure, when there is a settled one. */
@@ -653,6 +812,9 @@ const DEMOTIONS: Record<string, UnitStep> = {
   tbsp: { to: "tsp", per: 3, language: "en" },
   "cuillere a soupe": { to: "cuillere a cafe", per: 3, language: "fr" },
   tasse: { to: "cuillere a soupe", per: 16, language: "fr" },
+  cucharada: { to: "cucharadita", per: 3, language: "es" },
+  cda: { to: "cdta", per: 3, language: "es" },
+  taza: { to: "cucharada", per: 16, language: "es" },
 
   kg: { to: "g", per: 1000, language: "en" },
   g: { to: "mg", per: 1000, language: "en" },
@@ -742,7 +904,7 @@ export function unitDivisibility(unit: UnitInfo): Divisibility {
  * one takes a corner off it in the same gesture: a quarter of a tranche de pain
  * is a crouton.
  *
- * Each measure is listed in either language, because how far one of them
+ * Each measure is listed in every language, because how far one of them
  * divides has nothing to do with the words a page uses for it.
  *
  * The pattern is exported because any of these words can stand where the
@@ -750,7 +912,7 @@ export function unitDivisibility(unit: UnitInfo): Divisibility {
  * to the same list.
  */
 export const QUARTERED_MEASURE =
-  /\b(pots?|bouteilles?|bottles?|jars?|blocs?|blocks?|tranches?|slices?)\b/i;
+  /\b(pots?|bouteilles?|bottles?|jars?|blocs?|blocks?|tranches?|slices?|botes?|tarros?|botellas?|bloques?|lonchas?|rebanadas?|rodajas?)\b/i;
 
 /**
  * True for a measure that counts pieces without saying anything about them.
@@ -845,9 +1007,14 @@ export function formatUnit(unit: UnitInfo, amount: number, language: Language): 
   if (unit.symbol) {
     return unit.canonical;
   }
+  // French keeps the singular through "1,5", where English and Spanish take
+  // the plural on anything above one.
   const singular = language === "fr" ? amount < 2 : amount <= 1;
   if (singular) {
     return unit.canonical;
   }
-  return unit.plural ?? `${unit.canonical}s`;
+  if (unit.plural) {
+    return unit.plural;
+  }
+  return language === "es" ? spanishPlural(unit.canonical) : `${unit.canonical}s`;
 }

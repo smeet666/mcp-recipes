@@ -139,3 +139,24 @@ describe("a shape more than one source could claim", () => {
     expect(read("marmiton:44078").source.id).toBe("marmiton");
   });
 });
+
+describe("the hyphenated slug one source mints", () => {
+  it("routes to that source, and says the reading was inferred", () => {
+    const read_ = read("tortilla-de-patatas");
+
+    expect(read_.source.id).toBe("pequerecetas");
+    // Another site could address a recipe the same way, so the answer says the
+    // reading was arrived at rather than certain.
+    expect(read_.inferred).not.toBeNull();
+  });
+
+  it("does not take a single word, which too many sources would accept", () => {
+    expect(() => read("tortilla")).toThrow();
+  });
+
+  it("takes the slug out of the address the site publishes", () => {
+    expect(read("https://www.pequerecetas.com/receta/paella-de-marisco/").source.id).toBe(
+      "pequerecetas",
+    );
+  });
+});

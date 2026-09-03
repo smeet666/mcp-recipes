@@ -34,6 +34,13 @@ import type {
   PtitchefRecipe,
   PtitchefRow,
 } from "../../src/sources/ptitchef.js";
+import { pequerecetasAdapter } from "../../src/sources/pequerecetas.js";
+import type {
+  PequerecetasListingRow,
+  PequerecetasPage,
+  PequerecetasReader,
+  PequerecetasRecipe,
+} from "../../src/sources/pequerecetas.js";
 import { supertoinetteAdapter } from "../../src/sources/supertoinette.js";
 import type {
   SupertoinetteListingRow,
@@ -498,6 +505,13 @@ export interface FakeOptions {
     recipe?: SupertoinetteRecipe;
     cached?: boolean;
   };
+  pequerecetas?: {
+    fail?: Error;
+    failRecipe?: Error;
+    rows?: PequerecetasListingRow[];
+    page?: PequerecetasPage;
+    cached?: boolean;
+  };
 }
 
 export function fakeMarmiton(options: NonNullable<FakeOptions["marmiton"]> = {}): MarmitonReader {
@@ -632,6 +646,117 @@ export function fakeSupertoinette(
   };
 }
 
+export function fakePequerecetas(
+  options: NonNullable<FakeOptions["pequerecetas"]> = {},
+): PequerecetasReader {
+  return {
+    async searchRecipes() {
+      if (options.fail) {
+        throw options.fail;
+      }
+      return {
+        data: {
+          rows: options.rows ?? pequerecetasRows,
+          page_served: 1,
+          has_more: false,
+        },
+        cached: options.cached ?? false,
+      };
+    },
+    async getRecipe() {
+      if (options.fail) {
+        throw options.fail;
+      }
+      if (options.failRecipe) {
+        throw options.failRecipe;
+      }
+      return { data: options.page ?? pequerecetasPage, cached: options.cached ?? false };
+    },
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pequerecetas                                                                */
+/* -------------------------------------------------------------------------- */
+
+export const pequerecetasRows: PequerecetasListingRow[] = [
+  {
+    id: "crepes-caseras",
+    title: "Crepes caseras",
+    url: "https://www.pequerecetas.com/receta/crepes-caseras/",
+    image_url: "https://images.example/crepes.jpg",
+  },
+  {
+    id: "crepes-saladas",
+    title: "Crepes saladas",
+    url: "https://www.pequerecetas.com/receta/crepes-saladas/",
+    image_url: null,
+  },
+];
+
+export const pequerecetasRecipe: PequerecetasRecipe = {
+  id: "crepes-caseras",
+  title: "Crepes caseras",
+  url: "https://www.pequerecetas.com/receta/crepes-caseras/",
+  description: "Las crepes de toda la vida",
+  published_at: "2024-01-20",
+  modified_at: null,
+  // Most of this site's recipes keep their ingredients in the body of the
+  // article rather than in the block it writes for search engines.
+  source_shape: "article",
+  yield_text: "4 raciones",
+  ingredients: [
+    "250 g de harina",
+    "4 huevos",
+    "500 ml de leche",
+    "1 pizca de sal",
+    "Sartén antiadherente",
+  ],
+  steps: [
+    { text: "Bate los huevos con la leche.", group: "Preparación", url: null, image: null },
+    { text: "Añade la harina poco a poco.", group: "Preparación", url: null, image: null },
+  ],
+  prep_minutes: 10,
+  cook_minutes: 15,
+  total_minutes: 25,
+  categories: ["Postres"],
+  cuisines: ["Francesa"],
+  keywords: ["crepes"],
+  author: "Pequerecetas",
+  author_url: "https://www.pequerecetas.com/autor/",
+  rating: { value: 4.4, count: 96, scale: 5, worst: 1 },
+  nutrition: { text: "180 Kcal", calories: 180 },
+  images: ["https://images.example/crepes.jpg"],
+};
+
+export const pequerecetasPage: PequerecetasPage = {
+  kind: "recipe",
+  recipe: pequerecetasRecipe,
+};
+
+/** An article gathering recipes, served at the same kind of address as a recipe. */
+export const pequerecetasCollectionPage: PequerecetasPage = {
+  kind: "collection",
+  collection: {
+    id: "recetas-con-crepes",
+    title: "Recetas con crepes",
+    url: "https://www.pequerecetas.com/receta/recetas-con-crepes/",
+    description: "Una selección",
+    published_at: "2024-04-02",
+    modified_at: null,
+    headings: ["Dulces", "Saladas"],
+    recipes: [
+      {
+        id: "crepes-caseras",
+        title: "Crepes caseras",
+        url: "https://www.pequerecetas.com/receta/crepes-caseras/",
+        image_url: null,
+      },
+    ],
+    images: [],
+  },
+};
+
 export const silentLogger = {
   debug: () => undefined,
   info: () => undefined,
@@ -653,6 +778,7 @@ export function fakeReaders(options: FakeOptions = {}): Required<Readers> {
     ptitchef: fakePtitchef(options.ptitchef ?? {}),
     goodfood: fakeGoodFood(options.goodfood ?? {}),
     supertoinette: fakeSupertoinette(options.supertoinette ?? {}),
+    pequerecetas: fakePequerecetas(options.pequerecetas ?? {}),
   };
 }
 
@@ -664,11 +790,18 @@ export function fakeClient(options: FakeOptions = {}): RecipesClient {
  * Every source but the named ones answering with nothing.
  *
  * A test about one source's rows says which source it means in one line, rather
- * than restating what the other four should return.
+ * than restating what every other source should return.
  */
 export function onlyFrom(...kept: Array<keyof FakeOptions>): FakeOptions {
   const silenced: FakeOptions = {};
-  for (const id of ["marmiton", "cookbook", "ptitchef", "goodfood", "supertoinette"] as const) {
+  for (const id of [
+    "marmiton",
+    "cookbook",
+    "ptitchef",
+    "goodfood",
+    "supertoinette",
+    "pequerecetas",
+  ] as const) {
     if (!kept.includes(id)) {
       silenced[id] = { rows: [] };
     }
@@ -720,5 +853,6 @@ export function fakeSources() {
     ptitchefAdapter(fakePtitchef()),
     goodfoodAdapter(fakeGoodFood()),
     supertoinetteAdapter(fakeSupertoinette()),
+    pequerecetasAdapter(fakePequerecetas()),
   ];
 }

@@ -1,5 +1,42 @@
 # Changelog
 
+## 4.0.0
+
+- **`per_source` no longer carries `mixesReferencePages`.** A caller reading
+  that field reads `rowsThatAreNotRecipes` instead, which is null where every
+  row is a recipe and otherwise a sentence in the source's own words. The
+  boolean forced one wording on two different situations: a page about an
+  ingredient filed beside the recipes using it, and an article that gathers
+  recipes, and one sentence could only describe one of them truthfully.
+- **`get_recipe` answers in two shapes, and `kind` says which.** One source
+  publishes articles that gather recipes at the same kind of address as a
+  recipe. Such an answer carries `collection` with the headings and the recipes
+  it points at, and no `recipe`; a recipe carries `recipe` and no `collection`.
+  A caller that read the article as a recipe would have offered a dish nobody
+  can cook. `compare_recipes` leaves such a page out and says why.
+- **Pequerecetas is added**, under the id `pequerecetas`, beside the five
+  sources already read. It publishes in Spanish, states no total anywhere, and
+  addresses a recipe by the slug in its own address.
+- **Spanish is read and written like the other two languages.** The scaler
+  reads a Spanish line for what it is, keeps a huevo whole, halves a diente,
+  quarters a cebolla, moves a cucharada into the cucharadita before rounding
+  it, multiplies the count of a pizca while leaving the size of one to the
+  cook, and agrees nouns and adjectives with the number in front of them. A
+  list holding all three languages comes back with each line written in its
+  own. `scale_ingredients` takes `es` beside `fr`, `en` and `auto`.
+- **A line naming a tool is recognised and never multiplied.** Some sites write
+  what a recipe is cooked with among its ingredients, so a mould or an air
+  fryer arrives in the same list as the chicken. Every ingredient line carries
+  `is_equipment`, and `scale_ingredients` reports `equipment_count` beside the
+  counts of what was scaled: a recipe made for more people uses the same pan.
+- **Each site is read at the pace it asks for.** Two of the sites declare three
+  seconds between two requests where the shared default is one second, and they
+  were being read four times faster than that. A setting posted for every
+  source can now only make this server more patient than the slowest of them
+  asks for.
+- **The library section of the README states the API the client actually has.**
+  It documented a call that does not exist.
+
 ## 3.0.1
 
 - **Every tool is documented, with its arguments and what its answer carries.**

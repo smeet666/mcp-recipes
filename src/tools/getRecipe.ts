@@ -8,12 +8,21 @@
 
 import { z } from "zod";
 import type { RecipesClient } from "../sources/client.js";
-import { buildRecipeView, recipeSchema, renderYield, SECTIONS } from "./recipeView.js";
+import {
+  buildCollectionView,
+  buildRecipeView,
+  collectionSchema,
+  recipeSchema,
+  renderYield,
+  SECTIONS,
+} from "./recipeView.js";
 import type { Section } from "./recipeView.js";
 import { strictInput } from "./arguments.js";
+import type { RecipeDetail } from "../types.js";
 import {
   creditLine,
   fitLines,
+  mustKeep,
   noteTexts,
   ok,
   omittedLinesLine,
@@ -32,6 +41,14 @@ export const getRecipeDescription = [
   "'sections' decides what comes back, and 'sections_omitted' names what was left out: a field belonging to an omitted section is empty because nobody asked for it, never because the page states nothing.",
   "A field a source does not publish is null, never zero. Credit the source and link the url when you repeat any of it.",
 ].join(" ");
+
+/**
+ * How much of an article's text block the listing may take.
+ *
+ * Two thirds: the addresses are what a reader follows next, and the headings
+ * only say what the article is built from.
+ */
+const LISTING_SHARE = 2 / 3;
 
 export const getRecipeInput = strictInput({
   id: z
@@ -68,8 +85,25 @@ export const getRecipeInput = strictInput({
     .describe("Characters kept per step. Raise it only if a step was cut mid-sentence."),
 });
 
+/**
+ * What came back, in two shapes.
+ *
+ * One source publishes articles that gather recipes at the same kind of address
+ * as a recipe, and describes both with the same structured type, so the address
+ * alone does not say which this is. `kind` says which, and only the field
+ * belonging to that answer is present: an article has no ingredients and no
+ * method, and a recipe gathers nothing.
+ */
 export const getRecipeOutput = z.object({
-  recipe: recipeSchema,
+  kind: z
+    .enum(["recipe", "collection"])
+    .describe(
+      "What the address held. 'recipe' comes with 'recipe' and no 'collection'; 'collection' " +
+        "comes with 'collection' and no 'recipe', and is an article gathering other recipes " +
+        "rather than a dish anyone can cook from this page.",
+    ),
+  recipe: recipeSchema.optional().describe("Present when 'kind' is 'recipe'."),
+  collection: collectionSchema.optional().describe("Present when 'kind' is 'collection'."),
   id_read_as: z
     .string()
     .nullable()
@@ -85,6 +119,18 @@ export async function runGetRecipe(
 ): Promise<ToolResult> {
   try {
     const { recipe, cached, read } = await client.getRecipe(args.id);
+    const routed = read.inferred
+      ? [
+          `"${quoteForeign(args.id)}" was read as ${read.source.name}'s, because ${read.inferred}. ` +
+            "Spell an id with its source to leave nothing to infer.",
+        ]
+      : [];
+    const served = cached ? ["Served from this server's short-lived in-memory cache."] : [];
+
+    if (recipe.gathers) {
+      return gatheredAnswer(recipe, read.inferred, [...routed, ...served]);
+    }
+
     const view = buildRecipeView(recipe, {
       servings: args.servings ?? null,
       sections: args.sections as readonly Section[],
@@ -92,16 +138,7 @@ export async function runGetRecipe(
       maxStepChars: args.max_step_chars,
     });
 
-    const notes: Note[] = [...view.notes];
-    if (read.inferred) {
-      notes.unshift(
-        `"${quoteForeign(args.id)}" was read as ${read.source.name}'s, because ${read.inferred}. ` +
-          "Spell an id with its source to leave nothing to infer.",
-      );
-    }
-    if (cached) {
-      notes.push("Served from this server's short-lived in-memory cache.");
-    }
+    const notes: Note[] = [...routed, ...view.notes, ...served];
 
     const payload = view.payload;
     const credit = creditLine([{ attribution: payload.attribution, url: payload.url }]);
@@ -143,11 +180,73 @@ export async function runGetRecipe(
     }
 
     return ok(
-      { recipe: payload, id_read_as: read.inferred, notes: noteTexts(notes) },
+      { kind: "recipe", recipe: payload, id_read_as: read.inferred, notes: noteTexts(notes) },
       lines.join("\n"),
       { notes, credit },
     );
   } catch (error) {
     return toToolError(error);
   }
+}
+
+/**
+ * The answer for an address that held an article rather than a recipe.
+ *
+ * It carries no ingredients and no method because the page has none, which is a
+ * different statement from a recipe this server failed to read. What the page
+ * does carry is the listing, and that is worth following.
+ */
+function gatheredAnswer(
+  recipe: RecipeDetail,
+  inferred: string | null,
+  earlier: Note[],
+): ToolResult {
+  const payload = buildCollectionView(recipe);
+  const notes: Note[] = [
+    ...earlier,
+    mustKeep(
+      "This address gathers other recipes rather than holding one of its own, so there are no " +
+        `ingredients and no method to read. ${payload.source_name} publishes both at this kind ` +
+        "of address. Call get_recipe on one of the recipes listed here.",
+    ),
+  ];
+  const credit = creditLine([{ attribution: payload.attribution, url: payload.url }]);
+
+  const head = [
+    `${quoteForeign(payload.title)} · ${quoteForeign(payload.source_name)}`,
+    quoteForeign(payload.url),
+    `An article that gathers ${payload.recipes.length} recipe(s).`,
+  ];
+  const rows = payload.recipes.map(
+    (row) => `- ${quoteForeign(row.title)} — ${quoteForeign(row.id)}`,
+  );
+  const headings = payload.headings.map(quoteForeign);
+
+  // The two lists share what the notes leave, so neither fills the block and
+  // cuts the other away. The listing is served first, because the addresses are
+  // what a reader follows out of this answer and the headings only say what the
+  // article is built from.
+  const room = roomForBody({ notes, credit }) - head.join("\n").length;
+  const fitted = fitLines(rows, room * LISTING_SHARE);
+  const shownHeadings = fitLines(headings, room - fitted.lines.join("\n").length);
+
+  const lines = [...head];
+  if (rows.length > 0) {
+    lines.push("", "Recipes it points at:", ...fitted.lines);
+    if (fitted.hidden > 0) {
+      lines.push(omittedLinesLine(fitted.lines.length, rows.length, "recipes"));
+    }
+  }
+  if (headings.length > 0 && shownHeadings.lines.length > 0) {
+    lines.push("", `Built from: ${shownHeadings.lines.join(", ")}`);
+    if (shownHeadings.hidden > 0) {
+      lines.push(omittedLinesLine(shownHeadings.lines.length, headings.length, "headings"));
+    }
+  }
+
+  return ok(
+    { kind: "collection", collection: payload, id_read_as: inferred, notes: noteTexts(notes) },
+    lines.join("\n"),
+    { notes, credit },
+  );
 }

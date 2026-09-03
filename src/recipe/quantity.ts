@@ -27,6 +27,8 @@ const LEADING_INDEFINITE_WITH_SPACE = /^an?\s+/i;
 const LEADING_PARTITIVE = /^(?:de\s+la\s+|de\s+l'|d'|de\s+|du\s+|des\s+)/i;
 const OF_OPENING = /^of\s+/i;
 const OPENING_ARTICLE_FRENCH = /^\s*(un|une)\b\s*/i;
+const OPENING_ARTICLE_SPANISH = /^\s*(un|una)\b\s*/i;
+const LEADING_ARTICLE_SPANISH = /^(?:una|un)\s+/i;
 const REPEATED_COMMA_GROUPS = /^\s*\d+,\d+,\d/;
 const SLASH_OUTSIDE_A_FRACTION = /(?<!\d)\/|\/(?!\d)/;
 
@@ -37,7 +39,74 @@ const ENGLISH_RANGE_JOINER = /^\s+(to|or)\s+/i;
 const FRACTION_WORD =
   /^(?:(a|an|one|two|three)[\s-]+)?(halves|half|thirds|third|quarters|quarter|fourths|fourth)\b/i;
 const FRENCH_RANGE_JOINER = /^\s+(à|a|ou)\s+/i;
+const SPANISH_RANGE_JOINER = /^\s+(a|o)\s+/i;
+/**
+ * A fraction a Spanish line spells out: "medio limón", "tres cuartos de taza".
+ *
+ * "medio" and "media" agree with what they halve and carry no numerator of
+ * their own, so the numerator is only read on the parts that take one. The word
+ * boundary is what keeps "medialuna" out: a croissant is not half a moon.
+ */
+const SPANISH_FRACTION_WORD =
+  /^(?:medi[oa]s?\b|(?:(un|una|dos|tres)\s+)?(cuartos|cuarto|tercios|tercio|mitad(?:es)?)\b)/i;
 const GROUPED_DECIMAL = /^(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/;
+
+/**
+ * Which languages write a decimal comma.
+ *
+ * English groups thousands with the comma it never uses as a decimal mark, so
+ * "1,500 g" is fifteen hundred grams there and one and a half elsewhere. The
+ * two readings are incompatible, and the language is what chooses between them.
+ */
+function writesDecimalComma(language: Language): boolean {
+  return language !== "en";
+}
+
+/**
+ * Which languages introduce what is measured with a partitive.
+ *
+ * French and Spanish both write "un chorro de aceite" and "un bouchon de rhum",
+ * placing the measure between the article and the thing measured. English puts
+ * the preposition the other way round and is read by its own rules.
+ */
+function usesPartitiveDe(language: Language): boolean {
+  return language !== "en";
+}
+
+/** The article each Romance language opens a line with in place of the figure one. */
+const OPENING_ARTICLE_ROMANCE: Record<Language, RegExp> = {
+  en: OPENING_ARTICLE_FRENCH,
+  fr: OPENING_ARTICLE_FRENCH,
+  es: OPENING_ARTICLE_SPANISH,
+};
+
+/** The same article, for stripping off the front of an item name. */
+const ROMANCE_ARTICLE: Record<Language, RegExp> = {
+  en: LEADING_ARTICLE_FRENCH,
+  fr: LEADING_ARTICLE_FRENCH,
+  es: LEADING_ARTICLE_SPANISH,
+};
+
+/** The words each language joins the two ends of a range with. */
+const RANGE_JOINER: Record<Language, RegExp> = {
+  en: ENGLISH_RANGE_JOINER,
+  fr: FRENCH_RANGE_JOINER,
+  es: SPANISH_RANGE_JOINER,
+};
+
+/**
+ * The vocabularies tried after a line's own, in the order they are tried.
+ *
+ * A gloss inside brackets is written in whichever language the page reached
+ * for, so the order decides only which reading wins when two vocabularies spell
+ * a measure alike. The nearer language comes first: a French page glossing in
+ * Spanish is likelier than one glossing in English, and the reverse for Spanish.
+ */
+const OTHER_LANGUAGES: Record<Language, readonly Language[]> = {
+  en: ["fr", "es"],
+  fr: ["es", "en"],
+  es: ["fr", "en"],
+};
 const HYPHENATED_TAIL = /^-\p{L}/u;
 const LEADING_DASH = /^\s*(–|—|-)\s*/;
 const LEADING_INDEFINITE = /^an?\s/i;
@@ -49,7 +118,7 @@ const PARTITIVE_BEFORE_BRACKET = /^(?:de\s+|du\s+|des\s+|d'|of\s+)(?=\()/i;
 const PARTITIVE_OPENING = /^(?:de\s|d'|du\s|des\s|,)/i;
 const SIMPLE_FRACTION = /^(\d+)\s*\/\s*(\d+)/;
 const TRAILING_S = /s$/;
-const VAGUE_ARTICLE = /^(?:un|une|quelques|of\s+an?|an?)\s+/iu;
+const VAGUE_ARTICLE = /^(?:une|unas|unos|una|un|quelques|of\s+an?|an?)\s+/iu;
 const WHITESPACE = /\s+/;
 
 /**
@@ -199,6 +268,7 @@ function readable(text: string): string {
 const APPROXIMATION_PREFIX: Record<Language, RegExp> = {
   en: /^(?:~|\u2248|about|approx\.?|approximately|around|roughly)\s*/i,
   fr: /^(?:~|\u2248|environ|approximativement|\u00e0 peu pr\u00e8s|a peu pres)\s*/i,
+  es: /^(?:~|≈|unos|unas|aproximadamente|alrededor de|más o menos|mas o menos|como)\s*/i,
 };
 
 /**
@@ -222,7 +292,7 @@ const CONTAINER_CONTENTS = /^\s*(?:de\s|d'|du\s|des\s)/i;
  * has been taken off it, so "450 g (1 livre) de spaghetti" never reaches here:
  * that line counts grams, and its bracket restates the same quantity.
  */
-function statesItemSize(item: string): boolean {
+function statesItemSize(item: string, language: Language): boolean {
   const attached = ATTACHED_DE.exec(item);
   if (!attached) {
     return false;
@@ -233,17 +303,17 @@ function statesItemSize(item: string): boolean {
     return false;
   }
 
-  return isStatedSize(item.slice(attached.index + attached[0].length));
+  return isStatedSize(item.slice(attached.index + attached[0].length), language);
 }
 
 /** A mass or a volume standing on its own, with nothing it is the amount of. */
-function isStatedSize(text: string): boolean {
-  const size = parseLeadingQuantity(text, "fr");
+function isStatedSize(text: string, language: Language): boolean {
+  const size = parseLeadingQuantity(text, language);
   if (!size) {
     return false;
   }
 
-  const measure = takeUnit(text.slice(size.length).trimStart(), "fr");
+  const measure = takeUnit(text.slice(size.length).trimStart(), language);
   if (measure.unit?.kind !== "measured") {
     return false;
   }
@@ -348,16 +418,27 @@ function namesContainer(word: string | undefined): boolean {
 }
 
 /**
- * Measures of time, in either language.
+ * Measures of time, in every language.
  *
  * An ingredient list carries lines that state a length rather than an amount:
  * a rest, a proof, a marinade, a bake. The factor says how much of the dish to
  * make, and how long a dough takes to rise is no part of that.
+ *
+ * Every vocabulary is tried on every line, because a duration is not a quantity
+ * whichever language names it, and a line whose language was read one way and
+ * whose hours were written the other would come back with its resting time
+ * doubled.
  */
 const TIME_UNIT: Record<Language, RegExp> = {
   en: /^(?:h|hr|hrs|hours?|mins?|minutes?|secs?|seconds?|days?|nights?|weeks?)\b/i,
   fr: /^(?:h|mn|heures?|mins?|minutes?|secs?|secondes?|jours?|nuits?|semaines?)\b/i,
+  es: /^(?:h|hs|horas?|mins?|minutos?|segs?|segundos?|días?|dias?|noches?|semanas?)\b/i,
 };
+
+/** Whether a figure is followed by a length of time in any of the vocabularies. */
+function namesALengthOfTime(text: string): boolean {
+  return Object.values(TIME_UNIT).some((pattern) => pattern.test(text));
+}
 
 /**
  * The letters a language glues to a figure to make it a rank: the "er" of
@@ -379,6 +460,7 @@ const ORDINAL_SUFFIX = /^(?:ers?|[eè]res?|[eè]mes?|es?|st|nd|rd|th)\b/i;
 const PER_PERSON: Record<Language, RegExp> = {
   en: /\bper\s+(?:person|head|serving|guest|diner)\b/i,
   fr: /\bpar\s+(?:personne|convive|part|t\u00eate)\b/i,
+  es: /\bpor\s+(?:persona|comensal|ración|racion)\b/i,
 };
 
 /**
@@ -413,6 +495,24 @@ const MEASURE_ADJECTIVES: Record<Language, Set<string>> = {
     "grosse",
     "petit",
     "petite",
+  ]),
+  es: new Set([
+    "buen",
+    "buena",
+    "colmada",
+    "colmado",
+    "escasa",
+    "escaso",
+    "generosa",
+    "generoso",
+    "gran",
+    "grande",
+    "mediana",
+    "mediano",
+    "pequeña",
+    "pequeño",
+    "rasa",
+    "raso",
   ]),
 };
 
@@ -510,29 +610,38 @@ export function parseLeadingQuantity(text: string, language: Language): ParsedQu
   // "1,500 g" is fifteen hundred grams. Reading the digits up to the comma and
   // stopping there answers 1 for a line that said 1500, and leaves ",500 g"
   // behind in the item name.
-  const decimal = (language === "fr" ? DECIMAL : GROUPED_DECIMAL).exec(trimmed);
+  const decimal = (writesDecimalComma(language) ? DECIMAL : GROUPED_DECIMAL).exec(trimmed);
   if (decimal) {
     const [written = ""] = decimal.slice(1);
     const amount = Number(
-      language === "fr" ? written.replace(",", ".") : written.replace(/,/g, ""),
+      writesDecimalComma(language) ? written.replace(",", ".") : written.replace(/,/g, ""),
     );
     if (Number.isFinite(amount)) {
       return { amount, length: offset + decimal[0].length };
     }
   }
 
-  if (language === "en") {
-    const written = parseWrittenFraction(trimmed);
-    if (written) {
-      return { amount: written.amount, length: offset + written.length };
-    }
+  const written =
+    language === "es" ? parseSpanishFraction(trimmed) : parseWrittenFraction(trimmed, language);
+  if (written) {
+    return { amount: written.amount, length: offset + written.length };
   }
 
   return null;
 }
 
 /** How many of the part a line names: "two thirds", "a quarter", "half". */
-const WRITTEN_NUMERATORS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3 };
+const WRITTEN_NUMERATORS: Record<string, number> = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  un: 1,
+  una: 1,
+  dos: 2,
+  tres: 3,
+};
 
 /** What the part is a part of. */
 const WRITTEN_DENOMINATORS: Record<string, number> = {
@@ -544,6 +653,12 @@ const WRITTEN_DENOMINATORS: Record<string, number> = {
   quarters: 4,
   fourth: 4,
   fourths: 4,
+  cuarto: 4,
+  cuartos: 4,
+  tercio: 3,
+  tercios: 3,
+  mitad: 2,
+  mitades: 2,
 };
 
 /**
@@ -560,7 +675,10 @@ const WRITTEN_DENOMINATORS: Record<string, number> = {
  * stated elsewhere, and multiplying it would answer with a number that belongs
  * to another line.
  */
-function parseWrittenFraction(text: string): ParsedQuantity | null {
+function parseWrittenFraction(text: string, language: Language): ParsedQuantity | null {
+  if (language !== "en") {
+    return null;
+  }
   const match = FRACTION_WORD.exec(text);
   if (!match) {
     return null;
@@ -574,6 +692,40 @@ function parseWrittenFraction(text: string): ParsedQuantity | null {
 
   const rest = text.slice(match[0].length).replace(LEADING_OF, "").trimStart();
   if (!(LEADING_INDEFINITE.test(rest) || takeUnit(rest, "en").unit)) {
+    return null;
+  }
+
+  return { amount: numerator / denominator, length: match[0].length };
+}
+
+/**
+ * Read a fraction a Spanish line spells out, as in "medio limón" or "tres
+ * cuartos de taza".
+ *
+ * Spanish writes the halves in words far more readily than in figures, and a
+ * line opening on one carries an amount like any other. "medio" and "media"
+ * stand directly in front of what they halve; the other parts take the
+ * partitive, "un cuarto de cebolla".
+ *
+ * What follows decides whether the words are a quantity at all. "media" with
+ * nothing behind it names no share of anything, and a line that only names a
+ * food or a measure is what states an amount.
+ */
+function parseSpanishFraction(text: string): ParsedQuantity | null {
+  const match = SPANISH_FRACTION_WORD.exec(text);
+  if (!match) {
+    return null;
+  }
+
+  const numerator = match[1] ? WRITTEN_NUMERATORS[match[1].toLowerCase()] : 1;
+  // "medio" and "media" name the half on their own, with no part word behind.
+  const denominator = match[2] ? WRITTEN_DENOMINATORS[match[2].toLowerCase()] : 2;
+  if (!(numerator && denominator)) {
+    return null;
+  }
+
+  const rest = text.slice(match[0].length).replace(LEADING_PARTITIVE, "").trimStart();
+  if (rest === "") {
     return null;
   }
 
@@ -608,7 +760,7 @@ export function parseLeadingRange(text: string, language: Language): ParsedRange
   const after = text.slice(low.length);
   // A written separator needs whitespace around it, so "5 tomatoes" is not read
   // as "5 to" followed by an unreadable second bound.
-  const written = language === "fr" ? FRENCH_RANGE_JOINER : ENGLISH_RANGE_JOINER;
+  const written = RANGE_JOINER[language];
   const separator = written.exec(after) ?? LEADING_DASH.exec(after);
   if (!separator) {
     return null;
@@ -684,6 +836,13 @@ export interface ParsedIngredient {
    * reads the way the page did.
    */
   measureAdjective: string | null;
+  /**
+   * Whether that size word stood behind the measure rather than in front of it.
+   *
+   * Spanish writes "1 cucharada colmada" where French writes "1 grosse pincée",
+   * and the rewrite has to put the word back where the page had it.
+   */
+  measureAdjectiveFollows: boolean;
   amount: number | null;
   /**
    * Upper bound when the line gives a range, as in "225–500 g". Null for a
@@ -742,7 +901,14 @@ export interface ParsedIngredient {
  * it is this server's reading rather than the page's quantity, and a reading
  * multiplied is a number nobody wrote.
  */
-const FRENCH_ARTICLES: Record<string, number> = { un: 1, une: 1 };
+/**
+ * The articles that stand for the figure one.
+ *
+ * French and Spanish each write two of them, and "un" is the one they share.
+ * The plural forms Spanish writes, "unos" and "unas", stand for a vague several
+ * rather than for one, and are read as an approximation elsewhere.
+ */
+const ROMANCE_ARTICLES: Record<string, number> = { un: 1, une: 1, una: 1 };
 
 /**
  * Take a measure off the front of `text`, longest spelling first, so "cuillère
@@ -802,12 +968,13 @@ function afterKey(text: string, key: string): string | null {
 }
 
 /**
- * A measure inside brackets can be stated in the other language's vocabulary: a
+ * A measure inside brackets can be stated in another language's vocabulary: a
  * French page glosses grams in ounces, and an English page glosses cups in
- * millilitres. The line's own language is tried first, so a word both
- * vocabularies carry keeps the spelling and the plural of the line it sits in.
+ * millilitres. The line's own language is tried first, so a word several
+ * vocabularies carry keeps the spelling and the plural of the line it sits in;
+ * the others are tried in the order `OTHER_LANGUAGES` declares.
  */
-function takeUnitEitherLanguage(
+function takeUnitAnyLanguage(
   text: string,
   language: Language,
 ): { unit: UnitInfo | null; rest: string } {
@@ -815,7 +982,13 @@ function takeUnitEitherLanguage(
   if (first.unit) {
     return first;
   }
-  return takeUnit(text, language === "fr" ? "en" : "fr");
+  for (const other of OTHER_LANGUAGES[language]) {
+    const taken = takeUnit(text, other);
+    if (taken.unit) {
+      return taken;
+    }
+  }
+  return first;
 }
 
 /**
@@ -836,8 +1009,9 @@ function readEvidence(line: string): LanguageEvidence {
 
   const frenchUnit = takeUnit(afterArticle, "fr").unit !== null;
   const englishUnit = takeUnit(afterArticle, "en").unit !== null;
+  const spanishUnit = takeUnit(afterArticle, "es").unit !== null;
 
-  return readLanguage(text, { frenchUnit, englishUnit });
+  return readLanguage(text, { frenchUnit, englishUnit, spanishUnit });
 }
 
 /**
@@ -855,14 +1029,32 @@ function readMeasure(
   leading: ReturnType<typeof takeLeadingUnit>;
   described: { adjective: string | null; rest: string };
   behind: ReturnType<typeof takeLeadingUnit> | null;
+  /** Whether the size word stood behind the measure rather than in front of it. */
+  follows: boolean;
 } {
   const direct = takeLeadingUnit(rest, language, fromArticle);
-  const described = direct.unit ? { adjective: null, rest } : takeMeasureAdjective(rest, language);
+  if (direct.unit) {
+    // Spanish puts the size word behind the measure it qualifies, where French
+    // and English put it in front: "1 cucharada colmada" is a heaped spoonful,
+    // and reading "colmada" as what is being measured loses the measure.
+    const following = language === "es" ? takeMeasureAdjective(direct.rest, language) : null;
+    if (following?.adjective) {
+      return {
+        leading: { ...direct, rest: following.rest },
+        described: { adjective: following.adjective, rest: direct.rest },
+        behind: direct,
+        follows: true,
+      };
+    }
+    return { leading: direct, described: { adjective: null, rest }, behind: null, follows: false };
+  }
+
+  const described = takeMeasureAdjective(rest, language);
   const behind = described.adjective
     ? takeLeadingUnit(described.rest, language, fromArticle)
     : null;
 
-  return { leading: leadingMeasure(direct, behind), described, behind };
+  return { leading: leadingMeasure(direct, behind), described, behind, follows: false };
 }
 
 /**
@@ -874,18 +1066,14 @@ function readMeasure(
  * time, which belongs to the method rather than to the proportions. `false`
  * means the figure counts.
  */
-function whatTheFigureIsNot(
-  behindFigure: string,
-  couldBeARank: boolean,
-  language: Language,
-): HeldBack | null | false {
+function whatTheFigureIsNot(behindFigure: string, couldBeARank: boolean): HeldBack | null | false {
   if (HYPHENATED_TAIL.test(behindFigure)) {
     return "sizeQualifier";
   }
   if (couldBeARank && ORDINAL_SUFFIX.test(behindFigure)) {
     return null;
   }
-  if (TIME_UNIT[language].test(behindFigure.trimStart())) {
+  if (namesALengthOfTime(behindFigure.trimStart())) {
     return "duration";
   }
   return false;
@@ -958,7 +1146,7 @@ function whatTheFiguresSize(
   item: string,
   language: Language,
 ): HeldBack | null {
-  if (language === "fr" && !leading.unit && statesItemSize(item)) {
+  if (usesPartitiveDe(language) && !leading.unit && statesItemSize(item, language)) {
     return "itemSize";
   }
 
@@ -967,7 +1155,7 @@ function whatTheFiguresSize(
   // counting, since a pot or a boîte is a thing to buy more of; a noun read as
   // a measure only for standing there names the food itself, and a mass behind
   // it is the size of one of them.
-  if (language === "fr" && leading.partitive && isStatedSize(item)) {
+  if (usesPartitiveDe(language) && leading.partitive && isStatedSize(item, language)) {
     return "itemSize";
   }
 
@@ -1056,6 +1244,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     decoration,
     approximation: null,
     measureAdjective: null,
+    measureAdjectiveFollows: false,
     amount: null,
     amountMax: null,
     rangeSeparator: null,
@@ -1085,11 +1274,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
 
   // A figure joined to a word by a hyphen describes one thing rather than
   // counting things: "4 to 5-pound roast" is one roast that weighs that much.
-  const notAnAmount = whatTheFigureIsNot(
-    stated.slice(quantity.length),
-    quantity !== article,
-    language,
-  );
+  const notAnAmount = whatTheFigureIsNot(stated.slice(quantity.length), quantity !== article);
   if (notAnAmount !== false) {
     return empty(notAnAmount);
   }
@@ -1137,6 +1322,7 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
     decoration,
     approximation: loose ? loose[0] : null,
     measureAdjective: behind?.unit ? described.adjective : null,
+    measureAdjectiveFollows: measure.follows,
     amount: whole * times,
     amountMax: range === null ? null : range.max * times,
     rangeSeparator: range?.separator ?? null,
@@ -1162,7 +1348,11 @@ export function parseIngredient(line: string, choice: LanguageChoice = "auto"): 
  */
 function unreadableComma(text: string, language: Language, evidence: LanguageEvidence): boolean {
   if (COMMA_GROUPED.test(text)) {
-    const settled = evidence.french !== evidence.english;
+    // Settled means one language outscored every other. Two tied at the top
+    // leave the comma readable two ways, whichever pair they are.
+    const scores = [evidence.french, evidence.english, evidence.spanish];
+    const top = Math.max(...scores);
+    const settled = scores.filter((score) => score === top).length === 1;
     return !settled;
   }
   if (language === "en") {
@@ -1191,8 +1381,8 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
   const counts = (rest: string) =>
     takeLeadingUnit(rest, language, true).unit !== null || readCountMultiplier(rest) !== null;
 
-  if (language === "fr") {
-    const match = OPENING_ARTICLE_FRENCH.exec(text);
+  if (usesPartitiveDe(language)) {
+    const match = OPENING_ARTICLE_ROMANCE[language].exec(text);
     if (!match) {
       return null;
     }
@@ -1200,7 +1390,7 @@ function readArticle(text: string, language: Language): ParsedArticle | null {
       return null;
     }
     const [word = ""] = match.slice(1);
-    const amount = FRENCH_ARTICLES[word.toLowerCase()];
+    const amount = ROMANCE_ARTICLES[word.toLowerCase()];
     if (amount === undefined) {
       return null;
     }
@@ -1269,8 +1459,8 @@ function takeLeadingUnit(
     return { ...taken, partitive: false };
   }
 
-  if (language === "fr" && fromArticle) {
-    const measure = readPartitiveMeasure(text);
+  if (usesPartitiveDe(language) && fromArticle) {
+    const measure = readPartitiveMeasure(text, language);
     // A noun the vocabulary never listed, read as a measure for standing
     // between the article and the partitive.
     if (measure) {
@@ -1294,8 +1484,8 @@ function takeLeadingUnit(
  * broken text rather than as a quantity.
  */
 function stripItemLead(text: string, language: Language): string {
-  if (language === "fr") {
-    return text.replace(LEADING_PARTITIVE, "").replace(LEADING_ARTICLE_FRENCH, "").trim();
+  if (usesPartitiveDe(language)) {
+    return text.replace(LEADING_PARTITIVE, "").replace(ROMANCE_ARTICLE[language], "").trim();
   }
   return text.replace(OF_OPENING, "").replace(LEADING_INDEFINITE_WITH_SPACE, "").trim();
 }
@@ -1355,7 +1545,7 @@ function takeMeasureAfterQuantity(
   text: string,
   language: Language,
 ): { unit: UnitInfo | null; rest: string } {
-  const direct = takeUnitEitherLanguage(text, language);
+  const direct = takeUnitAnyLanguage(text, language);
   if (direct.unit) {
     return direct;
   }
@@ -1364,7 +1554,7 @@ function takeMeasureAfterQuantity(
   if (!partitive) {
     return direct;
   }
-  return takeUnitEitherLanguage(text.slice(partitive[0].length), language);
+  return takeUnitAnyLanguage(text.slice(partitive[0].length), language);
 }
 
 /**
@@ -1469,7 +1659,7 @@ function takeSlashAlternates(
       break;
     }
 
-    const taken = takeUnitEitherLanguage(after.slice(quantity.length).trimStart(), language);
+    const taken = takeUnitAnyLanguage(after.slice(quantity.length).trimStart(), language);
     if (!taken.unit) {
       break;
     }
@@ -1516,7 +1706,7 @@ export function formatAmount(
         ? Number(value.toPrecision(2))
         : Math.round(value * 100) / 100;
     const rendered = String(rounded);
-    return language === "fr" ? rendered.replace(".", ",") : rendered;
+    return writesDecimalComma(language) ? rendered.replace(".", ",") : rendered;
   };
 
   if (!Number.isFinite(amount)) {

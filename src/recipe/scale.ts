@@ -1,5 +1,5 @@
 /**
- * Scaling ingredient quantities, in French and in English.
+ * Scaling ingredient quantities, in French, in English and in Spanish.
  *
  * The guiding rule is that a scaled quantity must be something a cook can act
  * on. Multiplying every number by the factor is arithmetically correct and
@@ -12,13 +12,14 @@
  * states loosely still holds a share of the dish, and a leavening agent left at
  * one pinch for twenty-five servings is a recipe that does not rise.
  *
- * The two languages are read by one set of rules. A list holding French lines
- * and English lines comes back scaled by the same arithmetic, with each line
- * written the way its own language writes numbers, plurals and measures.
+ * The languages are read by one set of rules. A list holding lines in more than
+ * one comes back scaled by the same arithmetic, with each line written the way
+ * its own language writes numbers, plurals and measures.
  */
 
 import type { Language, LanguageChoice } from "./language.js";
-import { formatAmount, parseIngredient } from "./quantity.js";
+import { EQUIPMENT_NOTE, isEquipmentLine } from "./equipment.js";
+import { detectLanguage, formatAmount, parseIngredient } from "./quantity.js";
 import type { HeldBack, Measure, ParsedIngredient } from "./quantity.js";
 import type { Divisibility, UnitInfo } from "./units.js";
 import {
@@ -30,6 +31,8 @@ import {
   formatUnit,
   hasEmbeddedMeasure,
   isSpoonMeasure,
+  spanishPlural,
+  spanishSingular,
   unitDivisibility,
 } from "./units.js";
 
@@ -91,8 +94,37 @@ export interface ScaledIngredient {
   unit: string | null;
   /** The language the line was read and rewritten in. */
   language: Language;
+  /**
+   * Whether the line names a tool rather than something eaten.
+   *
+   * Some sites write what a recipe is cooked with inside the list they write
+   * the ingredients in, so a mould or an air fryer arrives among the food. Such
+   * a line is never multiplied: a recipe made for more people uses the same one.
+   */
+  isEquipment: boolean;
   /** Why the line was rounded, clamped or left alone. */
   note?: string;
+}
+
+/**
+ * A tool line, as published, with the reason it was left alone.
+ *
+ * The language is still read, so an answer can say which vocabulary the line
+ * was understood in, and no quantity is reported: the number a tool line
+ * carries counts tools rather than an amount of the dish.
+ */
+function equipmentIngredient(line: string, language: LanguageChoice = "auto"): ScaledIngredient {
+  return {
+    text: line.trim(),
+    original: line,
+    scaling: "unscaled",
+    amount: null,
+    amountMax: null,
+    unit: null,
+    language: language === "auto" ? detectLanguage(line) : language,
+    isEquipment: true,
+    note: EQUIPMENT_NOTE,
+  };
 }
 
 /** Round to a step, keeping two decimals at most. */
@@ -459,7 +491,7 @@ function scaleMeasure(
  * the share it wants out of one is decided by a knife. A quarter of one is a
  * piece someone serves, and what is left keeps.
  *
- * Both lists carry each food in either language, because where a food falls on
+ * Both lists carry each food in every language, because where a food falls on
  * that comparison has nothing to do with the words a page uses for it.
  */
 const PORTION_SIZED_ITEM = new RegExp(
@@ -485,6 +517,13 @@ const QUARTERED_ITEM = new RegExp(
     "|betteraves?|navets?|panais|poireaux?|bananes?|mangues?|avocats?|pastèques?|pasteques?" +
     "|gigots?|fromages?|chèvres?|chevres?|ananas|pêches?|peches?|abricots?|laits?" +
     "|poulets?|pintades?|reblochons?|bûches?|buches?|rôtis?|rotis?" +
+    // The same produce, as a Spanish line names it.
+    "|cebollas?|cebolletas?|chalotas?|patatas?|papas?|zanahorias?|manzanas?|peras?" +
+    "|limones|limón|limon|limas?|naranjas?|tomates?|pepinos?|calabacines|calabacín|calabacin" +
+    "|berenjenas?|calabazas?|coles|col|melones|melón|melon|sandías?|sandias?|pimientos?" +
+    "|remolachas?|nabos?|chirivías?|chirivias?|puerros?|plátanos?|platanos?|mangos?" +
+    "|aguacates?|piñas?|pinas?|melocotones|melocotón|melocoton|albaricoques?|duraznos?" +
+    "|quesos?|pollos?|asados?|barras? de pan" +
     ")\\b",
   "iu",
 );
@@ -523,7 +562,7 @@ const HALVED_ITEM = /\b(?:jus|juices?)\b/iu;
  *   a cook stops at.
  */
 const WHOLE_ITEM =
-  /\b(?:eggs?|yolks?|egg\s+whites?|oeufs?|œufs?|jaunes?\s+d['e]|clous?|zestes?|zests?)\b/iu;
+  /\b(?:eggs?|yolks?|egg\s+whites?|oeufs?|œufs?|jaunes?\s+d['e]|clous?|zestes?|zests?|huevos?|yemas?\s+de|claras?\s+de|clavos?\s+de)\b/iu;
 
 /**
  * A piece carved off a bird or off a joint, which stops at the half.
@@ -1086,6 +1125,9 @@ function agreeLeadingAdjective(word: string, amount: number, language: Language)
   if (language === "en") {
     return word;
   }
+  if (language === "es") {
+    return agreeSpanishAdjective(word, amount);
+  }
 
   const wantsPlural = amount >= 2;
   const folded = foldWord(word);
@@ -1102,7 +1144,77 @@ function agreeLeadingAdjective(word: string, amount: number, language: Language)
 }
 
 function agreeWithAmount(item: string, amount: number, language: Language): string {
-  return language === "fr" ? agreeInFrench(item, amount) : agreeInEnglish(item, amount);
+  if (language === "fr") {
+    return agreeInFrench(item, amount);
+  }
+  return language === "es" ? agreeInSpanish(item, amount) : agreeInEnglish(item, amount);
+}
+
+/**
+ * Agree a Spanish item with the number in front of it.
+ *
+ * Spanish marks the plural on the noun and on every adjective that follows it,
+ * so "1 diente de ajo picado" becomes "2 dientes de ajo picado": the head word
+ * counts, and what stands after the partitive names the food rather than being
+ * counted. The head is therefore the only word the number reaches, and the
+ * adjective sitting immediately after it agrees with it.
+ */
+function agreeInSpanish(item: string, amount: number): string {
+  if (!item) {
+    return item;
+  }
+
+  const words = item.split(" ");
+  const head = words[0] ?? "";
+  if (head.length <= 2 || !LETTERS_ONLY.test(head)) {
+    return item;
+  }
+
+  const wantsPlural = amount > 1;
+  const singular = spanishSingular(head);
+  const isPlural = head.toLowerCase() !== singular.toLowerCase();
+  if (wantsPlural === isPlural) {
+    return item;
+  }
+
+  words[0] = wantsPlural ? spanishPlural(head) : singular;
+
+  // The word right after the head is an adjective when nothing separates them,
+  // and it takes the same number. A partitive in between marks what follows as
+  // the food rather than a description of the head, and that stays as written.
+  const next = words[1];
+  if (next !== undefined && LETTERS_ONLY.test(next) && !SPANISH_PARTITIVE.test(next)) {
+    const adjectiveSingular = spanishSingular(next);
+    const adjectiveIsPlural = next.toLowerCase() !== adjectiveSingular.toLowerCase();
+    if (wantsPlural !== adjectiveIsPlural) {
+      words[1] = wantsPlural ? spanishPlural(next) : adjectiveSingular;
+    }
+  }
+
+  return words.join(" ");
+}
+
+/** The words that mark what follows as the food rather than as a description. */
+const SPANISH_PARTITIVE = /^(?:de|del|con|sin|para|al|y|en|o)$/i;
+
+/**
+ * Agree a Spanish adjective standing between the amount and the measure, as in
+ * "1 cucharada colmada" taken to "2 cucharadas colmadas".
+ *
+ * Only the number changes. The gender belongs to the measure the adjective
+ * qualifies, and it is already written the way the page wrote it.
+ */
+function agreeSpanishAdjective(word: string, amount: number): string {
+  if (!LETTERS_ONLY.test(word)) {
+    return word;
+  }
+  const wantsPlural = amount > 1;
+  const singular = spanishSingular(word);
+  const isPlural = word.toLowerCase() !== singular.toLowerCase();
+  if (wantsPlural === isPlural) {
+    return word;
+  }
+  return wantsPlural ? spanishPlural(word) : singular;
 }
 
 /**
@@ -1114,8 +1226,8 @@ function agreeWithAmount(item: string, amount: number, language: Language): stri
  * reading as one.
  */
 function agreeCountedContainer(item: string, amount: number, language: Language): string {
-  if (language === "fr") {
-    return agreeInFrench(item, amount);
+  if (language !== "en") {
+    return agreeWithAmount(item, amount, language);
   }
   const space = item.indexOf(" ");
   if (space < 0) {
@@ -1147,6 +1259,11 @@ function joinItem(item: string, language: Language): string {
   if (language === "en") {
     return ` ${item}`;
   }
+  // Spanish writes the partitive in full whatever follows it, so there is no
+  // elision to decide: "6 cucharadas de aceite".
+  if (language === "es") {
+    return ` de ${item}`;
+  }
   const elides = VOWEL_OPENING.test(item) || MUTE_H_WORDS.test(item);
   return elides ? ` d'${item}` : ` de ${item}`;
 }
@@ -1155,10 +1272,11 @@ function joinItem(item: string, language: Language): string {
 /* Scaling one line                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** How a line writes the choice between two quantities, in either language. */
+/** How a line writes the choice between two quantities, in each language. */
 const BRANCH_SEPARATORS: Record<Language, RegExp> = {
   en: /\s+or\s+/gi,
   fr: /\s+ou\s+/gi,
+  es: /\s+o\s+/gi,
 };
 
 interface Branch {
@@ -1208,6 +1326,12 @@ function splitBranch(text: string, parsed: ParsedIngredient): Branch | null {
  */
 export function scaleIngredient(line: string, options: ScaleOptions): ScaledIngredient {
   const { factor } = options;
+  // Read before the quantity, because a tool line can carry one: "2 moldes de
+  // 20 cm" counts moulds, and how many a recipe needs at once is not something
+  // the number of eaters changes.
+  if (isEquipmentLine(line)) {
+    return equipmentIngredient(line, options.language);
+  }
   // A factor of one changes nothing, and rewriting the line anyway would round
   // "178 ml" to "180 ml" and report a difference the caller never asked for.
   if (factor === 1) {
@@ -1310,7 +1434,7 @@ function alternateLabel(
 /**
  * What follows the amount: the partitive French puts between a measure and what
  * it measures, or the counted item itself, which stands straight after its
- * number in both languages and agrees with it.
+ * number in every language and agrees with it.
  */
 function itemLabelFor(
   named: UnitInfo | null,
@@ -1501,13 +1625,17 @@ function renderScaledLine(
   itemLabel: string;
 } {
   const named = unit && !countsBarePieces(unit) ? unit : null;
-  // The size word the page put in front of its measure goes back in front of
-  // it: the page asked for a grosse pincée, and a pincée is not the same ask.
+  // The size word goes back where the page had it, in front of the measure or
+  // behind it: the page asked for a grosse pincée and for a cucharada colmada,
+  // and neither a pincée nor a cucharada is the same ask.
   const adjective =
     named && parsed.measureAdjective
       ? ` ${agreeLeadingAdjective(parsed.measureAdjective, shown, language)}`
       : "";
-  const unitLabel = named ? `${adjective} ${formatUnit(named, shown, language)}` : "";
+  const measure = named ? ` ${formatUnit(named, shown, language)}` : "";
+  const unitLabel = parsed.measureAdjectiveFollows
+    ? `${measure}${adjective}`
+    : `${adjective}${measure}`;
   const alternateTexts = alternates.map((entry) => entry.text);
   const introduced = parsed.alternateIntro ? `${parsed.alternateIntro} ` : "";
   const bracketed = alternates.length === 0 ? "" : ` (${introduced}${alternateTexts.join(" / ")})`;
@@ -1573,6 +1701,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
       amountMax: null,
       unit: null,
       language,
+      isEquipment: false,
       note: parsed.heldBack
         ? HELD_BACK_NOTE[parsed.heldBack]
         : "No quantity given; adjust to taste.",
@@ -1633,6 +1762,7 @@ function scaleSingleLine(line: string, options: ScaleOptions): ScaledIngredient 
     amountMax: collapsed ? null : (high?.amount ?? null),
     unit: named?.canonical ?? null,
     language,
+    isEquipment: false,
   };
 
   const note = noteForScaledLine({
@@ -1728,6 +1858,9 @@ export function passthroughIngredient(
   line: string,
   language: LanguageChoice = "auto",
 ): ScaledIngredient {
+  if (isEquipmentLine(line)) {
+    return equipmentIngredient(line, language);
+  }
   const parsed = parseIngredient(line, language);
 
   const held = parsed.amount === null || parsed.heldBack !== null;
@@ -1739,6 +1872,7 @@ export function passthroughIngredient(
     amountMax: held ? null : parsed.amountMax,
     unit: held ? null : (parsed.unit?.canonical ?? null),
     language: parsed.language,
+    isEquipment: false,
   };
   if (parsed.heldBack) {
     result.note = HELD_BACK_NOTE[parsed.heldBack];

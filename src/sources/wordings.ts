@@ -159,6 +159,93 @@ const FRENCH_FRAME = new Set([
   "à",
 ]);
 
+/**
+ * The same, for Spanish.
+ *
+ * The caution that governs the other two lists governs this one: a word stays
+ * out of it wherever it is also something a person eats. Spanish "coco" is a
+ * coconut and "caldo" a stock, so neither is a framing word however often a
+ * question happens to carry it.
+ */
+const SPANISH_FRAME = new Set([
+  "algo",
+  "alguna",
+  "algunas",
+  "alguno",
+  "algunos",
+  "buenas",
+  "buenos",
+  "busco",
+  "buscar",
+  "casera",
+  "caseras",
+  "casero",
+  "caseros",
+  "como",
+  "conoces",
+  "cual",
+  "cuales",
+  "dame",
+  "de",
+  "del",
+  "dime",
+  "el",
+  "ella",
+  "ellos",
+  "en",
+  "es",
+  "esta",
+  "estoy",
+  "facil",
+  "faciles",
+  "gracias",
+  "hacer",
+  "hago",
+  "hay",
+  "hola",
+  "las",
+  "los",
+  "mas",
+  "me",
+  "mejor",
+  "mejores",
+  "necesito",
+  "para",
+  "pero",
+  "por",
+  "porfavor",
+  "puedes",
+  "que",
+  "queria",
+  "quiero",
+  "quisiera",
+  "receta",
+  "recetas",
+  "rica",
+  "ricas",
+  "rico",
+  "ricos",
+  "saber",
+  "sabes",
+  "se",
+  "sencilla",
+  "sencillas",
+  "sencillo",
+  "sencillos",
+  "ser",
+  "si",
+  "son",
+  "soy",
+  "tengo",
+  "tienes",
+  "un",
+  "una",
+  "unas",
+  "unos",
+  "y",
+  "yo",
+]);
+
 const ENGLISH_FRAME = new Set([
   "a",
   "about",
@@ -295,6 +382,8 @@ const NEGATORS = new Set([
   "pas",
   "sans",
   "sauf",
+  "sin",
+  "tampoco",
   "without",
   "zero",
 ]);
@@ -326,6 +415,13 @@ const HEALTH_MARKERS = new Set([
   "intolerante",
   "intolerantes",
   "intolerants",
+  "alergia",
+  "alergias",
+  "alergica",
+  "alergico",
+  "celiaca",
+  "celiaco",
+  "intolerantes",
 ]);
 
 /**
@@ -355,6 +451,12 @@ const DIETS = new Set([
   "vegetalienne",
   "vegetaliennes",
   "vegetaliens",
+  "vegana",
+  "veganas",
+  "veganos",
+  "vegetariana",
+  "vegetarianas",
+  "vegetarianos",
   "vegetarian",
   "vegetarians",
   "vegetarien",
@@ -504,10 +606,10 @@ function foldWord(word: string): string {
  * once it has split an elision is not a word at all.
  */
 function namesTheDish(word: string, key: string): boolean {
-  if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key)) {
+  if (FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key) || SPANISH_FRAME.has(key)) {
     return false;
   }
-  if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word)) {
+  if (FRENCH_FRAME.has(word) || ENGLISH_FRAME.has(word) || SPANISH_FRAME.has(word)) {
     return false;
   }
   if (DIGITS_ONLY.test(word)) {
@@ -574,8 +676,8 @@ function readQuestion(question: string): ReadQuestion {
       continue;
     }
 
-    // A negation stands before what it negates, in both languages: "sans
-    // beurre", "without butter", "pas de beurre".
+    // A negation stands before what it negates, in every language the questions
+    // arrive in: "sans beurre", "without butter", "sin mantequilla".
     if (NEGATORS.has(key)) {
       const forward = takeFood(words, index + 1);
       state(forward.named === "" ? null : forward.named, "excluded");
@@ -690,7 +792,12 @@ function takeFood(words: string[], from: number): { named: string; next: number 
 /** A word standing between a marker and its food, naming no food itself. */
 function isFiller(word: string): boolean {
   const key = foldWord(word);
-  return CONDITION_JOINERS.has(key) || FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key);
+  return (
+    CONDITION_JOINERS.has(key) ||
+    FRENCH_FRAME.has(key) ||
+    ENGLISH_FRAME.has(key) ||
+    SPANISH_FRAME.has(key)
+  );
 }
 
 /** Whether a word can be part of the name of something a recipe holds. */
@@ -714,7 +821,7 @@ function namesFood(word: string): boolean {
   if (CONDITION_UNITS.has(key)) {
     return false;
   }
-  return !(FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key));
+  return !(FRENCH_FRAME.has(key) || ENGLISH_FRAME.has(key) || SPANISH_FRAME.has(key));
 }
 
 /**

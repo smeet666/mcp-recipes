@@ -8,7 +8,7 @@ _[Version française](#confidentialité)_
 
 ## What this server is
 
-`mcp-recipes` is a read-only client for five recipe sites: [Marmiton](https://www.marmiton.org), the [Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents), [Ptitchef](https://www.ptitchef.com), [BBC Good Food](https://www.bbcgoodfood.com) and [Supertoinette](https://www.supertoinette.com). It runs on your
+`mcp-recipes` is a read-only client for six recipe sites: [Marmiton](https://www.marmiton.org), the [Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents), [Ptitchef](https://www.ptitchef.com), [BBC Good Food](https://www.bbcgoodfood.com), [Supertoinette](https://www.supertoinette.com) and [Pequerecetas](https://www.pequerecetas.com). It runs on your
 own machine, as a process your MCP host starts, and it speaks over stdio. It
 listens on no port.
 
@@ -16,7 +16,7 @@ It needs no API key and no account, so there is no credential for it to hold and
 
 ## What leaves your machine, and where it goes
 
-**5 hosts are contacted**, and nothing else.
+**6 hosts are contacted**, and nothing else.
 
 | Host                    | What is read there                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------ |
@@ -25,6 +25,7 @@ It needs no API key and no account, so there is no credential for it to hold and
 | `www.ptitchef.com`      | the site's pages                                                                                 |
 | `www.bbcgoodfood.com`   | a JSON route the site's own front end uses, for a search; the recipe's page itself, for a recipe |
 | `www.supertoinette.com` | the site's pages                                                                                 |
+| `www.pequerecetas.com`  | the site's pages, and the sitemaps it publishes its own listings in                              |
 
 A Cookbook page is linked as `en.wikibooks.org`, which is where a reader opens
 it. That host is never contacted by this server: the pages themselves are read
@@ -38,7 +39,7 @@ What a request carries:
 | A `User-Agent`         | `mcp-recipes/<version> (+https://github.com/smeet666/mcp-recipes)`, so the site can reach a person about the traffic it receives. |
 | Your IP address        | Sent by your network to any host you contact, as with any web request.                                                            |
 
-Your requests reach the five sites above. What is done with them there is governed by each site's own privacy policy, which this project does not control.
+Your requests reach the six sites above. What is done with them there is governed by each site's own privacy policy, which this project does not control.
 
 ## What is kept, and for how long
 
@@ -90,7 +91,7 @@ Ce serveur ne collecte rien sur vous et n'envoie rien à son auteur.
 
 ## Ce qu'est ce serveur
 
-`mcp-recipes` est un client en lecture seule pour cinq sites de recettes : [Marmiton](https://www.marmiton.org), le [Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents), [Ptitchef](https://www.ptitchef.com), [BBC Good Food](https://www.bbcgoodfood.com) et [Supertoinette](https://www.supertoinette.com). Il
+`mcp-recipes` est un client en lecture seule pour six sites de recettes : [Marmiton](https://www.marmiton.org), le [Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents), [Ptitchef](https://www.ptitchef.com), [BBC Good Food](https://www.bbcgoodfood.com), [Supertoinette](https://www.supertoinette.com) et [Pequerecetas](https://www.pequerecetas.com). Il
 tourne sur votre machine, comme un processus que votre hôte MCP démarre, et il
 parle en stdio. Il n'écoute sur aucun port.
 
@@ -98,7 +99,7 @@ Il ne demande ni clé d'API ni compte, donc il ne détient aucun identifiant et 
 
 ## Ce qui quitte votre machine, et où cela va
 
-**5 hôtes sont joints**, et rien d'autre.
+**6 hôtes sont joints**, et rien d'autre.
 
 | Hôte                    | Ce qui y est lu                                                                                             |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -107,6 +108,7 @@ Il ne demande ni clé d'API ni compte, donc il ne détient aucun identifiant et 
 | `www.ptitchef.com`      | les pages du site                                                                                           |
 | `www.bbcgoodfood.com`   | une route JSON qu'emploie l'interface du site, pour une recherche ; la page de la recette, pour une recette |
 | `www.supertoinette.com` | les pages du site                                                                                           |
+| `www.pequerecetas.com`  | les pages du site, et les sitemaps où il publie ses propres listes                                          |
 
 Une page du Cookbook est liée sous `en.wikibooks.org`, où un lecteur l'ouvre. Ce
 serveur ne joint jamais cet hôte : les pages elles-mêmes sont lues par la
@@ -120,7 +122,7 @@ Ce qu'une requête emporte :
 | Un `User-Agent`   | `mcp-recipes/<version> (+https://github.com/smeet666/mcp-recipes)`, pour que le site puisse joindre une personne au sujet du trafic qu'il reçoit. |
 | Votre adresse IP  | Transmise par votre réseau à tout hôte que vous joignez, comme pour n'importe quelle requête web.                                                 |
 
-Vos requêtes atteignent les cinq sites ci-dessus. Ce qui en est fait là-bas relève de la politique de confidentialité propre à chaque site, que ce projet ne contrôle pas.
+Vos requêtes atteignent les six sites ci-dessus. Ce qui en est fait là-bas relève de la politique de confidentialité propre à chaque site, que ce projet ne contrôle pas.
 
 ## Ce qui est conservé, et combien de temps
 

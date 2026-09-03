@@ -67,7 +67,7 @@ export function buildInstructions(sources: Array<{ name: string; language: strin
     "search_recipes asks every source at once and returns one list; every id it hands back names the source it came from, and get_recipe routes on that.",
     "Use compare_recipes when the question is how a dish differs between traditions: it reads each source's closest version and can rescale them all to the same number of servings so the lists stand comparison.",
     "Do not rescale quantities yourself. get_recipe and scale_ingredients keep an egg whole, halve what pours or cuts, move a small measurement to a smaller unit before rounding it, and flag what cannot be scaled, which is what stops answers like '2.4 eggs'.",
-    "scale_ingredients works offline on a list from anywhere and reads French and English lines in one call, each in its own language.",
+    "scale_ingredients works offline on a list from anywhere and reads French, English and Spanish lines in one call, each in its own language.",
     "A source that fails is named as a source that failed. An answer holding rows from some sources is never evidence about what the others hold, and 'per_source' says which was which.",
     "The sources share no scale. Their result counts count different things and are never added; some carry reader ratings and some have no author and no rating by nature, so rows are interleaved rather than ranked.",
     "Nothing is converted between measuring systems, and a yield is repeated in the source's own words, because '4 à 6 personnes' and '4 personnes' are different claims. A page stating no yield cannot be rescaled and says so.",
@@ -118,7 +118,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   server.registerTool(
     "scale_ingredients",
     {
-      title: "Scale an ingredient list, in either language",
+      title: "Scale an ingredient list, in any language it reads",
       description: scaleIngredientsDescription,
       inputSchema: scaleIngredientsInput,
       outputSchema: scaleIngredientsOutput,

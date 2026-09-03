@@ -1,7 +1,7 @@
 {
   "author": "Damien Bouissou",
   "authorUrl": "https://github.com/smeet666",
-  "description": "MCP server that asks five recipe sites at once, in French and English, merges the answers, and scales quantities. No API key required.",
+  "description": "MCP server that asks six recipe sites at once, in French, English and Spanish, merges the answers, and scales quantities. No API key required.",
   "homepage": "https://github.com/smeet666/mcp-recipes#readme",
   "identifier": "smeet666-mcp-recipes",
   "name": "mcp-recipes",
@@ -1895,5 +1895,5 @@
       }
     }
   ],
-  "version": "3.0.1"
+  "version": "4.0.0"
 }

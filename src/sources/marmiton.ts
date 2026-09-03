@@ -62,8 +62,7 @@ export const MARMITON_PROFILE = {
   homeUrl: "https://www.marmiton.org",
   language: "fr" as const,
   attribution: "Source: Marmiton",
-  // Every page the search returns is a recipe.
-  mixesReferencePages: false,
+  rowsThatAreNotRecipes: null,
 };
 
 /** Recipe pages, whose address ends in the numeric identifier. */
@@ -198,6 +197,7 @@ export function marmitonDetail(payload: unknown): RecipeDetail {
     prepMinutes: count(recipe.prepMinutes),
     cookMinutes: count(recipe.cookMinutes),
     totalMinutes: count(recipe.totalMinutes),
+    gathers: null,
     category: text(recipe.category),
     author: text(recipe.author),
     rating:

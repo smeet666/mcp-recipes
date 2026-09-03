@@ -16,11 +16,12 @@ a serving is, and a wiki cookbook in English, with equipment lists and prose the
 first has no field for. Asking a question of one of them answers about one of
 them.
 
-This server reads five, three in French:
+This server reads six. Three publish in French,
 [Marmiton](https://www.marmiton.org), [Ptitchef](https://www.ptitchef.com) and
-[Supertoinette](https://www.supertoinette.com), and two in English: the
+[Supertoinette](https://www.supertoinette.com); two in English, the
 [Wikibooks Cookbook](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents)
-and [BBC Good Food](https://www.bbcgoodfood.com). You can search them all with
+and [BBC Good Food](https://www.bbcgoodfood.com); and one in Spanish,
+[Pequerecetas](https://www.pequerecetas.com). You can search them all with
 one question, read a recipe from any of them in one shape, put several versions
 of the same dish side by side, and rescale any ingredient list. It needs no API
 key and no account.
@@ -64,7 +65,7 @@ Node 24 or later is required, and no environment variable has to be set.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.1"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:4.0.0"]
     }
   }
 }
@@ -73,12 +74,12 @@ Node 24 or later is required, and no environment variable has to be set.
 `-i` keeps stdin open, which is where the protocol travels, and `-t` is left out
 because a TTY rewrites the stream. The container needs outbound HTTPS to
 `www.marmiton.org`, `api.wikimedia.org`, `www.ptitchef.com`,
-`www.bbcgoodfood.com` and `www.supertoinette.com`, and nothing else:
-no volume, no port, no credential.
+`www.bbcgoodfood.com`, `www.supertoinette.com` and `www.pequerecetas.com`, and
+nothing else: no volume, no port, no credential.
 
 ### Bundle, without npm
 
-Download `mcp-recipes-3.0.1.mcpb` from
+Download `mcp-recipes-4.0.0.mcpb` from
 [the latest release](https://github.com/smeet666/mcp-recipes/releases/latest) and
 open it. A client that supports MCP bundles installs it on its own, with no npm
 and no configuration file to edit. The bundle carries its dependencies, so
@@ -104,10 +105,20 @@ its source, and `get_recipe` takes it.
 | `ptitchef`      | `www.ptitchef.com`      | French   |
 | `goodfood`      | `www.bbcgoodfood.com`   | English  |
 | `supertoinette` | `www.supertoinette.com` | French   |
+| `pequerecetas`  | `www.pequerecetas.com`  | Spanish  |
 
 A row's `id` names its source, so an identifier read from one answer goes back to
 the right site. **Counts are never added across sources**, and a source that
 failed is reported as having failed rather than as having found nothing.
+
+Each site is read at its own pace: two of them ask for three seconds between
+requests, and a setting posted for all of them can only make this server more
+patient than the slowest asks for.
+
+Two of these sites file something other than a recipe at the address a recipe
+lives at. The Wikibooks Cookbook keeps pages about an ingredient beside the
+recipes using it, and Pequerecetas publishes articles that gather recipes. A
+search says so, and `get_recipe` says what it read off the page.
 
 ## Tools
 
@@ -224,15 +235,15 @@ other counts the rows it served.
 
 Every variable is optional. Set them in the `env` block of your client config.
 
-| Variable                    | Default              | What it does                                                                         |
-| --------------------------- | -------------------- | ------------------------------------------------------------------------------------ |
-| `RECIPES_USER_AGENT`        | the project identity | Names your application to both sites, with an address where a person can be reached. |
-| `RECIPES_MIN_INTERVAL_MS`   | `1000`               | Gap between two requests to one site, from 500 to 60000.                             |
-| `RECIPES_TIMEOUT_MS`        | `20000`              | Deadline for one request, from 1000 to 120000.                                       |
-| `RECIPES_MAX_RETRIES`       | `3`                  | Attempts after a transient failure, from 0 to 8.                                     |
-| `RECIPES_CACHE_TTL_MS`      | `900000`             | How long an answer stays in memory, from 0 to 86400000.                              |
-| `RECIPES_CACHE_MAX_ENTRIES` | `200`                | Answers held in memory at once, from 1 to 5000.                                      |
-| `RECIPES_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` or `debug`, written to stderr.                             |
+| Variable                    | Default              | What it does                                                                        |
+| --------------------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| `RECIPES_USER_AGENT`        | the project identity | Names your application to the sites, with an address where a person can be reached. |
+| `RECIPES_MIN_INTERVAL_MS`   | `1000`               | Gap between two requests to one site, from 500 to 60000.                            |
+| `RECIPES_TIMEOUT_MS`        | `20000`              | Deadline for one request, from 1000 to 120000.                                      |
+| `RECIPES_MAX_RETRIES`       | `3`                  | Attempts after a transient failure, from 0 to 8.                                    |
+| `RECIPES_CACHE_TTL_MS`      | `900000`             | How long an answer stays in memory, from 0 to 86400000.                             |
+| `RECIPES_CACHE_MAX_ENTRIES` | `200`                | Answers held in memory at once, from 1 to 5000.                                     |
+| `RECIPES_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` or `debug`, written to stderr.                            |
 
 A value outside its range falls back to the default, and the reason is written to
 stderr.
@@ -256,25 +267,47 @@ so one silent site never hides the other.
 
 ## As a library
 
-The layer reading the two sites is published on its own, with its pacing, its
-cache and its errors, and with no protocol attached.
+The layer reading the sites is published on its own, with its pacing, its cache
+and its errors, and with no protocol attached.
 
 ```ts
 import { RecipesClient } from "mcp-recipes/client";
 
 const client = new RecipesClient();
-const read = await client.search({ query: "carbonara", limitPerSource: 3 });
-console.log(read.data.results.length);
+const { rows, reports } = await client.searchRecipes("carbonara", 3);
+console.log(
+  rows.length,
+  reports.map((report) => report.status),
+);
+
+const { recipe } = await client.getRecipe(rows[0].id);
 ```
 
-Each read answers `{ data, cached }`, and throws an error carrying one of the six
-codes. Each site keeps its own pace, and the floor holds here as well.
+`searchRecipes(query, limitPerSource, sources?, options?)` answers
+`{ rows, reports }`: one report per source, saying whether it answered and what
+its own count measured, so a source that failed is never read as a source that
+holds nothing. `getRecipe(id)` answers `{ recipe, cached, read }`, and throws an
+error carrying one of the six codes. `client.profiles` lists the sources the
+build registers.
+
+The scaler is published separately at `mcp-recipes/scale`, and works offline on
+any list:
+
+```ts
+import { scaleIngredients } from "mcp-recipes/scale";
+
+scaleIngredients(["200 g de harina", "4 oeufs", "1 cup milk"], { factor: 2 });
+```
+
+Each site keeps its own pace, and the floors hold here as well.
 
 ## Pacing and attribution
 
 Each site is paced on its own, one request at a time with at least a second
 between two, and the floor of half a second holds however the server is
-configured. Asking every site at once therefore costs each of them one request,
+configured. Two of the sites ask for more, three seconds between two requests,
+and they get it: a setting posted for every source can raise a site's spacing
+and never lower it. Asking every site at once therefore costs each of them one request,
 never two. The `User-Agent` always ends with the project identity and an address
 where a person can be reached.
 
@@ -282,7 +315,7 @@ Every row carries the address of the recipe's own page and the name of the site
 that published it. The Cookbook pages are published under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), which asks that
 what is built on them be shared under the same licence. Marmiton, Ptitchef, BBC
-Good Food and Supertoinette state no terms on a recipe page, and their recipes
+Good Food, Supertoinette and Pequerecetas state no terms on a recipe page, and their recipes
 belong to those sites and to the cooks who wrote them. Silence is not a grant, so
 credit the site and link the page you took a recipe from.
 
@@ -303,7 +336,8 @@ sites it reads.
 
 This server collects nothing about you and sends nothing to its author. It runs
 on your machine, contacts `www.marmiton.org`, `api.wikimedia.org`,
-`www.ptitchef.com`, `www.bbcgoodfood.com` and `www.supertoinette.com` and nothing
+`www.ptitchef.com`, `www.bbcgoodfood.com`, `www.supertoinette.com` and
+`www.pequerecetas.com` and nothing
 else, holds its answers in memory while it runs,
 and writes nothing to disk. [PRIVACY.md](PRIVACY.md) states what a request
 carries and which settings change any of it.
@@ -347,11 +381,12 @@ qu'est une part, et un wiki de cuisine en anglais, avec des listes de matériel 
 une prose pour lesquelles le premier n'a aucun champ. Poser une question à l'un
 d'eux répond au sujet de l'un d'eux.
 
-Ce serveur en lit cinq, trois en français :
+Ce serveur en lit six. Trois publient en français,
 [Marmiton](https://www.marmiton.org), [Ptitchef](https://www.ptitchef.com) et
-[Supertoinette](https://www.supertoinette.com), et deux en anglais : le
+[Supertoinette](https://www.supertoinette.com) ; deux en anglais, le
 [Cookbook des Wikibooks](https://en.wikibooks.org/wiki/Cookbook:Table_of_Contents)
-et [BBC Good Food](https://www.bbcgoodfood.com). On peut chercher dans les cinq
+et [BBC Good Food](https://www.bbcgoodfood.com) ; un en espagnol,
+[Pequerecetas](https://www.pequerecetas.com). On peut chercher dans les six
 avec une seule question, lire une recette de n'importe lequel sous une seule
 forme, mettre plusieurs versions d'un même plat côte à côte, et adapter
 n'importe quelle liste d'ingrédients. Aucune clé d'API, aucun compte.
@@ -392,7 +427,7 @@ renseigner.
   "mcpServers": {
     "recipes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:3.0.1"]
+      "args": ["run", "-i", "--rm", "ghcr.io/smeet666/mcp-recipes:4.0.0"]
     }
   }
 }
@@ -401,12 +436,12 @@ renseigner.
 `-i` garde l'entrée standard ouverte, qui est le canal du protocole, et `-t` est
 omis parce qu'un TTY réécrit le flux. Le conteneur a besoin d'un accès HTTPS
 sortant vers `www.marmiton.org`, `api.wikimedia.org`, `www.ptitchef.com`,
-`www.bbcgoodfood.com` et `www.supertoinette.com`, et de
+`www.bbcgoodfood.com`, `www.supertoinette.com` et `www.pequerecetas.com`, et de
 rien d'autre : aucun volume, aucun port, aucun identifiant.
 
 ### Bundle, sans npm
 
-Téléchargez `mcp-recipes-3.0.1.mcpb` depuis
+Téléchargez `mcp-recipes-4.0.0.mcpb` depuis
 [la dernière publication](https://github.com/smeet666/mcp-recipes/releases/latest)
 et ouvrez-le. Un client qui gère les bundles MCP l'installe seul, sans npm et
 sans fichier de configuration à modifier. Le bundle emporte ses dépendances, donc
@@ -432,11 +467,22 @@ qui nomme sa source, et `get_recipe` le reprend.
 | `ptitchef`      | `www.ptitchef.com`      | français |
 | `goodfood`      | `www.bbcgoodfood.com`   | anglais  |
 | `supertoinette` | `www.supertoinette.com` | français |
+| `pequerecetas`  | `www.pequerecetas.com`  | espagnol |
 
 L'`id` d'une ligne nomme sa source, donc un identifiant lu dans une réponse
 retourne vers le bon site. **Les comptes ne sont jamais additionnés entre
 sources**, et une source qui a échoué est rapportée comme ayant échoué plutôt que
 comme n'ayant rien trouvé.
+
+Chaque site est lu à son propre rythme : deux d'entre eux demandent trois
+secondes entre deux requêtes, et un réglage posé pour tous ne peut que rendre ce
+serveur plus patient que ce que le plus lent demande.
+
+Deux de ces sites rangent autre chose qu'une recette à l'adresse où vit une
+recette. Le Cookbook des Wikibooks garde des pages sur un ingrédient à côté des
+recettes qui l'emploient, et Pequerecetas publie des articles qui rassemblent
+des recettes. Une recherche le dit, et `get_recipe` dit ce qu'il a lu sur la
+page.
 
 ## Les outils
 
@@ -555,15 +601,15 @@ une catégorie entière et l'autre compte les lignes qu'il a servies.
 Chaque variable est facultative. Elles se posent dans le bloc `env` de la
 configuration du client.
 
-| Variable                    | Défaut               | Ce qu'elle fait                                                                          |
-| --------------------------- | -------------------- | ---------------------------------------------------------------------------------------- |
-| `RECIPES_USER_AGENT`        | l'identité du projet | Nomme votre application auprès des deux sites, avec une adresse où joindre une personne. |
-| `RECIPES_MIN_INTERVAL_MS`   | `1000`               | Écart entre deux requêtes vers un même site, de 500 à 60000.                             |
-| `RECIPES_TIMEOUT_MS`        | `20000`              | Délai d'une requête, de 1000 à 120000.                                                   |
-| `RECIPES_MAX_RETRIES`       | `3`                  | Tentatives après un échec passager, de 0 à 8.                                            |
-| `RECIPES_CACHE_TTL_MS`      | `900000`             | Durée pendant laquelle une réponse reste en mémoire, de 0 à 86400000.                    |
-| `RECIPES_CACHE_MAX_ENTRIES` | `200`                | Réponses gardées en mémoire à la fois, de 1 à 5000.                                      |
-| `RECIPES_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` ou `debug`, écrit sur la sortie d'erreur.                      |
+| Variable                    | Défaut               | Ce qu'elle fait                                                                     |
+| --------------------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| `RECIPES_USER_AGENT`        | l'identité du projet | Nomme votre application auprès des sites, avec une adresse où joindre une personne. |
+| `RECIPES_MIN_INTERVAL_MS`   | `1000`               | Écart entre deux requêtes vers un même site, de 500 à 60000.                        |
+| `RECIPES_TIMEOUT_MS`        | `20000`              | Délai d'une requête, de 1000 à 120000.                                              |
+| `RECIPES_MAX_RETRIES`       | `3`                  | Tentatives après un échec passager, de 0 à 8.                                       |
+| `RECIPES_CACHE_TTL_MS`      | `900000`             | Durée pendant laquelle une réponse reste en mémoire, de 0 à 86400000.               |
+| `RECIPES_CACHE_MAX_ENTRIES` | `200`                | Réponses gardées en mémoire à la fois, de 1 à 5000.                                 |
+| `RECIPES_LOG_LEVEL`         | `error`              | `silent`, `error`, `info` ou `debug`, écrit sur la sortie d'erreur.                 |
 
 Une valeur hors de sa plage retombe sur le défaut, et la raison est écrite sur la
 sortie d'erreur.
@@ -587,25 +633,47 @@ toute la réponse, donc un site silencieux n'en cache jamais un autre.
 
 ## Comme bibliothèque
 
-La couche qui lit les deux sites est publiée seule, avec son rythme, son cache et
+La couche qui lit les sites est publiée seule, avec son rythme, son cache et
 ses erreurs, sans protocole attaché.
 
 ```ts
 import { RecipesClient } from "mcp-recipes/client";
 
 const client = new RecipesClient();
-const read = await client.search({ query: "carbonara", limitPerSource: 3 });
-console.log(read.data.results.length);
+const { rows, reports } = await client.searchRecipes("carbonara", 3);
+console.log(
+  rows.length,
+  reports.map((report) => report.status),
+);
+
+const { recipe } = await client.getRecipe(rows[0].id);
 ```
 
-Chaque lecture répond `{ data, cached }`, et lève une erreur portant un des six
-codes. Chaque site garde son propre rythme, et le plancher tient également ici.
+`searchRecipes(query, limitPerSource, sources?, options?)` répond
+`{ rows, reports }` : un rapport par source, disant si elle a répondu et ce que
+son propre compte mesure, pour qu'une source en échec ne se lise jamais comme une
+source qui ne détient rien. `getRecipe(id)` répond `{ recipe, cached, read }`, et
+lève une erreur portant un des six codes. `client.profiles` énumère les sources
+que cette construction enregistre.
+
+La mise à l'échelle est publiée à part, sous `mcp-recipes/scale`, et travaille
+hors ligne sur n'importe quelle liste :
+
+```ts
+import { scaleIngredients } from "mcp-recipes/scale";
+
+scaleIngredients(["200 g de harina", "4 oeufs", "1 cup milk"], { factor: 2 });
+```
+
+Chaque site garde son propre rythme, et les planchers tiennent également ici.
 
 ## Rythme et attribution
 
 Chaque site est cadencé pour lui-même, une requête à la fois avec au moins une
 seconde entre deux, et le plancher d'une demi-seconde tient quelle que soit la
-configuration. Les interroger toutes à la fois coûte donc à chacune une requête,
+configuration. Deux des sites en demandent davantage, trois secondes entre deux
+requêtes, et ils l'obtiennent : un réglage posé pour toutes les sources peut
+élargir l'écart d'un site, jamais le réduire. Les interroger toutes à la fois coûte donc à chacune une requête,
 jamais deux. Le `User-Agent` se termine toujours par l'identité du projet et une
 adresse où joindre une personne.
 
@@ -613,7 +681,7 @@ Chaque ligne porte l'adresse de la page de la recette et le nom du site qui l'a
 publiée. Les pages du Cookbook sont publiées sous
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.fr), qui
 demande que ce qu'on bâtit dessus soit partagé sous la même licence. Marmiton,
-Ptitchef, BBC Good Food et Supertoinette n'énoncent aucune condition sur une page
+Ptitchef, BBC Good Food, Supertoinette et Pequerecetas n'énoncent aucune condition sur une page
 de recette, et leurs recettes appartiennent à ces sites et aux cuisiniers qui les
 ont écrites. Le silence n'est pas une autorisation : créditez le site et liez la
 page d'où vient la recette.
@@ -635,7 +703,8 @@ lit.
 
 Ce serveur ne collecte rien sur vous et n'envoie rien à son auteur. Il tourne sur
 votre machine, ne joint que `www.marmiton.org`, `api.wikimedia.org`,
-`www.ptitchef.com`, `www.bbcgoodfood.com` et `www.supertoinette.com`, garde ses réponses en mémoire le temps qu'il tourne, et
+`www.ptitchef.com`, `www.bbcgoodfood.com`, `www.supertoinette.com` et
+`www.pequerecetas.com`, garde ses réponses en mémoire le temps qu'il tourne, et
 n'écrit rien sur le disque. [PRIVACY.md](PRIVACY.md) dit ce qu'une requête
 emporte et quels réglages changent cela.
 

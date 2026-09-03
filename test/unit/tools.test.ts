@@ -34,7 +34,7 @@ describe("search_recipes", () => {
 
     expect(payload.result_count).toBe(payload.results.length);
     expect(new Set(payload.results.map((row) => row.source))).toEqual(
-      new Set(["marmiton", "cookbook", "ptitchef", "goodfood", "supertoinette"]),
+      new Set(["marmiton", "cookbook", "ptitchef", "goodfood", "supertoinette", "pequerecetas"]),
     );
     expect(payload.results.every((row) => row.id.startsWith(row.source))).toBe(true);
   });
@@ -286,6 +286,7 @@ describe("compare_recipes", () => {
       "ptitchef",
       "goodfood",
       "supertoinette",
+      "pequerecetas",
     ]);
   });
 
@@ -295,7 +296,7 @@ describe("compare_recipes", () => {
     }>(await runCompareRecipes(fakeClient(), compareArgs({ dish: "crepes", servings: 8 })));
 
     // A factor per source, each read off what that source says it yields.
-    expect(payload.versions.map((version) => version.yield.factor)).toEqual([2, 1, 2, 2, 2]);
+    expect(payload.versions.map((version) => version.yield.factor)).toEqual([2, 1, 2, 2, 2, 2]);
     expect(payload.versions.every((version) => version.yield.requested === 8)).toBe(true);
   });
 
@@ -369,9 +370,11 @@ describe("compare_recipes", () => {
   });
 
   it("names which version each note is about", async () => {
+    // Two sources, so what is measured is the naming rather than how many
+    // notes the text block had room for.
     const result = await runCompareRecipes(
-      fakeClient(),
-      compareArgs({ dish: "crepes", servings: 8 }),
+      fakeClient(onlyFrom("marmiton", "cookbook")),
+      compareArgs({ dish: "crepes", servings: 8, sources: ["marmiton", "cookbook"] }),
     );
     expect(textOf(result)).toMatch(/Note: Marmiton: /);
   });

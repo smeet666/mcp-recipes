@@ -67,3 +67,45 @@ describe("a whole list can be read at once", () => {
     expect(readListLanguage(["200 g flour", "4 eggs", "salt"])).toBe("en");
   });
 });
+
+describe("Spanish stands on its own beside the other two", () => {
+  it("reads the words only Spanish writes", () => {
+    expect(detectLanguage("200 g de harina de trigo")).toBe("es");
+    expect(detectLanguage("1 cucharada de aceite de oliva")).toBe("es");
+    expect(detectLanguage("2 dientes de ajo picados")).toBe("es");
+  });
+
+  it("reads a letter French never writes as Spanish", () => {
+    expect(detectLanguage("100 g de azúcar")).toBe("es");
+    expect(detectLanguage("1 limón")).toBe("es");
+    expect(detectLanguage("1 pizca de canela molida")).toBe("es");
+  });
+
+  it("keeps a French line French where the two share their small words", () => {
+    expect(detectLanguage("2 gousses d'ail")).toBe("fr");
+    expect(detectLanguage("100 g de sucre")).toBe("fr");
+    expect(detectLanguage("1 pincée de cannelle")).toBe("fr");
+  });
+
+  it("reads a Spanish measure as Spanish", () => {
+    expect(detectLanguage("2 cucharaditas levadura")).toBe("es");
+    expect(detectLanguage("1 taza arroz")).toBe("es");
+  });
+
+  it("reads a Spanish name on a line that carries nothing else", () => {
+    expect(detectLanguage("6 huevos")).toBe("es");
+    expect(detectLanguage("sal")).toBe("es");
+  });
+
+  it("leaves a measure every vocabulary shares to the rest of the line", () => {
+    expect(detectLanguage("250 ml de leche")).toBe("es");
+    expect(detectLanguage("250 ml de lait")).toBe("fr");
+    expect(detectLanguage("250 ml milk")).toBe("en");
+  });
+});
+
+describe("a whole list can be read at once, in three languages", () => {
+  it("takes the language the evidence points to across every line", () => {
+    expect(readListLanguage(["200 g de harina", "4 huevos", "1 pizca de sal"])).toBe("es");
+  });
+});

@@ -10,6 +10,8 @@ import { GoodFoodClient } from "mcp-bbc-goodfood/client";
 import type { ClientOptions as GoodFoodClientOptions } from "mcp-bbc-goodfood/client";
 import { MarmitonClient } from "mcp-marmiton/client";
 import type { MarmitonClientOptions } from "mcp-marmiton/client";
+import { PequerecetasClient } from "mcp-pequerecetas/client";
+import type { ClientOptions as PequerecetasClientOptions } from "mcp-pequerecetas/client";
 import { PtitchefClient } from "mcp-ptitchef/client";
 import type { ClientOptions as PtitchefClientOptions } from "mcp-ptitchef/client";
 import { SupertoinetteClient } from "mcp-supertoinette/client";
@@ -27,6 +29,8 @@ import { GOODFOOD_PROFILE, goodfoodAdapter } from "./goodfood.js";
 import type { GoodFoodReader } from "./goodfood.js";
 import { MARMITON_PROFILE, marmitonAdapter } from "./marmiton.js";
 import type { MarmitonReader } from "./marmiton.js";
+import { PEQUERECETAS_PROFILE, pequerecetasAdapter } from "./pequerecetas.js";
+import type { PequerecetasReader } from "./pequerecetas.js";
 import { PTITCHEF_PROFILE, ptitchefAdapter } from "./ptitchef.js";
 import type { PtitchefReader } from "./ptitchef.js";
 import { SUPERTOINETTE_PROFILE, supertoinetteAdapter } from "./supertoinette.js";
@@ -46,6 +50,7 @@ export interface Readers {
   ptitchef?: PtitchefReader;
   goodfood?: GoodFoodReader;
   supertoinette?: SupertoinetteReader;
+  pequerecetas?: PequerecetasReader;
 }
 
 /**
@@ -54,31 +59,64 @@ export interface Readers {
  *
  * They are that reader's own defaults, repeated here because its options
  * require them. This server exposes no setting for either: a setting governing
- * one source out of five is one nobody can reason about, and the pacing,
+ * one source out of six is one nobody can reason about, and the pacing,
  * timeout and retry settings that do govern every source are the ones a caller
  * can move.
  */
 const PAGE_READ_BOUNDS = { maxBodyBytes: 8_000_000, budgetMs: 60_000 };
 
-export function buildSources(config: Config, readers: Readers, logger: Logger): SourceAdapter[] {
-  const shared = {
+/**
+ * The spacing a site imposes at home, which a setting here cannot go below.
+ *
+ * Each source publishes a floor of its own, and a client built with a
+ * configuration object takes the number it is handed: nothing downstream clamps
+ * it. So the floor is applied here, where the configuration meets the client,
+ * and one setting governing every source can only ever make this server more
+ * patient than the slowest of them asks for.
+ *
+ * A source absent from this table asks for no more than the shared default.
+ */
+const PACING_FLOOR_MS: Record<SourceId, number> = {
+  supertoinette: 3000,
+  pequerecetas: 3000,
+};
+
+/** The spacing one source is read at: the setting, or its own floor when that is higher. */
+export function pacingFor(source: SourceId, configured: number): number {
+  return Math.max(configured, PACING_FLOOR_MS[source] ?? 0);
+}
+
+/** The settings one source's client is handed, which is the shared set at that source's pace. */
+export function pacedConfig(config: Config, source: SourceId) {
+  return {
     userAgent: config.userAgent,
-    minIntervalMs: config.minIntervalMs,
+    minIntervalMs: pacingFor(source, config.minIntervalMs),
     timeoutMs: config.timeoutMs,
     maxRetries: config.maxRetries,
     cacheTtlMs: config.cacheTtlMs,
     cacheMaxEntries: config.cacheMaxEntries,
     logLevel: config.logLevel,
   };
+}
 
-  const marmitonOptions: MarmitonClientOptions = { config: shared };
-  const cookbookOptions: CookbookClientOptions = { config: shared };
+export function buildSources(config: Config, readers: Readers, logger: Logger): SourceAdapter[] {
+  const paced = (source: SourceId) => pacedConfig(config, source);
+
+  const marmitonOptions: MarmitonClientOptions = { config: paced(MARMITON_PROFILE.id) };
+  const cookbookOptions: CookbookClientOptions = { config: paced(COOKBOOK_PROFILE.id) };
   const ptitchefOptions: PtitchefClientOptions = {
-    config: { ...shared, ...PAGE_READ_BOUNDS },
+    config: { ...paced(PTITCHEF_PROFILE.id), ...PAGE_READ_BOUNDS },
     logger,
   };
-  const goodfoodOptions: GoodFoodClientOptions = { config: shared, logger };
-  const supertoinetteOptions: SupertoinetteClientOptions = { config: shared, logger };
+  const goodfoodOptions: GoodFoodClientOptions = { config: paced(GOODFOOD_PROFILE.id), logger };
+  const supertoinetteOptions: SupertoinetteClientOptions = {
+    config: paced(SUPERTOINETTE_PROFILE.id),
+    logger,
+  };
+  const pequerecetasOptions: PequerecetasClientOptions = {
+    config: paced(PEQUERECETAS_PROFILE.id),
+    logger,
+  };
 
   return [
     marmitonAdapter(readers.marmiton ?? new MarmitonClient(marmitonOptions)),
@@ -86,6 +124,7 @@ export function buildSources(config: Config, readers: Readers, logger: Logger): 
     ptitchefAdapter(readers.ptitchef ?? new PtitchefClient(ptitchefOptions)),
     goodfoodAdapter(readers.goodfood ?? new GoodFoodClient(goodfoodOptions)),
     supertoinetteAdapter(readers.supertoinette ?? new SupertoinetteClient(supertoinetteOptions)),
+    pequerecetasAdapter(readers.pequerecetas ?? new PequerecetasClient(pequerecetasOptions)),
   ];
 }
 
@@ -123,4 +162,5 @@ export const PROFILES = [
   PTITCHEF_PROFILE,
   GOODFOOD_PROFILE,
   SUPERTOINETTE_PROFILE,
+  PEQUERECETAS_PROFILE,
 ] as const;

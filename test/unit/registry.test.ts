@@ -29,8 +29,15 @@ describe("every source has a stand-in", () => {
 });
 
 describe("what the registry holds", () => {
-  it("reads the five sources, in its own order", () => {
-    expect(ids).toEqual(["marmiton", "cookbook", "ptitchef", "goodfood", "supertoinette"]);
+  it("reads the six sources, in its own order", () => {
+    expect(ids).toEqual([
+      "marmiton",
+      "cookbook",
+      "ptitchef",
+      "goodfood",
+      "supertoinette",
+      "pequerecetas",
+    ]);
   });
 
   it("publishes a profile for each, in that same order", () => {
@@ -41,7 +48,7 @@ describe("what the registry holds", () => {
     for (const source of registered) {
       expect(source.name).not.toBe("");
       expect(source.homeUrl).toMatch(/^https:\/\//);
-      expect(["fr", "en"]).toContain(source.language);
+      expect(["fr", "en", "es"]).toContain(source.language);
       expect(source.attribution).toContain(source.name);
     }
   });
@@ -55,7 +62,7 @@ describe("what the registry holds", () => {
 
 describe("choosing sources", () => {
   it("asks them all when none is named", () => {
-    expect(selectSources(registered, undefined)).toHaveLength(5);
+    expect(selectSources(registered, undefined)).toHaveLength(6);
   });
 
   it("accepts each id the registry publishes", () => {

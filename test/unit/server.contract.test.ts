@@ -157,6 +157,20 @@ describe("what each tool promises to return", () => {
     }
   });
 
+  it("says which of its two shapes get_recipe answered with", () => {
+    // The address one source publishes both at holds a recipe or an article
+    // gathering recipes, and only the field belonging to the answer is present.
+    expect(Object.keys(getRecipeOutput.shape)).toContain("kind");
+    expect(
+      getRecipeOutput.parse({
+        kind: "collection",
+        collection: undefined,
+        id_read_as: null,
+        notes: [],
+      }).recipe,
+    ).toBeUndefined();
+  });
+
   it("carries the per-source report on every tool that calls a source", () => {
     expect(Object.keys(searchRecipesOutput.shape)).toContain("per_source");
     expect(Object.keys(compareRecipesOutput.shape)).toContain("per_source");

@@ -18,7 +18,9 @@ import {
   labelNote,
   mustKeep,
   quoteForeign,
+  rowSchema,
   toIngredientPayload,
+  toRowPayload,
   truncate,
 } from "./shared.js";
 import type { Note } from "./shared.js";
@@ -85,7 +87,7 @@ export const recipeSchema = z.object({
   id: z.string(),
   source: z.string(),
   source_name: z.string(),
-  language: z.enum(["fr", "en"]).describe("The language this recipe is written in."),
+  language: z.enum(["fr", "en", "es"]).describe("The language this recipe is written in."),
   title: z.string(),
   url: z.string(),
   image_url: z.string().nullable(),
@@ -150,6 +152,44 @@ export const recipeSchema = z.object({
 });
 
 export type RecipePayload = z.infer<typeof recipeSchema>;
+
+/**
+ * An article that gathers recipes, served at the address a recipe lives at.
+ *
+ * One source publishes both there and describes them alike, so an answer says
+ * which came back. Rendering this as a recipe would offer a dish nobody can
+ * cook; dropping it would lose a listing worth following.
+ */
+export const collectionSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  source_name: z.string(),
+  title: z.string(),
+  url: z.string(),
+  image_url: z.string().nullable(),
+  headings: z
+    .array(z.string())
+    .describe("The headings the article is built from, in the order it prints them."),
+  recipes: z.array(rowSchema).describe("The recipes it points at, each readable with get_recipe."),
+  attribution: z.string().describe("Show this, with the url, when repeating anything from here."),
+});
+
+export type CollectionPayload = z.infer<typeof collectionSchema>;
+
+/** The article an address held, in the shape a tool returns. */
+export function buildCollectionView(recipe: RecipeDetail): CollectionPayload {
+  return {
+    id: recipe.id,
+    source: recipe.source,
+    source_name: recipe.sourceName,
+    title: recipe.title,
+    url: recipe.url,
+    image_url: recipe.imageUrl,
+    headings: recipe.gathers?.headings ?? [],
+    recipes: (recipe.gathers?.rows ?? []).map(toRowPayload),
+    attribution: recipe.attribution,
+  };
+}
 
 /** The sections a caller can ask for, since a full recipe is a lot of text. */
 export const SECTIONS = [
@@ -402,7 +442,13 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
   const notes: Note[] = [...yieldNotes, ...partNotes(recipe, wants)];
 
   const rounded = ingredients.filter((entry) => entry.scaling === "rounded");
-  const unscaled = ingredients.filter((entry) => entry.scaling === "unscaled");
+  const equipment = ingredients.filter((entry) => entry.isEquipment);
+  // A tool is counted apart from a line that simply carries no figure: the two
+  // are repeated as published for opposite reasons, and merging them would say
+  // this server found no quantity on a line where it found one and declined it.
+  const unscaled = ingredients.filter(
+    (entry) => entry.scaling === "unscaled" && !entry.isEquipment,
+  );
 
   if (rounded.length > 0) {
     notes.push(
@@ -413,6 +459,12 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
   if (unscaled.length > 0 && factor !== null && factor !== 1) {
     notes.push(
       `${unscaled.length} line(s) carry no quantity to multiply and are repeated as published.`,
+    );
+  }
+  if (equipment.length > 0) {
+    notes.push(
+      `${equipment.length} line(s) name a tool rather than an ingredient, which this site writes ` +
+        "among them. They were left as published: a recipe made for more people uses the same one.",
     );
   }
   if (recipe.license) {
