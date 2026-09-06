@@ -83,7 +83,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "mcp-bbc-goodfood": "^1.0.1",
     "mcp-marmiton": "^2.0.1",
-    "mcp-pequerecetas": "^1.0.0",
+    "mcp-pequerecetas": "^1.0.1",
     "mcp-ptitchef": "^1.0.1",
     "mcp-supertoinette": "^1.0.2",
     "mcp-wikibooks-cookbook": "^2.0.1",
