@@ -6,10 +6,11 @@ One question, several kitchens: every recipe source answered together.
 
 ## Description
 
-An MCP server for recipes. It reads Marmiton in French and the Wikibooks
-Cookbook in English, searches them at once for one merged list, reads either
-recipe in full, rescales it to any number of people, and puts the same dish side
-by side as each tradition writes it.
+An MCP server for recipes. It reads Marmiton, Ptitchef and Supertoinette in
+French, the Wikibooks Cookbook and BBC Good Food in English and Pequerecetas in
+Spanish, searches them at once for one merged list, reads any of their recipes
+in full, rescales it to any number of people, and puts the same dish side by
+side as each tradition writes it.
 
 The scaling is the part worth having. Multiplying every number by a factor
 produces "2.4 eggs" and "0.67 pinch of salt" with the same confidence as "267 g

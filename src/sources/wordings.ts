@@ -891,24 +891,40 @@ export function deriveWordings(question: string): Wording[] {
 }
 
 /**
- * Whether a row's title carries a word naming the dish that was asked for.
+ * Whether a row's title carries at least one of the words naming the dish.
  *
- * This decides whether a wording answered, and nothing else: no row is dropped
- * and no row is moved for failing it. A source that ranks on the words it was
- * handed answers a sentence with a page of recipes that share its framing
+ * This decides whether a wording answered and how rows are ordered, and nothing
+ * else: no row is dropped for failing it. A source that ranks on the words it
+ * was handed answers a sentence with a page of recipes that share its framing
  * words, and counting those as an answer would stop the search on the page that
  * proves it has not found the dish.
+ *
+ * One shared word makes a row worth offering. Whether the row is the dish is a
+ * different question, and `carriesDish` is the one that answers it.
  *
  * Diacritics and punctuation fold away, so "crêpes" reads the same as "crepes"
  * and a namespace in front of a page name settles nothing. A question that
  * names no dish has nothing to check against, and every row passes.
  */
-export function namesDish(title: string, question: string): boolean {
+export function sharesDishWord(title: string, question: string): boolean {
   const words = namingWords(question);
   if (words.length === 0) {
     return true;
   }
   return dishWordsMissing(title, question).length < words.length;
+}
+
+/**
+ * Whether a row's title carries every word naming the dish that was asked for.
+ *
+ * This is what a count of rows that are the dish may be built on. "Mousse au
+ * chocolat" shares a word with "gâteau au chocolat" and is a different dish, so
+ * a title has to carry all of them before an answer states it is the one asked
+ * for. A question that names no dish leaves nothing to go unanswered, and every
+ * row passes.
+ */
+export function carriesDish(title: string, question: string): boolean {
+  return dishWordsMissing(title, question).length === 0;
 }
 
 /**

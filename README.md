@@ -133,12 +133,12 @@ search says so, and `get_recipe` says what it read off the page.
 
 Searches every source with one question.
 
-| Argument           | Type                          | Required | What it does                                                     |
-| ------------------ | ----------------------------- | -------- | ---------------------------------------------------------------- |
-| `query`            | string, 1 to 200 characters   | yes      | The dish or the ingredient to look for.                          |
-| `limit_per_source` | integer, 1 to 25, default `5` | no       | Rows to keep from each source.                                   |
-| `sources`          | array of source ids           | no       | Ask these sources alone.                                         |
-| `fan_out`          | boolean, default `true`       | no       | Ask every source rather than stopping at the first that answers. |
+| Argument           | Type                          | Required | What it does                                                      |
+| ------------------ | ----------------------------- | -------- | ----------------------------------------------------------------- |
+| `query`            | string, 1 to 200 characters   | yes      | The dish or the ingredient to look for.                           |
+| `limit_per_source` | integer, 1 to 25, default `5` | no       | Rows to keep from each source.                                    |
+| `sources`          | array of source ids           | no       | Ask these sources alone.                                          |
+| `fan_out`          | boolean, default `true`       | no       | Also send each source shorter wordings derived from the question. |
 
 **In return:** `results`, rows carrying `id`, which `get_recipe` takes;
 `source` and `source_name` saying which site published the row; `title`; `url`;
@@ -508,12 +508,12 @@ page.
 
 Cherche dans toutes les sources avec une seule question.
 
-| Argument           | Type                             | Requis | Ce qu'il fait                                                           |
-| ------------------ | -------------------------------- | ------ | ----------------------------------------------------------------------- |
-| `query`            | chaîne, 1 à 200 caractères       | oui    | Le plat ou l'ingrédient cherché.                                        |
-| `limit_per_source` | entier, 1 à 25, défaut `5`       | non    | Lignes à garder de chaque source.                                       |
-| `sources`          | tableau d'identifiants de source | non    | N'interroger que ces sources.                                           |
-| `fan_out`          | booléen, défaut `true`           | non    | Interroger chaque source plutôt que s'arrêter à la première qui répond. |
+| Argument           | Type                             | Requis | Ce qu'il fait                                                                      |
+| ------------------ | -------------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| `query`            | chaîne, 1 à 200 caractères       | oui    | Le plat ou l'ingrédient cherché.                                                   |
+| `limit_per_source` | entier, 1 à 25, défaut `5`       | non    | Lignes à garder de chaque source.                                                  |
+| `sources`          | tableau d'identifiants de source | non    | N'interroger que ces sources.                                                      |
+| `fan_out`          | booléen, défaut `true`           | non    | Envoyer aussi à chaque source des formulations plus courtes tirées de la question. |
 
 **En retour :** `results`, des lignes portant `id`, que `get_recipe` reprend ;
 `source` et `source_name` qui disent quel site a publié la ligne ; `title` ;

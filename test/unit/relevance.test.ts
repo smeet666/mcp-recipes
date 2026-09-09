@@ -31,6 +31,54 @@ const offTopic = [
   },
 ];
 
+/** Rows that share one word of the dish and are not the dish. */
+const sharingOneWord = [
+  {
+    id: "3101",
+    title: "Mousse au chocolat",
+    url: "https://www.marmiton.org/recettes/recette_r_3101.aspx",
+    imageUrl: null,
+    description: null,
+  },
+  {
+    id: "3102",
+    title: "Fondant au chocolat",
+    url: "https://www.marmiton.org/recettes/recette_r_3102.aspx",
+    imageUrl: null,
+    description: null,
+  },
+];
+
+describe("a row sharing one word of the dish", () => {
+  it("is not counted as carrying the dish", async () => {
+    const payload = payloadOf(
+      await runSearchRecipes(
+        fakeClient({ ...onlyFrom("marmiton"), marmiton: { rows: sharingOneWord } }),
+        searchArgs({ query: "gâteau au chocolat" }),
+      ),
+    );
+
+    const marmiton = payload.per_source.find((report: any) => report.source === "marmiton");
+    expect(marmiton.count, "the rows are still offered").toBe(2);
+    expect(
+      marmiton.names_the_dish,
+      "neither title is a gâteau, and the field states how many are the dish",
+    ).toBe(0);
+  });
+
+  it("is not called a recipe for the dish", async () => {
+    const text = textOf(
+      await runSearchRecipes(
+        fakeClient({ ...onlyFrom("marmiton"), marmiton: { rows: sharingOneWord } }),
+        searchArgs({ query: "gâteau au chocolat" }),
+      ),
+    );
+
+    expect(text).toMatch(/rows for "gâteau au chocolat"/);
+    expect(text).not.toMatch(/recipes for "gâteau au chocolat"/);
+  });
+});
+
 describe("rows that do not name the dish", () => {
   it("are not called recipes for it", async () => {
     const text = textOf(

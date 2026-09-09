@@ -33,7 +33,12 @@ import { resolveId } from "./ids.js";
 import type { ResolvedId } from "./ids.js";
 import { buildSources, pacingFor, selectSources } from "./registry.js";
 import type { Readers } from "./registry.js";
-import { MAX_WORDINGS_PER_SOURCE, deriveWordings, namesDish } from "./wordings.js";
+import {
+  MAX_WORDINGS_PER_SOURCE,
+  carriesDish,
+  deriveWordings,
+  sharesDishWord,
+} from "./wordings.js";
 import type { Wording } from "./wordings.js";
 
 export type { SourceAdapter, ReadRecipe, ReadRows } from "./adapter.js";
@@ -191,7 +196,7 @@ function reportOf(attempt: Attempt, rows: RecipeRow[], question: string): Source
     preferredByName: attempt.preferredByName,
     // Counted over the rows this answer holds, so it is read against `count`
     // and never against a number of rows nobody was shown.
-    namesTheDish: rows.filter((row) => namesDish(row.title, question)).length,
+    namesTheDish: rows.filter((row) => carriesDish(row.title, question)).length,
   };
 }
 
@@ -231,7 +236,7 @@ function keepNewRows<T extends { id: string; title: string }>(
     seen.add(row.id);
     rows.push(row);
     added += 1;
-    if (namesDish(row.title, question)) {
+    if (sharesDishWord(row.title, question)) {
       onTopic += 1;
     }
   }
@@ -498,8 +503,8 @@ export class RecipesClient {
     // returned for a dish it does not hold arrive in its own order and the
     // first of them reads as the answer. This is an order over one source's own
     // rows, and never a score against another source.
-    const onTopicRows = rows.filter((row) => namesDish(row.title, question));
-    const ordered = [...onTopicRows, ...rows.filter((row) => !namesDish(row.title, question))];
+    const onTopicRows = rows.filter((row) => sharesDishWord(row.title, question));
+    const ordered = [...onTopicRows, ...rows.filter((row) => !sharesDishWord(row.title, question))];
 
     // A source that answered one wording answered. Reporting it as failed
     // because a later wording timed out would hide the rows it did return

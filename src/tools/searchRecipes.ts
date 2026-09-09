@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import type { RecipesClient } from "../sources/client.js";
-import { namesDish, readConditions } from "../sources/wordings.js";
+import { readConditions, sharesDishWord } from "../sources/wordings.js";
 import type { ConditionKind } from "../sources/wordings.js";
 import type { SourceId } from "../types.js";
 import {
@@ -243,7 +243,7 @@ export async function runSearchRecipes(
     // A source ranking a title on the letters it opens with answers "chameau"
     // with a chapeau and three châteaux. The rows are what the sources offered,
     // and a reader shown them without a word about it takes them for the dish.
-    if (results.length > 0 && !results.some((row) => namesDish(row.title, args.query))) {
+    if (results.length > 0 && !results.some((row) => sharesDishWord(row.title, args.query))) {
       notes.push(
         `No title here carries a word of "${args.query}". These rows are what the sources ranked ` +
           "for that spelling, so read them as candidates to check rather than as recipes for the dish.",
