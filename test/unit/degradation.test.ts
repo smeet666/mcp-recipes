@@ -30,6 +30,7 @@ import {
   textOf,
   recipeArgs,
   compareArgs,
+  searchArgs,
 } from "./support.js";
 
 /** A reader answering in a shape no source publishes. */
@@ -122,6 +123,36 @@ describe("a recipe a site sent in a shape this server cannot read", () => {
 
     const read = await client.getRecipe("cookbook:Cookbook:Crepes");
     expect(read.recipe.ingredients).toEqual(["500 ml milk"]);
+  });
+});
+
+describe("a source that answered one wording and failed a later one", () => {
+  const args = () => searchArgs({ query: "je cherche une recette de tarte tatin" });
+  const options = () => ({
+    ...onlyFrom("marmiton"),
+    marmiton: {
+      rows: [],
+      failLaterSearches: new FakeSourceError("timeout", "marmiton took too long to answer"),
+    },
+  });
+
+  it("says a wording failed rather than letting the absence stand alone", async () => {
+    const text = textOf(await runSearchRecipes(fakeClient(options()), args()));
+
+    expect(
+      text,
+      "an absence stated over a wording nobody could send is an absence nobody established",
+    ).toMatch(/could not be sent|did not answer|failed/i);
+  });
+
+  it("carries the failure in the payload as well as in the text", async () => {
+    const payload = payloadOf(await runSearchRecipes(fakeClient(options()), args())) as {
+      per_source: Array<{ source: string; wordings: Array<{ error: unknown }> }>;
+    };
+
+    const marmiton = payload.per_source.find((report) => report.source === "marmiton");
+    const failed = marmiton?.wordings.filter((attempt) => attempt.error !== null) ?? [];
+    expect(failed.length, "a wording did fail").toBeGreaterThan(0);
   });
 });
 

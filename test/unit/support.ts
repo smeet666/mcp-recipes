@@ -468,6 +468,8 @@ export interface FakeOptions {
   marmiton?: {
     /** Fails everything this source is asked. */
     fail?: Error;
+    /** Fails every search after the first, so one wording answers and a later one does not. */
+    failLaterSearches?: Error;
     /** Fails only the read of one recipe, so a search still offers a row. */
     failRecipe?: Error;
     rows?: MarmitonSummary[];
@@ -515,10 +517,15 @@ export interface FakeOptions {
 }
 
 export function fakeMarmiton(options: NonNullable<FakeOptions["marmiton"]> = {}): MarmitonReader {
+  let searches = 0;
   return {
     async search() {
       if (options.fail) {
         throw options.fail;
+      }
+      searches += 1;
+      if (options.failLaterSearches && searches > 1) {
+        throw options.failLaterSearches;
       }
       return { data: options.rows ?? marmitonRows, cached: options.cached ?? false };
     },

@@ -265,9 +265,25 @@ export function labelNote(label: string, note: Note): Note {
 function answeredNotes(report: SourceReport): Note[] {
   const notes: Note[] = [];
   const sent = report.wordings.filter((attempt) => attempt.ran && attempt.error === null);
+  const failed = report.wordings.filter((attempt) => attempt.error !== null);
 
   if (report.count === 0) {
     notes.push(nothingOfferedNote(report, sent));
+  }
+  // A source that answered one wording carries the rows it returned, and a
+  // later wording that failed carries no absence. Saying only what the wordings
+  // that ran established would let a read that broke pass for a corpus that
+  // holds nothing.
+  if (failed.length > 0) {
+    notes.push(
+      mustKeep(
+        `${report.name} did not answer ${failed
+          .map((attempt) => `"${quoteForeign(attempt.query)}" ([${attempt.error?.code}])`)
+          .join(", ")}, so nothing here is a statement about ${
+          failed.length > 1 ? "those wordings" : "that wording"
+        }.`,
+      ),
+    );
   }
   if (sent.length > 1) {
     notes.push(
