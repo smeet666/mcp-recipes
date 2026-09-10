@@ -35,7 +35,7 @@ import type { Note, ToolResult } from "./shared.js";
 export const getRecipeDescription = [
   "Read one recipe in full: its ingredients, its steps, what it yields, and whatever times, rating and nutrition its source publishes.",
   "'id' must come from search_recipes. It names the source, so this reads the right one without guessing; an identifier no source would have minted is refused, because sending it anywhere would answer about the wrong dish.",
-  "Pass 'servings' to rescale. Quantities land where a kitchen can follow them: an egg stays whole, anything that pours or cuts can halve, a small measurement moves to a smaller unit before it is rounded, and anything unmultipliable is flagged rather than scaled.",
+  "Pass 'servings' to rescale. Quantities land where a kitchen can follow them: an egg stays whole, anything that pours or cuts can halve, a small measurement moves to a smaller unit before it is rounded, and anything unmultipliable comes back flagged.",
   "A page that states no number of servings comes back as published and says so, because dividing by a yield nobody wrote would answer for a number of people the page never claimed.",
   "Read 'kind' first. Some sources publish articles gathering other recipes at the same kind of address as a recipe, and such an answer carries 'collection' with the recipes it points at and no 'recipe' at all: there is nothing to cook from that page, and the recipes it lists are read with get_recipe.",
   "A part this answer holds nothing for says which of two things happened: the page showed no sign of it, or this server failed to read what the page carries. An empty ingredient list is never evidence that an ingredient is absent from the dish.",

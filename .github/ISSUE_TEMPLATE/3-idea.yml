@@ -22,7 +22,7 @@ body:
   - type: textarea
     id: source
     attributes:
-      label: Where the data lives on marmiton.org or en.wikibooks.org
+      label: Which site holds the data, and where on it
       description: A link to a page that shows it, if you know one.
   - type: checkboxes
     id: offer

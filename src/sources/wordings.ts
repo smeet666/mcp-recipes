@@ -57,9 +57,9 @@ export const MAX_WORDINGS_PER_SOURCE = 3;
 /**
  * Words that frame a question rather than name what is cooked.
  *
- * Both languages are applied to every question. Telling them apart would need a
- * detector, and a detector that guesses wrong strips the wrong words; the two
- * lists barely overlap, and where they do the word frames a question in both.
+ * All three languages are applied to every question. Telling them apart would
+ * need a detector, and a detector that guesses wrong strips the wrong words; the
+ * lists barely overlap, and where they do the word frames a question in each.
  *
  * A word is left out of these lists wherever it is also something a person
  * eats. French "son" is a possessive and is also bran, so it stays. The same
@@ -712,8 +712,8 @@ function readQuestion(question: string): ReadQuestion {
  * follows: "allergique aux noix", "allergic to peanuts", "free of dairy". With
  * no such word the food is the one the marker was written onto the end of:
  * "peanut allergy", "lactose intolerant", "gluten free". The two orders belong
- * to the two languages these sources publish in, so reading only one of them
- * leaves every question written in the other unread.
+ * to the languages these sources publish in, so reading only one of them leaves
+ * every question written the other way round unread.
  *
  * Read the wrong way round, a marker takes a word out of the dish and leaves
  * the food being avoided in the search, which is both halves of the harm at

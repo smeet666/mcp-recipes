@@ -314,11 +314,11 @@ Each site keeps its own pace, and the floors hold here as well.
 
 ## Pacing and attribution
 
-Each site is paced on its own, one request at a time with at least a second
-between two, and the floor of half a second holds however the server is
-configured. Two of the sites ask for more, three seconds between two requests,
-and they get it: a setting posted for every source can raise a site's spacing
-and never lower it. Asking every site at once therefore costs each of them one request,
+Each site is paced on its own, one request at a time. Every site holds a floor
+of its own that no configuration goes under: half a second for Marmiton and the
+Cookbook, one second for Ptitchef and BBC Good Food, three seconds for
+Supertoinette and Pequerecetas. A setting posted for every source can raise a
+site's spacing and never lower it. Asking every site at once therefore costs each of them one request,
 never two. The `User-Agent` always ends with the project identity and an address
 where a person can be reached.
 
@@ -695,11 +695,11 @@ Chaque site garde son propre rythme, et les planchers tiennent également ici.
 
 ## Rythme et attribution
 
-Chaque site est cadencé pour lui-même, une requête à la fois avec au moins une
-seconde entre deux, et le plancher d'une demi-seconde tient quelle que soit la
-configuration. Deux des sites en demandent davantage, trois secondes entre deux
-requêtes, et ils l'obtiennent : un réglage posé pour toutes les sources peut
-élargir l'écart d'un site, jamais le réduire. Les interroger toutes à la fois coûte donc à chacune une requête,
+Chaque site est cadencé pour lui-même, une requête à la fois. Chaque site tient
+un plancher qui lui est propre et sous lequel aucune configuration ne descend :
+une demi-seconde pour Marmiton et le Cookbook, une seconde pour Ptitchef et BBC
+Good Food, trois secondes pour Supertoinette et Pequerecetas. Un réglage posé
+pour toutes les sources peut élargir l'écart d'un site, jamais le réduire. Les interroger toutes à la fois coûte donc à chacune une requête,
 jamais deux. Le `User-Agent` se termine toujours par l'identité du projet et une
 adresse où joindre une personne.
 

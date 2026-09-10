@@ -13,8 +13,9 @@ treat that as a best effort rather than a service commitment.
 
 ## What is in scope
 
-This server is a read-only client for public recipe websites, currently
-marmiton.org and en.wikibooks.org. It holds no credentials, needs no API key,
+This server is a read-only client for public recipe websites: marmiton.org,
+ptitchef.com, supertoinette.com, en.wikibooks.org through api.wikimedia.org,
+bbcgoodfood.com and pequerecetas.com. It holds no credentials, needs no API key,
 opens no port, and writes nothing back. That rules out most of what a vulnerability report usually concerns.
 
 What remains is worth reporting:
