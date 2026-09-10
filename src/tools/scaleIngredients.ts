@@ -28,9 +28,7 @@ export const scaleIngredientsInput = strictInput({
     .array(z.string().max(500))
     .min(1)
     .max(200)
-    .describe(
-      "The lines as written, one ingredient each, such as '200 g de farine' or '3 eggs'. One line, not a whole recipe.",
-    ),
+    .describe("The lines as written, one ingredient each, such as '200 g de farine' or '3 eggs'."),
   factor: z
     .number()
     .gt(0)

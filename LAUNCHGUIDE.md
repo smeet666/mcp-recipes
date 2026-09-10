@@ -18,7 +18,7 @@ flour", which is arithmetically correct and useless in a kitchen. Here an egg st
 because half of one means beating it and weighing the result; anything that
 pours, weighs or cuts halves; a spoonful shrinks into the smaller spoon before
 it is rounded; and a pinch keeps whatever size a hand gives it while its count
-is multiplied. One list can hold French lines and English lines at
+is multiplied. One list can hold French, English and Spanish lines at
 once, and each comes back written the way its own language writes numbers,
 plurals and measures.
 
@@ -67,14 +67,14 @@ Lifestyle & Food
 - "Read the Marmiton crêpes recipe for 12 people"
 - "Scale this list to 30 people: 250 g de farine, 4 oeufs, une pincée de sel"
 - "What does the Cookbook ask for in a Victoria sponge, for 6?"
-- Tool: search_recipes — Searches every source at once and returns one merged list
-- Tool: get_recipe — Reads one recipe, optionally rescaled
-- Tool: scale_ingredients — Scales a list from anywhere, offline, in French, English or Spanish
-- Tool: compare_recipes — One dish, as each source writes it
+- Tool: search_recipes: Searches every source at once and returns one merged list
+- Tool: get_recipe: Reads one recipe, optionally rescaled
+- Tool: scale_ingredients: Scales a list from anywhere, offline, in French, English or Spanish
+- Tool: compare_recipes: One dish, as each source writes it
 
 ## Tags
 
-recipes, cooking, marmiton, wikibooks, cookbook, ingredient-scaling, bilingual, french, english, no-api-key
+recipes, cooking, marmiton, ptitchef, supertoinette, wikibooks, cookbook, bbc-good-food, pequerecetas, ingredient-scaling, french, english, spanish, no-api-key
 
 ## Documentation URL
 

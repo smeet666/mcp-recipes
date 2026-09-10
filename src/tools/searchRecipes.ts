@@ -69,7 +69,7 @@ export const searchRecipesDescription = [
   "Ask in a whole sentence if that is the question. These indexes answer the words they are handed, so a sentence is also sent as the words naming the dish and as the dish word alone, and the rows are the union; 'per_source' lists every wording and what it returned.",
   "What the question says the recipe must not hold is set aside from those shorter wordings rather than searched for, and named back in the notes: a negation, an allergy stated as one, a diet named in one word, and the number of people at the table. No source filters on any of it, so open a row with get_recipe and read the ingredient list before calling it suitable.",
   "A condition is read with the food on whichever side of it the sentence put one, so 'allergique aux noix' and 'peanut allergy' both name the nut. Where a sentence puts a food on neither side, the notes say a condition was stated and that its food was not read, because naming the wrong word would hide a dish and search for the food being avoided at once.",
-  "Rows are interleaved one source at a time rather than ranked, because the sources share no score that could order them against each other.",
+  "Rows are interleaved one source at a time, since the sources share no score that could order them against each other.",
 ].join(" ");
 
 export const searchRecipesInput = strictInput({

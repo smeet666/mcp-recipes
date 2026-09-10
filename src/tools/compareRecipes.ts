@@ -55,7 +55,7 @@ export const compareRecipesDescription = [
   "Each source's closest match is read in full, and all of them can be rescaled to the same number of servings so the ingredient lists stand comparison.",
   "The answer states what differs and leaves it there: the quantities each asks for, what each measures in, what each yields, and which fields each source publishes at all.",
   "No version is ranked above another. Some sources carry reader ratings and some have no author and no rating by nature, so there is no score they share.",
-  "When only one source answers, the answer says so and shows that one rather than presenting part of a comparison as the whole of it.",
+  "When only one source answers, the answer names that source and shows its version, so a single version is read as the one it is.",
 ].join(" ");
 
 export const compareRecipesInput = strictInput({

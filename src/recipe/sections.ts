@@ -7,8 +7,8 @@
  * about this server, and only the page can say whether there was anything to
  * read.
  *
- * Both languages the pages are written in are recognised here, since a heading
- * belongs to a page rather than to the corpus it sits in.
+ * Every language these pages are written in is recognised here, since a heading
+ * belongs to the page that carries it.
  */
 
 /** The parts of a recipe a page announces with a heading of its own. */

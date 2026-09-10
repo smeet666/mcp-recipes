@@ -32,7 +32,7 @@ body:
     id: expected
     attributes:
       label: What it should have said, and how you know
-      description: A link to the marmiton.org or en.wikibooks.org page is usually the shortest proof.
+      description: A link to the page on the site the answer came from is usually the shortest proof.
     validations:
       required: true
   - type: input

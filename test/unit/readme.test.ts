@@ -29,6 +29,8 @@ const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
   version: string;
 };
 
+const SPELLED: Record<number, string> = { 1: "one", 2: "two", 3: "three" };
+
 const FRENCH_TITLE = `# ${pkg.name} (français)`;
 const splitAt = readme.indexOf(FRENCH_TITLE);
 const english = readme.slice(0, splitAt === -1 ? readme.length : splitAt);
@@ -279,6 +281,30 @@ describe("the settings", () => {
       expect(loadConfig({ [name]: announced }), `${name} announces ${announced}`).toEqual(
         untouched,
       );
+    }
+  });
+});
+
+describe("what the README says about pacing", () => {
+  const registrySource = readFileSync(join(ROOT, "src", "sources", "registry.ts"), "utf8");
+
+  it("names every spacing the registry holds a source to", () => {
+    const opens = registrySource.indexOf("PACING_FLOOR_MS");
+    const table = registrySource.slice(opens, registrySource.indexOf("};", opens));
+    const floors = new Set(
+      [...table.matchAll(/^\s*\w+:\s*([\d_]+),/gm)].map((found) =>
+        Number((found[1] ?? "").replaceAll("_", "")),
+      ),
+    );
+
+    expect(floors.size, "the registry paces its sources at more than one speed").toBeGreaterThan(1);
+    for (const floor of floors) {
+      const seconds = floor / 1000;
+      const said =
+        seconds === 0.5
+          ? /half a second/
+          : new RegExp(`\\b(${seconds}|${SPELLED[seconds] ?? seconds})\\b`);
+      expect(readme, `a floor of ${floor} ms is one a reader is never told about`).toMatch(said);
     }
   });
 });
