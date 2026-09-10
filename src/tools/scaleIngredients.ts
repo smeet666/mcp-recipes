@@ -187,7 +187,10 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
 
     return ok(
       {
-        factor: statedFactor(factor),
+        // The multiplier the quantities were worked out with, so a caller
+        // recomputing one from it lands where this answer landed. The block
+        // below states a shortened one, which is for reading.
+        factor,
         language: args.language,
         ingredients: scaled.map(toIngredientPayload),
         ...counts,
