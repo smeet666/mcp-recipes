@@ -56,12 +56,12 @@ describe("a row sharing one word of the dish", () => {
         fakeClient({ ...onlyFrom("marmiton"), marmiton: { rows: sharingOneWord } }),
         searchArgs({ query: "gâteau au chocolat" }),
       ),
-    );
+    ) as { per_source: Array<{ source: string; count: number; names_the_dish: number }> };
 
-    const marmiton = payload.per_source.find((report: any) => report.source === "marmiton");
-    expect(marmiton.count, "the rows are still offered").toBe(2);
+    const marmiton = payload.per_source.find((report) => report.source === "marmiton");
+    expect(marmiton?.count, "the rows are still offered").toBe(2);
     expect(
-      marmiton.names_the_dish,
+      marmiton?.names_the_dish,
       "neither title is a gâteau, and the field states how many are the dish",
     ).toBe(0);
   });

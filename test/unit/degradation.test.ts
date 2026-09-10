@@ -146,10 +146,12 @@ describe("a source that answered one wording and failed a later one", () => {
   });
 
   it("carries the failure in the payload as well as in the text", async () => {
-    const payload = payloadOf(await runSearchRecipes(fakeClient(options()), args()));
+    const payload = payloadOf(await runSearchRecipes(fakeClient(options()), args())) as {
+      per_source: Array<{ source: string; wordings: Array<{ error: unknown }> }>;
+    };
 
-    const marmiton = payload.per_source.find((report: any) => report.source === "marmiton");
-    const failed = marmiton.wordings.filter((attempt: any) => attempt.error !== null);
+    const marmiton = payload.per_source.find((report) => report.source === "marmiton");
+    const failed = marmiton?.wordings.filter((attempt) => attempt.error !== null) ?? [];
     expect(failed.length, "a wording did fail").toBeGreaterThan(0);
   });
 });
