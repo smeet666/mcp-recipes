@@ -54,10 +54,11 @@ function howTheRowsAreOrdered(contributed: ReadonlyArray<{ name: string }>): str
  * about the world, and a caller cannot tell them apart from an empty list.
  */
 function nothingCameBack(answeredCount: number, query: string, alsoSent: string): string {
+  const asked = quoteForeign(query);
   if (answeredCount === 0) {
-    return `No source answered for "${query}", so nothing here says whether such a recipe exists.`;
+    return `No source answered for "${asked}", so nothing here says whether such a recipe exists.`;
   }
-  return `Nothing came back for "${query}".${alsoSent}`;
+  return `Nothing came back for "${asked}".${alsoSent}`;
 }
 
 export const searchRecipesDescription = [
@@ -245,7 +246,7 @@ export async function runSearchRecipes(
     // and a reader shown them without a word about it takes them for the dish.
     if (results.length > 0 && !results.some((row) => sharesDishWord(row.title, args.query))) {
       notes.push(
-        `No title here carries a word of "${args.query}". These rows are what the sources ranked ` +
+        `No title here carries a word of "${quoteForeign(args.query)}". These rows are what the sources ranked ` +
           "for that spelling, so read them as candidates to check rather than as recipes for the dish.",
       );
     }
@@ -286,7 +287,7 @@ export async function runSearchRecipes(
     const anyNamesTheDish = merged.reports.some((report) => report.namesTheDish > 0);
     const body =
       results.length > 0
-        ? `${results.length} ${anyNamesTheDish ? "recipes" : "rows"} for "${args.query}":\n${renderRows(results)}${alsoSent}`
+        ? `${results.length} ${anyNamesTheDish ? "recipes" : "rows"} for "${quoteForeign(args.query)}":\n${renderRows(results)}${alsoSent}`
         : nothingCameBack(answered.length, args.query, alsoSent);
 
     return ok(

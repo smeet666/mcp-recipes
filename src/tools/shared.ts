@@ -653,7 +653,7 @@ export function truncate(text: string, maxChars: number): string {
 export function renderRows(rows: z.infer<typeof rowSchema>[]): string {
   return rows
     .map((row, index) => {
-      const head = `${index + 1}. ${quoteForeign(row.title)} · ${quoteForeign(row.source_name)} · id: ${row.id}`;
+      const head = `${index + 1}. ${quoteForeign(row.title)} · ${quoteForeign(row.source_name)} · id: ${quoteForeign(row.id)}`;
       // The address goes on its own line: a client that renders only text has
       // nothing else to cite from, and a model with an identifier and no link
       // will build one.
