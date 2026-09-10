@@ -1157,7 +1157,7 @@ function takeEquivalents(
  *
  * Three ways a line says it. Without a measure, the words behind the count
  * carry the mass. With a partitive, "une dinde de 3 kg" writes the noun where a
- * measure stands and the partitive takes it for one — a noun the vocabulary
+ * measure stands and the partitive takes it for one. A noun the vocabulary
  * lists as a measure keeps counting, since a pot is a thing to buy more of,
  * while a noun read as a measure only for standing there names the food itself.
  * And "12 oz can tomatoes" qualifies the tin, leaving how many tins unwritten.
