@@ -188,9 +188,16 @@ export async function runGetRecipe(
       if (entry.is_equipment) {
         return `- ${quoteForeign(entry.text)} (a tool)`;
       }
-      return entry.scaling === "unscaled"
-        ? `- ${quoteForeign(entry.text)} (no quantity)`
-        : `- ${quoteForeign(entry.text)}`;
+      if (entry.scaling !== "unscaled") {
+        return `- ${quoteForeign(entry.text)}`;
+      }
+      // A line comes back unmultiplied for two reasons, and they are different
+      // facts about it: the line carries no figure, or it carries one this
+      // server declined to multiply and said why. The payload distinguishes
+      // them with a note, and the block a caller reads says the same thing.
+      return entry.note
+        ? `- ${quoteForeign(entry.text)} (${quoteForeign(entry.note)})`
+        : `- ${quoteForeign(entry.text)} (no quantity)`;
     });
     const stepLines = payload.steps.map((step, index) => `${index + 1}. ${quoteForeign(step)}`);
 

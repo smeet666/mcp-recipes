@@ -301,7 +301,7 @@ describe("an answer says what it did not do", () => {
 
   it("says when a line carried nothing to multiply", () => {
     const result = runScaleIngredients({ ingredients: ["sel"], factor: 2, language: "auto" });
-    expect(textOf(result)).toMatch(/carry no quantity to multiply/);
+    expect(textOf(result)).toMatch(/came back as given/);
   });
 
   it("says that an approximate measure kept its own size", () => {
