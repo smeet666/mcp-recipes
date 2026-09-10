@@ -161,6 +161,12 @@ function withDeadline<T>(work: Promise<T>, ms: number, source: SourceAdapter): P
     );
     // A pending timer must not hold the process open once the answer is out.
     timer.unref?.();
+    // The race abandons the read; it does not stop it. None of the readers
+    // takes a signal from here, so the work carries on reaching the site and
+    // holding that source's turn until it finishes on its own. This is why the
+    // deadline is sized to cover what a reader spends rather than trimmed: one
+    // that fires early leaves a request in flight behind an answer nobody
+    // waits for.
   });
   return Promise.race([work, alarm]).finally(() => clearTimeout(timer));
 }
