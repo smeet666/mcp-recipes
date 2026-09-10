@@ -16,6 +16,8 @@ import type { Language } from "../recipe/language.js";
 import type { RecipeDetail, RecipeRow, SourceId, SourceProfile } from "../types.js";
 
 const NUMBER_AND_REST = /^\s*(\d+(?:[.,]\d+)?)\s*(.*)$/;
+/** A figure a page introduces with a word, as in "Makes 12 muffins". */
+const NUMBER_INSIDE = /^\D*?(\d+(?:[.,]\d+)?)\s*(.*)$/;
 const RANGE_AND_REST =
   /^\s*(\d+(?:[.,]\d+)?)\s*(?:à|a|to|-|–|—|ou|or)\s*(\d+(?:[.,]\d+)?)\s*(.*)$/i;
 
@@ -168,6 +170,18 @@ export function readYieldSpan(published: string | null): {
     const value = Number(figure.replace(",", "."));
     if (Number.isFinite(value)) {
       return { count: value, max: null, unit: text(single[2]) };
+    }
+  }
+
+  // A page that introduces its figure with a word still names what it counts:
+  // "Makes 12 muffins" measures muffins, and rescaling it to a number of eaters
+  // would put six people to six muffins without saying so.
+  const inside = NUMBER_INSIDE.exec(published);
+  if (inside) {
+    const [figure = ""] = inside.slice(1);
+    const value = Number(figure.replace(",", "."));
+    if (Number.isFinite(value)) {
+      return { count: value, max: null, unit: text(inside[2]) };
     }
   }
 

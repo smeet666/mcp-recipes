@@ -320,8 +320,16 @@ export class RecipesClient {
    */
   private deadlineFor(source: SourceId): number {
     const attempts = this.config.maxRetries + 1;
-    const between = pacingFor(source, this.config.minIntervalMs) + LONGEST_WAIT_BETWEEN_TRIES_MS;
-    return this.config.timeoutMs * attempts + between * this.config.maxRetries;
+    // The two waits are counted over different numbers of turns. A reader waits
+    // for its slot before every attempt, the first one included, so the spacing
+    // is counted once per attempt: counting it per retry leaves the first wait
+    // outside the deadline, and with no retry configured leaves all of it
+    // outside, so the guard fires while this server is holding its own request
+    // back and reports the site as having failed to answer. The backoff only
+    // falls between two attempts, so it is counted per retry.
+    const spacing = pacingFor(source, this.config.minIntervalMs) * attempts;
+    const backoff = LONGEST_WAIT_BETWEEN_TRIES_MS * this.config.maxRetries;
+    return this.config.timeoutMs * attempts + spacing + backoff;
   }
 
   /**

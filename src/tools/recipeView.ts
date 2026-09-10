@@ -570,17 +570,23 @@ export function buildRecipeView(recipe: RecipeDetail, options: BuildOptions): Re
     attribution: recipe.attribution,
     sections_returned: [...options.sections],
     sections_omitted: omitted,
-    scaling_summary: {
-      // A tool line is counted apart, so the four counts add up to the lines in
-      // the list. It carries "unscaled" like a line with no figure on it, and
-      // merging the two would say this server found no quantity where it found
-      // one and declined it.
-      scaled_count: ingredients.filter((entry) => entry.scaling === "scaled" && !entry.isEquipment)
-        .length,
-      rounded_count: rounded.length,
-      unscaled_count: unscaled.length,
-      equipment_count: equipment.length,
-    },
+    // The counts are over the lines this answer carries. Counting the lines a
+    // recipe holds while the list is empty would say the answer scaled and
+    // returned them.
+    scaling_summary: wants("ingredients")
+      ? {
+          // A tool line is counted apart, so the four counts add up to the lines
+          // in the list. It carries "unscaled" like a line with no figure on it,
+          // and merging the two would say this server found no quantity where it
+          // found one and declined it.
+          scaled_count: ingredients.filter(
+            (entry) => entry.scaling === "scaled" && !entry.isEquipment,
+          ).length,
+          rounded_count: rounded.length,
+          unscaled_count: unscaled.length,
+          equipment_count: equipment.length,
+        }
+      : { scaled_count: 0, rounded_count: 0, unscaled_count: 0, equipment_count: 0 },
   };
 
   if (options.label) {
