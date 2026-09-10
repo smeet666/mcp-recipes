@@ -5,6 +5,15 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     environment: "node",
     globals: false,
+    /**
+     * The vocabulary modules build their tables as they are imported, and that
+     * cost is charged to whichever test runs first in a file. Four seconds of it
+     * on an idle machine is most of the default bound before a test has done
+     * anything, so a loaded runner spends the bound on the import. This one
+     * still catches a test that hangs, and stops catching the machine it runs
+     * on.
+     */
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       reporter: ["text-summary", "json-summary"],
