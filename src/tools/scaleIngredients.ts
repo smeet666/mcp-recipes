@@ -157,7 +157,7 @@ export function runScaleIngredients(args: ScaleIngredientsArgs): ToolResult {
     }
     if (counts.unscaled_count > 0) {
       notes.push(
-        `${counts.unscaled_count} line(s) carry no quantity to multiply and are repeated as given.`,
+        `${counts.unscaled_count} line(s) came back as given: they carry no figure to multiply, or one this server declined to multiply and named on the line itself.`,
       );
     }
     if (counts.equipment_count > 0) {
