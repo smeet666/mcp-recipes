@@ -148,8 +148,10 @@ export function marmitonAdapter(reader: MarmitonReader): SourceAdapter {
         skipped,
         // Rows on the page, including the ones this server could not read: the
         // site saw them, and reporting only the readable ones would understate
-        // what it holds.
-        reportedTotal: rows.length + skipped,
+        // what it holds. A page carrying none is a page this server counted
+        // nothing on, and "Marmiton reported 0" is a sentence Marmiton never
+        // said.
+        reportedTotal: rows.length + skipped === 0 ? null : rows.length + skipped,
         reportedTotalMeans:
           "rows on the single page of results Marmiton serves; the site disallows paging, so this is not a catalogue count",
         cached: outcome.cached,

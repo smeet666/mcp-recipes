@@ -43,9 +43,14 @@ import type { ToolResult } from "./shared.js";
  * A version that was offered and could not be read is a different statement
  * from no source offering one at all: the first says the dish is out there.
  */
-function nothingWasCompared(someWereUnread: boolean, dish: string): string {
+function nothingWasCompared(someWereUnread: boolean, dish: string, answeredCount: number): string {
   if (someWereUnread) {
     return `Every version of "${quoteForeign(dish)}" that was offered could not be read, so nothing was compared.`;
+  }
+  // A source that never answered has said nothing about what it holds, and
+  // calling that an absence states the one thing this call did not establish.
+  if (answeredCount === 0) {
+    return `No source answered for "${quoteForeign(dish)}", so nothing here says whether such a recipe exists.`;
   }
   return `No source offered a recipe for "${quoteForeign(dish)}".`;
 }
@@ -488,7 +493,11 @@ export async function runCompareRecipes(
 
     const body =
       payloads.length === 0
-        ? nothingWasCompared(unread.size > 0, args.dish)
+        ? nothingWasCompared(
+            unread.size > 0,
+            args.dish,
+            merged.reports.filter((report) => report.error === null).length,
+          )
         : versionBlocks.join("\n\n");
 
     // What differs comes first. It is the answer to the question that was

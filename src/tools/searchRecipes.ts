@@ -255,7 +255,11 @@ export async function runSearchRecipes(
     // search that failed. Each source also says for itself that it offered no
     // row, and where there are several of those the per-source lines crowd the
     // block; this is the line the answer cannot be read safely without.
-    if (results.length === 0 && answered.length === merged.reports.length) {
+    // A source that answered with rows this server could not read has said
+    // nothing about its corpus, so it cannot stand among those that answered
+    // and hold nothing.
+    const allReadable = merged.reports.every((report) => report.skipped === 0);
+    if (results.length === 0 && answered.length === merged.reports.length && allReadable) {
       notes.push(
         mustKeep(
           "Every source answered and none holds anything under this wording. Try the dish's name in another language, or name a main ingredient instead.",
