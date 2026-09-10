@@ -54,16 +54,24 @@ export interface Readers {
 }
 
 /**
- * Two bounds one of the readers takes that the rest do not: the largest page it
- * will read, and the time it gives a whole read including its retries.
+ * The largest page any reader here will hold.
  *
- * They are that reader's own defaults, repeated here because its options
- * require them. This server exposes no setting for either: a setting governing
- * one source out of six is one nobody can reason about, and the pacing,
- * timeout and retry settings that do govern every source are the ones a caller
- * can move.
+ * A deadline abandons a body that arrives slowly. One that arrives quickly and
+ * large is never abandoned by it, and it lands in memory in one piece before
+ * anything looks at it. Every source is read under this, so a caller reasons
+ * about one number rather than about which source it asked.
  */
-const PAGE_READ_BOUNDS = { maxBodyBytes: 8_000_000, budgetMs: 60_000 };
+const MAX_BODY_BYTES = 8_000_000;
+
+/**
+ * The time one reader gives a whole read including its retries.
+ *
+ * That reader's own default, repeated here because its options require it.
+ * This server exposes no setting for it: a setting governing one source out of
+ * six is one nobody can reason about, and the pacing, timeout and retry
+ * settings that do govern every source are the ones a caller can move.
+ */
+const PTITCHEF_BUDGET_MS = 60_000;
 
 /**
  * The spacing each site imposes at home, which a setting here cannot go below.
@@ -112,6 +120,7 @@ export function pacedConfig(config: Config, source: SourceId) {
     minIntervalMs: pacingFor(source, config.minIntervalMs),
     timeoutMs: config.timeoutMs,
     maxRetries: config.maxRetries,
+    maxBodyBytes: MAX_BODY_BYTES,
     cacheTtlMs: config.cacheTtlMs,
     cacheMaxEntries: config.cacheMaxEntries,
     logLevel: config.logLevel,
@@ -124,7 +133,7 @@ export function buildSources(config: Config, readers: Readers, logger: Logger): 
   const marmitonOptions: MarmitonClientOptions = { config: paced(MARMITON_PROFILE.id) };
   const cookbookOptions: CookbookClientOptions = { config: paced(COOKBOOK_PROFILE.id) };
   const ptitchefOptions: PtitchefClientOptions = {
-    config: { ...paced(PTITCHEF_PROFILE.id), ...PAGE_READ_BOUNDS },
+    config: { ...paced(PTITCHEF_PROFILE.id), budgetMs: PTITCHEF_BUDGET_MS },
     logger,
   };
   const goodfoodOptions: GoodFoodClientOptions = { config: paced(GOODFOOD_PROFILE.id), logger };
