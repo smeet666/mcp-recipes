@@ -32,7 +32,9 @@ const TOOLS = ["search_recipes", "get_recipe", "scale_ingredients", "compare_rec
 
 describe("what the server offers", () => {
   it("registers exactly the four tools", () => {
-    expect(Object.keys(registered()).sort()).toEqual([...TOOLS].sort());
+    expect(Object.keys(registered()).sort((a, b) => Number(a > b) - Number(a < b))).toEqual(
+      [...TOOLS].sort((a, b) => Number(a > b) - Number(a < b)),
+    );
   });
 
   it("declares every tool as read-only and non-destructive", () => {
