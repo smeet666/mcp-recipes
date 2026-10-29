@@ -744,10 +744,9 @@ describe("the union of what came back", () => {
       await runSearchRecipes(client, searchArgs({ query: "ceviche", limit_per_source: 5 })),
     );
 
-    expect(payload.results.map((row) => row.id).sort()).toEqual([
-      "cookbook:Cookbook:Ceviche",
-      "marmiton:Ceviche",
-    ]);
+    expect(
+      payload.results.map((row) => row.id).sort((a, b) => Number(a > b) - Number(a < b)),
+    ).toEqual(["cookbook:Cookbook:Ceviche", "marmiton:Ceviche"]);
   });
 
   it("calls the order its own rather than any source's judgement of relevance", async () => {

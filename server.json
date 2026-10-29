@@ -19,12 +19,12 @@
     "url": "https://github.com/smeet666/mcp-recipes",
     "source": "github"
   },
-  "version": "4.0.0",
+  "version": "4.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-recipes",
-      "version": "4.0.0",
+      "version": "4.1.0",
       "transport": {
         "type": "stdio"
       },
@@ -68,8 +68,8 @@
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/smeet666/mcp-recipes/releases/download/v4.0.0/mcp-recipes-4.0.0.mcpb",
-      "version": "4.0.0",
+      "identifier": "https://github.com/smeet666/mcp-recipes/releases/download/v4.1.0/mcp-recipes-4.1.0.mcpb",
+      "version": "4.1.0",
       "transport": {
         "type": "stdio"
       }

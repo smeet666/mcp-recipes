@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.1.0
+
+- **Node.js 24.22.1 or later**, inside the Node.js 24 line. The package, the
+  extension manifest and the image all declare it.
+- **zod `^4.6.7`.** Below 4.6.6, zod can exhaust memory while
+  validating oversized constrained collections, and the range accepts none of
+  those versions.
+- **Dependency floors:** `@modelcontextprotocol/sdk` `^1.32.2`, `mcp-bbc-goodfood` `^1.1.0`, `mcp-marmiton` `^2.1.0`, `mcp-pequerecetas` `^1.1.0`, `mcp-supertoinette` `^1.1.0`, `mcp-wikibooks-cookbook` `^2.1.0`.
+
 ## 4.0.0
 
 - **The published client entry renames a field on `SourceProfile` and
