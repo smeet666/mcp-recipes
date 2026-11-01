@@ -81,12 +81,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "mcp-bbc-goodfood": "^1.1.0",
-    "mcp-marmiton": "^2.1.0",
-    "mcp-pequerecetas": "^1.1.0",
-    "mcp-ptitchef": "^1.0.2",
-    "mcp-supertoinette": "^1.1.0",
-    "mcp-wikibooks-cookbook": "^2.1.0",
+    "mcp-bbc-goodfood": "^1.2.0",
+    "mcp-marmiton": "^2.2.0",
+    "mcp-pequerecetas": "^1.2.0",
+    "mcp-ptitchef": "^1.1.0",
+    "mcp-supertoinette": "^1.2.0",
+    "mcp-wikibooks-cookbook": "^2.2.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
